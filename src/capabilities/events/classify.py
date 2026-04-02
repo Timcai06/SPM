@@ -17,12 +17,18 @@ import json
 import re
 import argparse
 import subprocess
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
-from task1_rule_config import (
+
+SRC_ROOT = Path(__file__).resolve().parents[2]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from capabilities.events.rules import (
     DURATION_DEFAULT,
     DURATION_ENUM,
     DURATION_RULES,
@@ -66,7 +72,7 @@ from task1_rule_config import (
 )
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 INPUT_PATH = ROOT / "data" / "demo_news.csv"
 OUTPUT_DIR = ROOT / "output"
 RAW_OUTPUT_PATH = OUTPUT_DIR / "raw_event_candidates.csv"
@@ -346,7 +352,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_outputs_to_postgres(db_name: str) -> None:
-    loader_path = ROOT / "src" / "task1_load_db.py"
+    loader_path = ROOT / "src" / "capabilities" / "storage" / "load_task1.py"
     subprocess.run(
         ["python3", str(loader_path), "--db", db_name, "--quiet"],
         check=True,

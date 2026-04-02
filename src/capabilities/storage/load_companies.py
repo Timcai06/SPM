@@ -11,7 +11,7 @@ from pathlib import Path
 import psycopg
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = "stock_event_mining"
 DEFAULT_SEED = ROOT / "data" / "companies_seed.csv"
 

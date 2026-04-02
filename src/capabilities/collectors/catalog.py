@@ -9,6 +9,7 @@ def write_source_catalog(path: Path) -> None:
         ["事件数据", "政策类事件", "中国政府网", "https://www.gov.cn/", "已自动接入", "gov 采集器"],
         ["事件数据", "政策类事件", "国家发展改革委官网", "https://www.ndrc.gov.cn/", "已自动接入", "ndrc 采集器"],
         ["事件数据", "政策类事件", "证监会官网", "https://www.csrc.gov.cn/", "已自动接入", "csrc 采集器"],
+        ["事件数据", "政策类事件", "工信部官网", "https://www.miit.gov.cn/", "已自动接入", "miit 采集器"],
         ["事件数据", "公司行为事件", "巨潮资讯网", "https://www.cninfo.com.cn/", "已自动接入", "cninfo 采集器"],
         ["事件数据", "公司行为事件", "上交所官网", "https://www.sse.com.cn/", "已自动接入", "sse 采集器"],
         ["事件数据", "公司行为事件", "深交所官网", "https://www.szse.cn/", "已自动接入", "szse 采集器"],
@@ -33,4 +34,3 @@ def write_source_catalog(path: Path) -> None:
         writer = csv.writer(f)
         writer.writerow(["data_group", "source_category", "source_name", "url", "status", "note"])
         writer.writerows(rows)
-

@@ -25,6 +25,7 @@
 - 东方财富行业频道：行业资讯
 - 36 氪产业板块：股市快讯
 - 财新网：宏观/地缘新闻（mini 列表）
+- 工信部官网：政策文件
 
 ### 已登记待接入
 
@@ -45,7 +46,7 @@
 
 一条文本要被识别为“事件”，至少要满足以下判断逻辑之一：
 
-当前规则已冻结到 `src/task1_rule_config.py`（`RULE_VERSION=task1_rules_v1`），
+当前规则已冻结到 `src/capabilities/events/rules.py`（`RULE_VERSION=task1_rules_v1`），
 `is_event` 采用统一阈值判定：`event_score >= event_threshold`。
 在 `raw_event_candidates.csv` 中会落字段：`event_score`、`event_threshold`、`rule_version`、`evidence`。
 
@@ -149,8 +150,9 @@
 
 采集层已按“源插件化”拆分：
 
-- 统一入口：`src/task1_collect.py`
-- 源采集器：`src/collectors/*.py`（每个真实源一个文件）
-- 来源目录生成：`src/collectors/catalog.py`
+- 统一入口：`src/capabilities/collectors/run.py`
+- 源采集器：`src/capabilities/collectors/*.py`（每个真实源一个文件）
+- 来源目录生成：`src/capabilities/collectors/catalog.py`
+- 采集执行报告：`output/collector_report.csv` / `output/collector_report.json`
 
 新增来源时，只需新增一个采集器并在入口注册，不再把所有抓取逻辑堆在单文件。

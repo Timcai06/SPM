@@ -15,23 +15,29 @@
 - 东方财富行业资讯采集结果：`data/source_eastmoney.csv`
 - 36 氪股市快讯采集结果：`data/source_36kr.csv`
 - 财新网采集结果：`data/source_caixin.csv`
+- 工信部政策采集结果：`data/source_miit.csv`
 - 手工补录模板：`data/manual_news.csv`
 - 输出原始判定结果：`output/raw_event_candidates.csv`
 - 输出标准化事件表：`output/structured_events.csv`
-- 任务 1 采集脚本：`src/task1_collect.py`
-- 任务 1 采集器目录：`src/collectors/`
-- 任务 1 分类与特征提取：`src/task1_classify.py`
-- 任务 1 冻结规则配置：`src/task1_rule_config.py`
-- 任务 1 入库脚本：`src/task1_load_db.py`
-- 任务 1 校验脚本：`src/task1_check.py`
-- 任务 1 可视化页面：`src/task1_view.py`
-- 任务 1 一键总入口：`src/task1_run.py`
+- 任务 1 采集入口：`src/capabilities/collectors/run.py`
+- 任务 1 采集器目录：`src/capabilities/collectors/`
+- 任务 1 分类与特征提取：`src/capabilities/events/classify.py`
+- 任务 1 冻结规则配置：`src/capabilities/events/rules.py`
+- 任务 1 入库脚本：`src/capabilities/storage/load_task1.py`
+- 任务 1 校验脚本：`src/capabilities/quality/check.py`
+- 任务 1 质量评估脚本：`src/capabilities/quality/quality_report.py`
+- 任务 1 特征-收益初步分析：`src/capabilities/analysis/feature_return.py`
+- 任务 1 可视化页面：`src/apps/view.py`
+- 任务 1 一键总入口：`src/pipelines/task1.py`
+- 任务 1 统一命令入口：`src/cli/task1.py`
 - 任务 2 表结构：`sql/create_task2_tables.sql`
 - 任务 1 规范说明：`docs_task1.md`
+- 任务 1 规则说明（答辩版）：`docs_task1_rulebook.md`
 - 附录 2 来源目录：`data/appendix2_sources.csv`
-- 公司导入脚本：`src/load_companies_to_postgres.py`
-- 事件-公司关联打分脚本：`src/generate_event_company_links.py`
-- 任务 2 一键入口：`src/run_task2_workflow.py`
+- 公司导入脚本：`src/capabilities/storage/load_companies.py`
+- 事件-公司关联打分脚本：`src/capabilities/linking/link_events.py`
+- 任务 2 一键入口：`src/pipelines/task2.py`
+- 任务 2 统一命令入口：`src/cli/task2.py`
 
 ## 已覆盖的任务 1 能力
 
@@ -56,14 +62,14 @@
 ## 运行方式
 
 ```bash
-python3 src/task1_classify.py
-python3 src/task1_check.py
+python3 src/cli/task1.py classify
+python3 src/cli/task1.py check
 ```
 
 推荐直接用一键总入口：
 
 ```bash
-python3 src/task1_run.py --limit 8
+python3 src/cli/task1.py run --limit 8
 ```
 
 这条命令会自动执行：
@@ -76,7 +82,7 @@ python3 src/task1_run.py --limit 8
 任务 2 最小闭环：
 
 ```bash
-python3 src/run_task2_workflow.py --db stock_event_mining --top-k 3 --min-score 0.35
+python3 src/cli/task2.py run --db stock_event_mining --top-k 3 --min-score 0.35
 ```
 
 这条命令会自动执行：
@@ -84,19 +90,19 @@ python3 src/run_task2_workflow.py --db stock_event_mining --top-k 3 --min-score 
 - 对 `structured_events` 做最小关联打分
 - 把结果写入 `event_company_links`
 
-默认情况下，`task1_classify.py` 在写出 CSV 后会继续把结果直接写入 PostgreSQL 的 `stock_event_mining` 数据库。
+默认情况下，`task1 classify` 在写出 CSV 后会继续把结果直接写入 PostgreSQL 的 `stock_event_mining` 数据库。
 
 如果只想生成 CSV、不入库：
 
 ```bash
-python3 src/task1_classify.py --skip-db-load
+python3 src/cli/task1.py classify --skip-db-load
 ```
 
 采集实时政府网数据并与样例/手工录入合并运行：
 
 ```bash
-python3 src/task1_collect.py --limit 8
-python3 src/task1_classify.py \
+python3 src/cli/task1.py collect --limit 8
+python3 src/capabilities/events/classify.py \
   --input data/demo_news.csv \
   --input data/source_gov.csv \
   --input data/source_ndrc.csv \
@@ -108,8 +114,21 @@ python3 src/task1_classify.py \
   --input data/source_eastmoney.csv \
   --input data/source_36kr.csv \
   --input data/source_caixin.csv \
+  --input data/source_miit.csv \
   --input data/manual_news.csv
-python3 src/task1_check.py
+python3 src/cli/task1.py check
+```
+
+生成任务1质量抽样与质量报告：
+
+```bash
+python3 src/cli/task1.py quality --sample-size 30
+```
+
+生成任务1“特征与股价影响”初步统计报告：
+
+```bash
+python3 src/cli/task1.py feature --db stock_event_mining --min-link-score 0.35
 ```
 
 ## 直观看表
@@ -123,7 +142,7 @@ psql -d stock_event_mining
 本地网页查看：
 
 ```bash
-python3 -m streamlit run src/task1_view.py
+python3 src/cli/task1.py view
 ```
 
 如果 `streamlit` 不在 PATH，可直接这样启动。
@@ -147,6 +166,7 @@ python3 -m streamlit run src/task1_view.py
 - 东方财富行业资讯抓取结果
 - 36 氪股市快讯抓取结果
 - 财新网 mini 列表抓取结果
+- 工信部政策列表抓取结果
 
 样例数据用于验证流程能跑通，包含：
 

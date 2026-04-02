@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = "stock_event_mining"
 CLASSIFY_INPUT_FILES = [
     "data/demo_news.csv",
@@ -22,6 +22,7 @@ CLASSIFY_INPUT_FILES = [
     "data/source_eastmoney.csv",
     "data/source_36kr.csv",
     "data/source_caixin.csv",
+    "data/source_miit.csv",
     "data/manual_news.csv",
 ]
 
@@ -48,7 +49,7 @@ def run(cmd: list[str]) -> None:
 
 
 def build_classify_cmd(db: str) -> list[str]:
-    cmd = ["python3", "src/task1_classify.py", "--db", db]
+    cmd = ["python3", "src/capabilities/events/classify.py", "--db", db]
     for input_file in CLASSIFY_INPUT_FILES:
         cmd.extend(["--input", input_file])
     return cmd
@@ -58,12 +59,12 @@ def main() -> None:
     args = parse_args()
 
     if not args.skip_collect:
-        run(["python3", "src/task1_collect.py", "--limit", str(args.limit)])
+        run(["python3", "src/capabilities/collectors/run.py", "--limit", str(args.limit)])
 
     run(build_classify_cmd(args.db))
 
     if not args.skip_validate:
-        run(["python3", "src/task1_check.py"])
+        run(["python3", "src/capabilities/quality/check.py"])
 
     print(f"Task 1 workflow completed for database: {args.db}")
 

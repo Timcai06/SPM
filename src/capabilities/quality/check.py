@@ -4,11 +4,17 @@
 from __future__ import annotations
 
 import csv
+import sys
 from pathlib import Path
-from task1_rule_config import DURATION_ENUM, EVENT_SUBJECT_ENUM, IMPACT_SCOPE_ENUM, INDUSTRY_ENUM, PREDICTABILITY_ENUM, RULE_VERSION
+
+SRC_ROOT = Path(__file__).resolve().parents[2]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from capabilities.events.rules import DURATION_ENUM, EVENT_SUBJECT_ENUM, IMPACT_SCOPE_ENUM, INDUSTRY_ENUM, PREDICTABILITY_ENUM, RULE_VERSION
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 RAW_OUTPUT_PATH = ROOT / "output" / "raw_event_candidates.csv"
 STRUCTURED_OUTPUT_PATH = ROOT / "output" / "structured_events.csv"
 

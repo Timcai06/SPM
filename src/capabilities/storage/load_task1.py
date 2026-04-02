@@ -13,7 +13,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 RAW_SOURCE_FILES = [
     ROOT / "data" / "demo_news.csv",
     ROOT / "data" / "source_gov.csv",
@@ -26,6 +26,7 @@ RAW_SOURCE_FILES = [
     ROOT / "data" / "source_eastmoney.csv",
     ROOT / "data" / "source_36kr.csv",
     ROOT / "data" / "source_caixin.csv",
+    ROOT / "data" / "source_miit.csv",
     ROOT / "data" / "manual_news.csv",
 ]
 RAW_CANDIDATES_PATH = ROOT / "output" / "raw_event_candidates.csv"

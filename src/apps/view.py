@@ -54,7 +54,7 @@ def main() -> None:
             """
         )
         st.subheader("Summary")
-        st.dataframe(summary, use_container_width=True, hide_index=True)
+        st.dataframe(summary, width="stretch", hide_index=True)
 
         st.subheader("Raw Documents")
         raw_docs = load_dataframe(
@@ -67,7 +67,7 @@ def main() -> None:
             """,
             (limit,),
         )
-        st.dataframe(raw_docs, use_container_width=True, hide_index=True)
+        st.dataframe(raw_docs, width="stretch", hide_index=True)
 
         st.subheader("Event Candidates")
         candidates = load_dataframe(
@@ -81,7 +81,7 @@ def main() -> None:
             """,
             (limit,),
         )
-        st.dataframe(candidates, use_container_width=True, hide_index=True)
+        st.dataframe(candidates, width="stretch", hide_index=True)
 
         st.subheader("Structured Events")
         conditions = []
@@ -106,7 +106,7 @@ def main() -> None:
             """,
             tuple(params),
         )
-        st.dataframe(events, use_container_width=True, hide_index=True)
+        st.dataframe(events, width="stretch", hide_index=True)
 
         st.subheader("Companies")
         companies = load_dataframe(
@@ -119,7 +119,7 @@ def main() -> None:
             """,
             (limit,),
         )
-        st.dataframe(companies, use_container_width=True, hide_index=True)
+        st.dataframe(companies, width="stretch", hide_index=True)
 
         st.subheader("Event Company Links")
         links = load_dataframe(
@@ -142,7 +142,7 @@ def main() -> None:
             """,
             (limit,),
         )
-        st.dataframe(links, use_container_width=True, hide_index=True)
+        st.dataframe(links, width="stretch", hide_index=True)
 
     conn.close()
 

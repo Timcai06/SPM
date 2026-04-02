@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = "stock_event_mining"
 
 
@@ -26,11 +26,11 @@ def run(cmd: list[str]) -> None:
 
 def main() -> None:
     args = parse_args()
-    run(["python3", "src/load_companies_to_postgres.py", "--db", args.db])
+    run(["python3", "src/capabilities/storage/load_companies.py", "--db", args.db])
     run(
         [
             "python3",
-            "src/generate_event_company_links.py",
+            "src/capabilities/linking/link_events.py",
             "--db",
             args.db,
             "--top-k",
