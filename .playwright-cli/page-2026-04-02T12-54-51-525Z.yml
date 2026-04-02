@@ -1,0 +1,380 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5]:
+    - link "个人中心" [ref=e7] [cursor=pointer]:
+      - /url: https://www.szse.cn/application/passCenter/pass/
+    - generic [ref=e8] [cursor=pointer]: 子站链接
+    - link "English" [ref=e11] [cursor=pointer]:
+      - /url: http://www.szse.cn/English/index.html
+    - link "繁体中文" [ref=e14] [cursor=pointer]:
+      - /url: https://big5.szse.cn/site/cht/www.szse.cn/disclosure/listed/notice/
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - link "深交所" [ref=e18] [cursor=pointer]:
+        - /url: http://www.szse.cn
+        - img "深交所" [ref=e19]
+      - paragraph [ref=e21]: 公诚勤廉 专实勇毅
+      - generic [ref=e23]:
+        - searchbox "请输入关键字" [ref=e24]
+        - button "" [ref=e25] [cursor=pointer]:
+          - generic [ref=e26]: 
+    - navigation [ref=e27]:
+      - generic [ref=e28]:
+        - link "我的定制" [ref=e30] [cursor=pointer]:
+          - /url: https://www.szse.cn/application/userCenter/customize/
+          - text: 我的定制
+        - list [ref=e34]:
+          - listitem [ref=e35]:
+            - link "首页" [ref=e36] [cursor=pointer]:
+              - /url: /index/index.html
+          - listitem [ref=e37]:
+            - link "党的建设" [ref=e38] [cursor=pointer]:
+              - /url: /partybuidling/index.html
+          - listitem [ref=e39]:
+            - link "发行上市" [ref=e40] [cursor=pointer]:
+              - /url: /listing/index.html
+          - listitem [ref=e41]:
+            - link "信息披露" [ref=e42] [cursor=pointer]:
+              - /url: /disclosure/index.html
+          - listitem [ref=e43]:
+            - link "市场数据" [ref=e44] [cursor=pointer]:
+              - /url: /market/index.html
+          - listitem [ref=e45]:
+            - link "法律规则" [ref=e46] [cursor=pointer]:
+              - /url: /lawrules/index.html
+          - listitem [ref=e47]:
+            - link "市场服务" [ref=e48] [cursor=pointer]:
+              - /url: /marketServices/index.html
+          - listitem [ref=e49]:
+            - link "关于本所" [ref=e50] [cursor=pointer]:
+              - /url: /aboutus/index.html
+  - text:                                                                                                                                                                         
+  - generic [ref=e51]:
+    - img [ref=e53]
+    - generic [ref=e55]:
+      - heading "上市公司公告" [level=2] [ref=e56]
+      - paragraph [ref=e57]:
+        - img [ref=e58]
+        - text: 位置：
+        - link "信息披露" [ref=e59] [cursor=pointer]:
+          - /url: ../../
+        - text: /
+        - link "上市公司信息" [ref=e60] [cursor=pointer]:
+          - /url: javascript:void(0);
+        - text: /
+        - link "上市公司公告" [ref=e61] [cursor=pointer]:
+          - /url: ./
+  - generic [ref=e63]:
+    - generic [ref=e65]:
+      - heading "信息披露" [level=2] [ref=e66]
+      - list [ref=e68]:
+        - listitem [ref=e69]:
+          - link "交易备忘" [ref=e70] [cursor=pointer]:
+            - /url: ../../../disclosure/memo/index.html
+            - generic [ref=e71]: 交易备忘
+        - listitem [ref=e72]:
+          - generic [ref=e74] [cursor=pointer]: 本所公告
+        - listitem [ref=e76]:
+          - generic [ref=e78] [cursor=pointer]: 交易信息
+        - listitem [ref=e80]:
+          - generic [ref=e82] [cursor=pointer]: 融资融券
+        - listitem [ref=e84]:
+          - generic [ref=e86] [cursor=pointer]: 监管信息公开
+        - listitem [ref=e88]:
+          - generic [ref=e90] [cursor=pointer]: 上市公司信息
+          - list [ref=e92]:
+            - listitem [ref=e93]:
+              - link "上市公司公告" [ref=e94] [cursor=pointer]:
+                - /url: ../../../disclosure/listed/notice/index.html
+                - generic [ref=e95]: 上市公司公告
+            - listitem [ref=e96]:
+              - link "质量回报双提升" [ref=e97] [cursor=pointer]:
+                - /url: ../../../disclosure/listed/quality/index.html
+                - generic [ref=e98]: 质量回报双提升
+            - listitem [ref=e99]:
+              - link "定期报告" [ref=e100] [cursor=pointer]:
+                - /url: ../../../disclosure/listed/fixed/index.html
+                - generic [ref=e101]: 定期报告
+            - listitem [ref=e102]:
+              - link "当日公告摘要" [ref=e103] [cursor=pointer]:
+                - /url: ../../../disclosure/listed/summary/index.html
+                - generic [ref=e104]: 当日公告摘要
+            - listitem [ref=e105]:
+              - link "风险警示板" [ref=e106] [cursor=pointer]:
+                - /url: ../../../disclosure/listed/warn/index.html
+                - generic [ref=e107]: 风险警示板
+            - listitem [ref=e108]:
+              - link "独立董事信息库" [ref=e109] [cursor=pointer]:
+                - /url: ../../../disclosure/listed/director/index.html
+                - generic [ref=e110]: 独立董事信息库
+            - listitem [ref=e111]:
+              - link "董事会秘书信息库" [ref=e112] [cursor=pointer]:
+                - /url: ../../../disclosure/listed/secretary/index.html
+                - generic [ref=e113]: 董事会秘书信息库
+            - listitem [ref=e114]:
+              - link "限售股份解限与减持" [ref=e115] [cursor=pointer]:
+                - /url: ../../../disclosure/listed/reduction/index.html
+                - generic [ref=e116]: 限售股份解限与减持
+            - listitem [ref=e117]:
+              - generic [ref=e119] [cursor=pointer]: 上市公司诚信档案
+            - listitem [ref=e121]:
+              - generic [ref=e123] [cursor=pointer]: 持续督导意见
+        - listitem [ref=e125]:
+          - generic [ref=e127] [cursor=pointer]: 基金信息
+        - listitem [ref=e129]:
+          - generic [ref=e131] [cursor=pointer]: 债券信息
+        - listitem [ref=e133]:
+          - link "权证信息" [ref=e134] [cursor=pointer]:
+            - /url: ../../../disclosure/warrant/index.html
+            - generic [ref=e135]: 权证信息
+        - listitem [ref=e136]:
+          - generic [ref=e138] [cursor=pointer]: 会员创新产品
+        - listitem [ref=e140]:
+          - link "固定收益产品" [ref=e141] [cursor=pointer]:
+            - /url: https://bond.szse.cn
+            - generic [ref=e142]: 固定收益产品
+        - listitem [ref=e143]:
+          - link "大湾区债券平台" [ref=e144] [cursor=pointer]:
+            - /url: https://bond.szse.cn/bayarea/index/index.html
+            - generic [ref=e145]: 大湾区债券平台
+    - generic [ref=e146]:
+      - generic:
+        - generic:
+          - iframe [ref=e147]:
+            
+          - paragraph:
+            - generic: loading
+        - generic:
+          - heading "上市公司公告" [level=4]
+        - generic:
+          - paragraph: 免责声明：本系统竭力保证所提供的证券市场信息准确可靠，但并不担保（无论是明示、默示、法定或其他形式）其准确性和完整性。任何使用方不得就全部或部分使用中的证券市场信息作为依据并对由此而引起的任何损失向本所提出索赔。
+  - contentinfo [ref=e148]:
+    - generic [ref=e150]:
+      - generic [ref=e151]:
+        - link "相关链接 " [ref=e155] [cursor=pointer]:
+          - /url: "#dropdown-menu-1"
+          - generic [ref=e156]: 相关链接
+          - generic [ref=e158]: 
+        - generic [ref=e160]:
+          - link "投资者热线" [ref=e161] [cursor=pointer]:
+            - /url: /marketServices/investor/service/index.html
+          - text: 400-808-9999
+        - generic [ref=e164]:
+          - img "扫一扫关注" [ref=e166] [cursor=pointer]
+          - link "微博" [ref=e167] [cursor=pointer]:
+            - /url: http://weibo.com/szse
+            - img "微博" [ref=e168]
+          - img "扫一扫下载深交所官网APP" [ref=e170] [cursor=pointer]
+          - generic [ref=e171] [cursor=pointer]: 意见反馈
+      - generic [ref=e172]:
+        - generic [ref=e173]:
+          - generic [ref=e174]:
+            - heading "党的建设" [level=5] [ref=e175]
+            - list [ref=e176]:
+              - listitem [ref=e177]:
+                - link "中央精神" [ref=e178] [cursor=pointer]:
+                  - /url: /partybuidling/iptpoint/index.html
+              - listitem [ref=e179]:
+                - link "党建要闻" [ref=e180] [cursor=pointer]:
+                  - /url: /partybuidling/pbnews/index.html
+              - listitem [ref=e181]:
+                - link "红色证券展" [ref=e182] [cursor=pointer]:
+                  - /url: https://res.static.szse.cn/simple/dist/index.html
+          - generic [ref=e183]:
+            - heading "发行上市" [level=5] [ref=e184]
+            - list [ref=e185]:
+              - listitem [ref=e186]:
+                - link "审核公告通知" [ref=e187] [cursor=pointer]:
+                  - /url: /listing/announcement/notification/index.html
+              - listitem [ref=e188]:
+                - link "审核信息披露" [ref=e189] [cursor=pointer]:
+                  - /url: /listing/disclosure/ipo/index.html
+              - listitem [ref=e190]:
+                - link "审核项目动态" [ref=e191] [cursor=pointer]:
+                  - /url: /listing/projectdynamic/ipo/index.html
+              - listitem [ref=e192]:
+                - link "关于上市审核中心" [ref=e193] [cursor=pointer]:
+                  - /url: /listing/about/function/index.html
+        - generic [ref=e195]:
+          - heading "信息披露" [level=5] [ref=e196]
+          - list [ref=e197]:
+            - listitem [ref=e198]:
+              - link "交易备忘" [ref=e199] [cursor=pointer]:
+                - /url: /disclosure/memo/index.html
+            - listitem [ref=e200]:
+              - link "本所公告" [ref=e201] [cursor=pointer]:
+                - /url: /disclosure/notice/general/index.html
+            - listitem [ref=e202]:
+              - link "交易信息" [ref=e203] [cursor=pointer]:
+                - /url: /disclosure/deal/public/index.html
+            - listitem [ref=e204]:
+              - link "融资融券" [ref=e205] [cursor=pointer]:
+                - /url: /disclosure/margin/business/index.html
+            - listitem [ref=e206]:
+              - link "监管信息公开" [ref=e207] [cursor=pointer]:
+                - /url: /disclosure/supervision/dynamic/index.html
+            - listitem [ref=e208]:
+              - link "上市公司信息" [ref=e209] [cursor=pointer]:
+                - /url: /disclosure/listed/notice/index.html
+            - listitem [ref=e210]:
+              - link "基金信息" [ref=e211] [cursor=pointer]:
+                - /url: /disclosure/fund/notice/index.html
+            - listitem [ref=e212]:
+              - link "债券信息" [ref=e213] [cursor=pointer]:
+                - /url: /disclosure/bond/notice/index.html
+            - listitem [ref=e214]:
+              - link "权证信息" [ref=e215] [cursor=pointer]:
+                - /url: /disclosure/warrant/index.html
+            - listitem [ref=e216]:
+              - link "会员创新产品" [ref=e217] [cursor=pointer]:
+                - /url: /disclosure/innovate/asset/product/index.html
+            - listitem [ref=e218]:
+              - link "固定收益产品" [ref=e219] [cursor=pointer]:
+                - /url: https://bond.szse.cn
+            - listitem [ref=e220]:
+              - link "大湾区债券平台" [ref=e221] [cursor=pointer]:
+                - /url: https://bond.szse.cn/bayarea/index/index.html
+        - generic [ref=e223]:
+          - heading "市场数据" [level=5] [ref=e224]
+          - list [ref=e225]:
+            - listitem [ref=e226]:
+              - link "市场总貌" [ref=e227] [cursor=pointer]:
+                - /url: /market/overview/index.html
+            - listitem [ref=e228]:
+              - link "深市指数" [ref=e229] [cursor=pointer]:
+                - /url: /market/exponent/pandect/index.html
+            - listitem [ref=e230]:
+              - link "股票数据" [ref=e231] [cursor=pointer]:
+                - /url: /market/stock/indicator/index.html
+            - listitem [ref=e232]:
+              - link "基金数据" [ref=e233] [cursor=pointer]:
+                - /url: /market/fund/dealSurvey/daily/index.html
+            - listitem [ref=e234]:
+              - link "债券数据" [ref=e235] [cursor=pointer]:
+                - /url: /market/bond/daily/index.html
+            - listitem [ref=e236]:
+              - link "期权数据" [ref=e237] [cursor=pointer]:
+                - /url: /market/option/day/index.html
+            - listitem [ref=e238]:
+              - link "其他数据" [ref=e239] [cursor=pointer]:
+                - /url: https://www.szse.cn/disclosure/margin/margin/index.html
+            - listitem [ref=e240]:
+              - link "行情信息" [ref=e241] [cursor=pointer]:
+                - /url: /market/trend/index.html
+            - listitem [ref=e242]:
+              - link "产品目录" [ref=e243] [cursor=pointer]:
+                - /url: /market/product/stock/list/index.html
+            - listitem [ref=e244]:
+              - link "统计资料" [ref=e245] [cursor=pointer]:
+                - /url: /market/periodical/month/index.html
+            - listitem [ref=e246]:
+              - link "专题统计" [ref=e247] [cursor=pointer]:
+                - /url: /market/subject/index.html
+        - generic [ref=e249]:
+          - heading "法律规则" [level=5] [ref=e250]
+          - list [ref=e251]:
+            - listitem [ref=e252]:
+              - link "法律法规" [ref=e253] [cursor=pointer]:
+                - /url: /lawrules/rules/law/index.html
+            - listitem [ref=e254]:
+              - link "证监会规章和规范性文件" [ref=e255] [cursor=pointer]:
+                - /url: /lawrules/csrcrules/command/index.html
+            - listitem [ref=e256]:
+              - link "本所业务规则" [ref=e257] [cursor=pointer]:
+                - /url: /lawrules/rule/new/index.html
+            - listitem [ref=e258]:
+              - link "本所业务指南" [ref=e259] [cursor=pointer]:
+                - /url: /lawrules/service/share/index.html
+            - listitem [ref=e260]:
+              - link "公开征求意见" [ref=e261] [cursor=pointer]:
+                - /url: /lawrules/publicadvice/index.html
+        - generic [ref=e263]:
+          - heading "市场服务" [level=5] [ref=e264]
+          - list [ref=e265]:
+            - listitem [ref=e266]:
+              - link "服务体系建设纲要" [ref=e267] [cursor=pointer]:
+                - /url: /marketServices/info/index.html
+            - listitem [ref=e268]:
+              - link "拟上市企业服务" [ref=e269] [cursor=pointer]:
+                - /url: /marketServices/listing/select/marketSystem/index.html
+            - listitem [ref=e270]:
+              - link "上市公司服务" [ref=e271] [cursor=pointer]:
+                - /url: /marketServices/marker/index.html
+            - listitem [ref=e272]:
+              - link "会员服务" [ref=e273] [cursor=pointer]:
+                - /url: /marketServices/meber/index.html
+            - listitem [ref=e274]:
+              - link "基金公司服务" [ref=e275] [cursor=pointer]:
+                - /url: /marketServices/fund/index.html
+            - listitem [ref=e276]:
+              - link "投资者服务" [ref=e277] [cursor=pointer]:
+                - /url: /marketServices/investor/inguide/index.html
+            - listitem [ref=e278]:
+              - link "媒体服务" [ref=e279] [cursor=pointer]:
+                - /url: /marketServices/media/index.html
+            - listitem [ref=e280]:
+              - link "交易服务" [ref=e281] [cursor=pointer]:
+                - /url: https://www.szse.cn/szhk/index.html
+            - listitem [ref=e282]:
+              - link "可持续金融服务" [ref=e283] [cursor=pointer]:
+                - /url: https://www.szse.cn/sustainablefinance/index.html
+            - listitem [ref=e284]:
+              - link "技术服务" [ref=e285] [cursor=pointer]:
+                - /url: /marketServices/technicalservice/index.html
+            - listitem [ref=e286]:
+              - link "信息服务" [ref=e287] [cursor=pointer]:
+                - /url: http://www.cninfo.com.cn/fwsq/hq/yw-2.htm
+            - listitem [ref=e288]:
+              - link "培训服务" [ref=e289] [cursor=pointer]:
+                - /url: ../../../marketServices/training/introduce/
+        - generic [ref=e291]:
+          - heading "关于本所" [level=5] [ref=e292]
+          - list [ref=e293]:
+            - listitem [ref=e294]:
+              - link "本所介绍" [ref=e295] [cursor=pointer]:
+                - /url: /aboutus/sse/introduction/index.html
+            - listitem [ref=e296]:
+              - link "本所动态" [ref=e297] [cursor=pointer]:
+                - /url: /aboutus/trends/news/index.html
+            - listitem [ref=e298]:
+              - link "本所会员" [ref=e299] [cursor=pointer]:
+                - /url: /aboutus/member/index.html
+            - listitem [ref=e300]:
+              - link "交易日历" [ref=e301] [cursor=pointer]:
+                - /url: /aboutus/calendar/index.html
+            - listitem [ref=e302]:
+              - link "社会责任" [ref=e303] [cursor=pointer]:
+                - /url: /aboutus/social/ecological/index.html
+            - listitem [ref=e304]:
+              - link "交流合作" [ref=e305] [cursor=pointer]:
+                - /url: /aboutus/cooperation/entrepreneur/index.html
+            - listitem [ref=e306]:
+              - link "研究动态" [ref=e307] [cursor=pointer]:
+                - /url: /aboutus/research/secuities/guide/index.html
+            - listitem [ref=e308]:
+              - link "在线招聘" [ref=e309] [cursor=pointer]:
+                - /url: /aboutus/online/index.html
+            - listitem [ref=e310]:
+              - link "采购信息" [ref=e311] [cursor=pointer]:
+                - /url: https://ebs.szse.cn/
+            - listitem [ref=e312]:
+              - link "联系我们" [ref=e313] [cursor=pointer]:
+                - /url: /aboutus/contactus/index.html
+    - generic [ref=e315]:
+      - generic [ref=e316]:
+        - link [ref=e317] [cursor=pointer]:
+          - /url: //bszs.conac.cn/sitename?method=show&id=541B4DBFF36A103AE053022819ACAC5A
+          - img [ref=e318]
+        - link [ref=e319]:
+          - /url: javascript:void(0)
+          - img [ref=e320]
+        - link [ref=e321]:
+          - /url: javascript:void(0)
+          - img [ref=e322]
+      - generic [ref=e323]:
+        - generic [ref=e324]:
+          - link "法律声明" [ref=e325] [cursor=pointer]:
+            - /url: https://www.szse.cn/application/laws/index.html
+          - link "粤ICP备05012689号" [ref=e326] [cursor=pointer]:
+            - /url: http://beian.miit.gov.cn
+          - generic [ref=e327]: 深圳证券交易所 版权所有 ©2026 Shenzhen Stock Exchange. All Rights Reserved
+        - generic [ref=e328]: 建议使用IE9.0以上浏览器，1280*800以上分辨率 本网站支持ipv6访问

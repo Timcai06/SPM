@@ -1,0 +1,18 @@
+source,title,publish_time,url,symbol_or_subject,dedup_key,duplicate_group_size,is_event,filter_reason,evidence,score_hint
+第一财经,印巴在克什米尔爆发大规模空战 巴基斯坦称使用中国制造战机击落印军战机,2025-05-07 10:00:00,https://example.com/news/air-combat,印巴空战,a5baf15dea73,2,true,event_signal_detected,命中事件关键词: 产业链|克什米尔|印巴|战机|空战,7
+财新网,克什米尔空战引发市场关注 军工产业链被重新定价,2025-05-07 13:20:00,https://example.com/news/kashmir-defense,印巴冲突,5ff652c905d4,1,true,event_signal_detected,命中事件关键词: 产业链|克什米尔|冲突|空战,5
+中国政府网,国家发改委发布新型储能产业支持政策,2025-03-18 09:00:00,https://example.com/policy/storage-policy,储能政策,1ea00d32961e,1,true,event_signal_detected,命中事件关键词: 产业链|发改委|措施|支持|政策,6
+巨潮资讯网,中航成飞关于签订重大军品合同的公告,2025-02-11 20:30:00,https://example.com/notice/contract,302132.SZ,83ac37fc0a66,1,true,event_signal_detected,命中事件关键词: 公告|合同,3
+东方财富网,某明星官宣参加综艺节目,2025-01-10 18:00:00,https://example.com/entertainment/show,无,cd969e61dc7d,1,false,non_financial_noise,命中非金融关键词: 明星|综艺|娱乐,0
+36氪,机器人公司发布新一代人形机器人样机,2025-04-02 11:15:00,https://example.com/industry/humanoid,机器人技术突破,2f47bc287d4b,1,true,event_signal_detected,命中事件关键词: 样机,2
+第一财经,印巴在克什米尔爆发大规模空战 巴基斯坦称使用中国制造战机击落印军战机,2025-05-07 10:05:00,https://example.com/news/air-combat-dup,印巴空战,a5baf15dea73,2,true,event_signal_detected,命中事件关键词: 产业链|克什米尔|印巴|战机|空战,7
+上交所,某上市公司2024年年度报告摘要,2025-03-30 21:00:00,https://example.com/report/annual,600000.SH,ee947e0c5459,1,false,routine_disclosure_without_signal,常规披露且无显著事件关键词: 年度报告摘要|常规信息|董事会报告,1
+中国政府网/新华社,国务院办公厅印发《关于建立企业信用状况综合评价体系的实施方案》,2026-04-02 17:04:00,https://www.gov.cn/yaowen/liebiao/202604/content_7064518.htm,政策/宏观,3fe9b9e62f35,1,true,event_signal_detected,命中事件关键词: 国务院|支持|行业,4
+国家发改委/价格司,关于优化完善无线电频率占用费标准的通知(发改价格〔2026〕413号),2026-03-27 15:02:08,https://www.ndrc.gov.cn/xxgk/zcfb/tz/202603/t20260327_1404395.html,政策/通知,a74d362ae7f1,1,true,event_signal_detected,命中事件关键词: 国务院|财政,3
+中国证监会/证监会,国务院公布《国务院关于进一步贯彻实施〈中华人民共和国行政处罚法〉的通知》,2025-10-12 22:43:35,https://www.csrc.gov.cn/csrc/c100028/c1615676/content.shtml,政策/监管,5447ed67a885,1,true,event_signal_detected,命中事件关键词: 国务院|证监会,3
+上交所/最新公告,首次公开发行部分限售股上市流通公告,2026-04-03 00:00:00,https://www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-04-03/688073_20260403_GXH9.pdf,688073,f4bdf1e6007e,1,true,event_signal_detected,命中事件关键词: 公告,2
+巨潮资讯网/最新公告,东方证券股份有限公司关于浙江泰福泵业股份有限公司详式权益变动报告书之财务顾问核查意见,2026-04-02 00:00:00,https://www.cninfo.com.cn/finalpage/2026-04-02/1225077573.PDF,300992,e7687be6cf0e,1,false,insufficient_signal,命中事件关键词: 无,1
+第一财经/新闻,广州叹早茶新姿势：事关茶位费和预制菜，新规五一起实施,2026-04-02 21:20:35,https://www.yicai.com/news/103117348.html,宏观/行业新闻,6a91a22ed689,1,false,insufficient_signal,命中事件关键词: 无,1
+东方财富/行业资讯,特朗普自行宣称对伊朗战事取得“快速、决定性、压倒性胜利”,2026-04-02 21:31:40,https://finance.eastmoney.com/a/202604023692844816.html,行业/市场新闻,2eda680bcf2c,1,false,insufficient_signal,命中事件关键词: 无,1
+36氪/股市快讯,普源精电科技股份有限公司向港交所提交上市申请书,2026-04-02 19:56:00,https://www.36kr.com/newsflashes/3749625211191808,行业/股市快讯,b03f4b9ef3d7,1,false,insufficient_signal,命中事件关键词: 无,1
+财新网/mini,财新闻｜特朗普：对伊朗战事取得“快速、决定性、压倒性胜利”,2026-04-02 19:36:00,https://mini.caixin.com/2026-04-02/102430077.html,宏观/地缘新闻,89d28df4d011,1,false,insufficient_signal,命中事件关键词: 无,1
