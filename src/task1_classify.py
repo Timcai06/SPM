@@ -22,6 +22,48 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
+from task1_rule_config import (
+    DURATION_DEFAULT,
+    DURATION_ENUM,
+    DURATION_RULES,
+    EVENT_DUPLICATE_BONUS_CAP,
+    EVENT_SCORE_THRESHOLD,
+    EVENT_SUBJECT_ENUM,
+    HEAT_DUPLICATE_CAP,
+    HEAT_DUPLICATE_PER_COUNT,
+    HEAT_SOURCE_MULTIPLIER,
+    HEAT_TITLE_CAP,
+    HEAT_TITLE_PER_HIT,
+    HEAT_TOTAL_CAP,
+    IMPACT_SCOPE_DEFAULT,
+    IMPACT_SCOPE_ENUM,
+    IMPACT_WIDE_KEYWORDS,
+    INDUSTRY_DEFAULT,
+    INDUSTRY_ENUM,
+    INDUSTRY_RULES,
+    INTENSITY_BASE_BY_SUBJECT,
+    INTENSITY_DEFAULT_BASE,
+    INTENSITY_POLICY_BONUS,
+    INTENSITY_POLICY_KEYWORDS,
+    INTENSITY_SHOCK_BONUS,
+    INTENSITY_SHOCK_KEYWORDS,
+    INTENSITY_SURPRISE_BONUS,
+    INTENSITY_TOTAL_CAP,
+    NEGATIVE_WORDS,
+    NON_EVENT_KEYWORDS,
+    POSITIVE_WORDS,
+    PREDICTABILITY_DEFAULT,
+    PREDICTABILITY_ENUM,
+    PREDICTABILITY_RULES,
+    RULE_VERSION,
+    SENTIMENT_ENUM,
+    SOURCE_WEIGHT_DEFAULT,
+    SOURCE_WEIGHT_TOKENS,
+    SUBJECT_DEFAULT,
+    SUBJECT_RULES,
+    TITLE_EMPHASIS_WORDS,
+    WEAK_NEUTRAL_KEYWORDS,
+)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -42,6 +84,9 @@ RAW_CANDIDATE_FIELDS = [
     "filter_reason",
     "evidence",
     "score_hint",
+    "event_score",
+    "event_threshold",
+    "rule_version",
 ]
 STRUCTURED_EVENT_FIELDS = [
     "event_id",
@@ -62,61 +107,7 @@ STRUCTURED_EVENT_FIELDS = [
     "classification_evidence",
 ]
 
-
-SUBJECT_RULES = {
-    "地缘类": ["空战", "冲突", "地缘", "印巴", "克什米尔", "战机", "局势升级"],
-    "政策类": ["政策", "发改委", "国务院", "证监会", "支持", "措施", "规划"],
-    "公司类": ["公告", "合同", "并购", "重组", "回购", "定增", "业绩预告"],
-    "行业类": ["行业", "产业链", "景气", "协会", "供需", "价格上涨", "技术突破", "样机"],
-    "宏观类": ["降息", "降准", "CPI", "PPI", "GDP", "出口", "财政"],
-}
-
-INDUSTRY_RULES = {
-    "军工": ["军工", "战机", "导弹", "无人机", "军品", "空战"],
-    "新能源": ["新能源", "储能", "锂电", "光伏", "风电", "电池"],
-    "科技": ["科技", "机器人", "芯片", "算力", "AI", "人形机器人", "样机"],
-    "消费": ["消费", "白酒", "旅游", "零售", "餐饮"],
-}
-
-PREDICTABILITY_RULES = {
-    "突发型": ["空战", "爆发", "冲突", "突发", "事故", "击落"],
-    "预披露型": ["公告", "预告", "政策", "规划", "发布", "签订"],
-}
-
-DURATION_RULES = {
-    "脉冲型": ["空战", "冲突", "突发", "击落", "热点"],
-    "中期型": ["政策", "合同", "示范项目", "订单", "扩产", "发布", "样机"],
-    "长尾型": ["规划", "技术突破", "产业趋势", "长期"],
-}
-
-POSITIVE_WORDS = [
-    "利好",
-    "支持",
-    "积极",
-    "增长",
-    "提升",
-    "带动",
-    "受益",
-    "突破",
-    "签订",
-]
-NEGATIVE_WORDS = ["利空", "下滑", "亏损", "处罚", "暴跌", "风险", "停牌", "冲突升级"]
 EVENT_KEYWORDS = sorted({word for words in SUBJECT_RULES.values() for word in words})
-NON_EVENT_KEYWORDS = ["明星", "综艺", "娱乐", "广告", "直播带货"]
-WEAK_NEUTRAL_KEYWORDS = ["年度报告摘要", "常规信息", "董事会报告", "财务报表"]
-TITLE_EMPHASIS_WORDS = ["重大", "爆发", "发布", "签订", "支持", "击落", "突破"]
-SOURCE_WEIGHTS = {
-    "中国政府网": 1.0,
-    "证监会官网": 1.0,
-    "国家发改委": 0.95,
-    "巨潮资讯网": 0.95,
-    "财新网": 0.9,
-    "第一财经": 0.85,
-    "上交所": 0.9,
-    "深交所": 0.9,
-    "36氪": 0.75,
-    "东方财富网": 0.7,
-}
 ENTITY_PATTERN = re.compile(r"[A-Z]{2,}\-?\d*|[0-9]{6}\.(?:SZ|SH)|印巴|克什米尔|歼\-?10CE|中航成飞|储能|机器人")
 
 
@@ -130,6 +121,8 @@ class CandidateResult:
     filter_reason: str
     evidence: str
     score_hint: int
+    event_score: int
+    event_threshold: int
 
 
 def load_rows(path: Path) -> List[Dict[str, str]]:
@@ -172,6 +165,17 @@ def keyword_hits(text: str, keywords: Iterable[str]) -> List[str]:
     return [kw for kw in keywords if kw in text]
 
 
+def freeze_enum(value: str, allowed: Iterable[str], default: str) -> str:
+    return value if value in set(allowed) else default
+
+
+def resolve_source_weight(source: str) -> float:
+    for token, weight in SOURCE_WEIGHT_TOKENS:
+        if token in source:
+            return weight
+    return SOURCE_WEIGHT_DEFAULT
+
+
 def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateResult:
     full_text = f'{row["title"]} {row["content"]}'
     publish_time = normalize_datetime(row["publish_time"])
@@ -189,6 +193,8 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             filter_reason="non_financial_noise",
             evidence="命中非金融关键词: " + "|".join(non_event_hits),
             score_hint=0,
+            event_score=0,
+            event_threshold=EVENT_SCORE_THRESHOLD,
         )
 
     if weak_hits and not event_hits:
@@ -201,12 +207,18 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             filter_reason="routine_disclosure_without_signal",
             evidence="常规披露且无显著事件关键词: " + "|".join(weak_hits),
             score_hint=1,
+            event_score=1,
+            event_threshold=EVENT_SCORE_THRESHOLD,
         )
 
-    score_hint = len(event_hits) + min(duplicate_group_size, 3)
-    is_event = score_hint >= 2
+    score_hint = len(event_hits) + min(duplicate_group_size, EVENT_DUPLICATE_BONUS_CAP)
+    is_event = score_hint >= EVENT_SCORE_THRESHOLD
     reason = "event_signal_detected" if is_event else "insufficient_signal"
-    evidence = "命中事件关键词: " + ("|".join(event_hits) if event_hits else "无")
+    evidence = (
+        "命中事件关键词: "
+        + ("|".join(event_hits) if event_hits else "无")
+        + f"; score={score_hint}; threshold={EVENT_SCORE_THRESHOLD}"
+    )
     return CandidateResult(
         row=row,
         normalized_publish_time=publish_time,
@@ -216,6 +228,8 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
         filter_reason=reason,
         evidence=evidence,
         score_hint=score_hint,
+        event_score=score_hint,
+        event_threshold=EVENT_SCORE_THRESHOLD,
     )
 
 
@@ -235,44 +249,39 @@ def compute_sentiment(text: str) -> str:
     pos = len(keyword_hits(text, POSITIVE_WORDS))
     neg = len(keyword_hits(text, NEGATIVE_WORDS))
     if pos > neg:
-        return "利好"
+        return freeze_enum("利好", SENTIMENT_ENUM, "中性")
     if neg > pos:
-        return "利空"
-    return "中性"
+        return freeze_enum("利空", SENTIMENT_ENUM, "中性")
+    return freeze_enum("中性", SENTIMENT_ENUM, "中性")
 
 
 def compute_heat_score(title: str, source: str, duplicate_group_size: int) -> int:
-    source_score = int(SOURCE_WEIGHTS.get(source, 0.6) * 40)
-    title_score = min(len(keyword_hits(title, TITLE_EMPHASIS_WORDS)) * 12, 24)
-    duplicate_score = min(duplicate_group_size * 12, 36)
-    return min(source_score + title_score + duplicate_score, 100)
+    source_score = int(resolve_source_weight(source) * HEAT_SOURCE_MULTIPLIER)
+    title_score = min(len(keyword_hits(title, TITLE_EMPHASIS_WORDS)) * HEAT_TITLE_PER_HIT, HEAT_TITLE_CAP)
+    duplicate_score = min(duplicate_group_size * HEAT_DUPLICATE_PER_COUNT, HEAT_DUPLICATE_CAP)
+    return min(source_score + title_score + duplicate_score, HEAT_TOTAL_CAP)
 
 
 def compute_intensity_score(text: str, subject_type: str, predictability_type: str) -> int:
-    base = {
-        "地缘类": 82,
-        "政策类": 72,
-        "公司类": 68,
-        "行业类": 64,
-        "宏观类": 75,
-    }.get(subject_type, 55)
+    base = INTENSITY_BASE_BY_SUBJECT.get(subject_type, INTENSITY_DEFAULT_BASE)
     if predictability_type == "突发型":
-        base += 8
-    if "重大" in text or "击落" in text or "爆发" in text:
-        base += 6
-    if "示范项目" in text or "若干措施" in text:
-        base += 4
-    return min(base, 100)
+        base += INTENSITY_SURPRISE_BONUS
+    if any(word in text for word in INTENSITY_SHOCK_KEYWORDS):
+        base += INTENSITY_SHOCK_BONUS
+    if any(word in text for word in INTENSITY_POLICY_KEYWORDS):
+        base += INTENSITY_POLICY_BONUS
+    return min(base, INTENSITY_TOTAL_CAP)
 
 
 def compute_impact_scope(subject_type: str, industry_type: str, text: str) -> str:
-    if subject_type in {"宏观类", "政策类"} and any(word in text for word in ["全国", "全市场", "行业"]):
-        return "全市场"
+    if subject_type in {"宏观类", "政策类"} and any(word in text for word in IMPACT_WIDE_KEYWORDS):
+        return freeze_enum("全市场", IMPACT_SCOPE_ENUM, IMPACT_SCOPE_DEFAULT)
     if subject_type in {"地缘类", "行业类", "政策类"}:
-        return "行业"
+        return freeze_enum("行业", IMPACT_SCOPE_ENUM, IMPACT_SCOPE_DEFAULT)
     if subject_type == "公司类":
-        return "个股链条"
-    return "行业" if industry_type != "其他" else "个股链条"
+        return freeze_enum("个股链条", IMPACT_SCOPE_ENUM, IMPACT_SCOPE_DEFAULT)
+    default_scope = "行业" if industry_type != "其他" else "个股链条"
+    return freeze_enum(default_scope, IMPACT_SCOPE_ENUM, IMPACT_SCOPE_DEFAULT)
 
 
 def extract_subject_entities(text: str) -> List[str]:
@@ -358,15 +367,22 @@ def build_candidate_row(row: Dict[str, str], result: CandidateResult) -> Dict[st
         "filter_reason": result.filter_reason,
         "evidence": result.evidence,
         "score_hint": result.score_hint,
+        "event_score": result.event_score,
+        "event_threshold": result.event_threshold,
+        "rule_version": RULE_VERSION,
     }
 
 
 def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[str, object]:
     full_text = f'{row["title"]} {row["content"]}'
-    subject_type, subject_hits = choose_label(full_text, SUBJECT_RULES, "行业类")
-    industry_type, industry_hits = choose_label(full_text, INDUSTRY_RULES, "其他")
-    predictability_type, predictability_hits = choose_label(full_text, PREDICTABILITY_RULES, "预披露型")
-    duration_type, duration_hits = choose_label(full_text, DURATION_RULES, "中期型")
+    subject_type, subject_hits = choose_label(full_text, SUBJECT_RULES, SUBJECT_DEFAULT)
+    industry_type, industry_hits = choose_label(full_text, INDUSTRY_RULES, INDUSTRY_DEFAULT)
+    predictability_type, predictability_hits = choose_label(full_text, PREDICTABILITY_RULES, PREDICTABILITY_DEFAULT)
+    duration_type, duration_hits = choose_label(full_text, DURATION_RULES, DURATION_DEFAULT)
+    subject_type = freeze_enum(subject_type, EVENT_SUBJECT_ENUM, SUBJECT_DEFAULT)
+    industry_type = freeze_enum(industry_type, INDUSTRY_ENUM, INDUSTRY_DEFAULT)
+    predictability_type = freeze_enum(predictability_type, PREDICTABILITY_ENUM, PREDICTABILITY_DEFAULT)
+    duration_type = freeze_enum(duration_type, DURATION_ENUM, DURATION_DEFAULT)
     subject_entities = extract_subject_entities(full_text)
     sentiment = compute_sentiment(full_text)
     heat_score = compute_heat_score(row["title"], row["source"], result.duplicate_group_size)
@@ -390,6 +406,7 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
         "raw_text_ref": row["url"],
         "classification_evidence": "|".join(
             [
+                f"rule_version={RULE_VERSION}",
                 "subject=" + (",".join(subject_hits) if subject_hits else "none"),
                 "industry=" + (",".join(industry_hits) if industry_hits else "none"),
                 "predictability=" + (",".join(predictability_hits) if predictability_hits else "none"),

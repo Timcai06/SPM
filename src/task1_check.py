@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+from task1_rule_config import DURATION_ENUM, EVENT_SUBJECT_ENUM, IMPACT_SCOPE_ENUM, INDUSTRY_ENUM, PREDICTABILITY_ENUM, RULE_VERSION
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -62,6 +63,26 @@ def check_required_fields(structured_rows) -> None:
     assert required_fields.issubset(structured_rows[0].keys()), "structured_events.csv missing required fields"
 
 
+def check_decision_threshold_fields(raw_rows) -> None:
+    required = {"event_score", "event_threshold", "rule_version", "is_event"}
+    assert required.issubset(raw_rows[0].keys()), "raw_event_candidates.csv missing decision threshold fields"
+    for row in raw_rows:
+        assert row["rule_version"] == RULE_VERSION, f"Unexpected rule version: {row['rule_version']}"
+        score = int(row["event_score"])
+        threshold = int(row["event_threshold"])
+        decision = row["is_event"] == "true"
+        assert decision == (score >= threshold), f"is_event decision mismatch for title={row['title']}"
+
+
+def check_enum_values(structured_rows) -> None:
+    for row in structured_rows:
+        assert row["event_subject_type"] in EVENT_SUBJECT_ENUM, f"Invalid event_subject_type: {row['event_subject_type']}"
+        assert row["duration_type"] in DURATION_ENUM, f"Invalid duration_type: {row['duration_type']}"
+        assert row["predictability_type"] in PREDICTABILITY_ENUM, f"Invalid predictability_type: {row['predictability_type']}"
+        assert row["industry_type"] in INDUSTRY_ENUM, f"Invalid industry_type: {row['industry_type']}"
+        assert row["impact_scope"] in IMPACT_SCOPE_ENUM, f"Invalid impact_scope: {row['impact_scope']}"
+
+
 def main() -> None:
     raw_rows = read_csv(RAW_OUTPUT_PATH)
     structured_rows = read_csv(STRUCTURED_OUTPUT_PATH)
@@ -70,6 +91,8 @@ def main() -> None:
     check_noise_case(raw_rows)
     check_dedup_case(raw_rows)
     check_required_fields(structured_rows)
+    check_decision_threshold_fields(raw_rows)
+    check_enum_values(structured_rows)
 
     print("Validation passed.")
     print(f"raw rows: {len(raw_rows)}")

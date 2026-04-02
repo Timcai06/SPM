@@ -21,6 +21,7 @@
 - 任务 1 采集脚本：`src/task1_collect.py`
 - 任务 1 采集器目录：`src/collectors/`
 - 任务 1 分类与特征提取：`src/task1_classify.py`
+- 任务 1 冻结规则配置：`src/task1_rule_config.py`
 - 任务 1 入库脚本：`src/task1_load_db.py`
 - 任务 1 校验脚本：`src/task1_check.py`
 - 任务 1 可视化页面：`src/task1_view.py`

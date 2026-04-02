@@ -45,6 +45,10 @@
 
 一条文本要被识别为“事件”，至少要满足以下判断逻辑之一：
 
+当前规则已冻结到 `src/task1_rule_config.py`（`RULE_VERSION=task1_rules_v1`），
+`is_event` 采用统一阈值判定：`event_score >= event_threshold`。
+在 `raw_event_candidates.csv` 中会落字段：`event_score`、`event_threshold`、`rule_version`、`evidence`。
+
 ### 定性判断依据
 
 - 存在明确的政策发布、实施方案、通知、意见、重大合同、并购、战争冲突、技术突破等事件载体
