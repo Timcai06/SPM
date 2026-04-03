@@ -49,6 +49,8 @@ def parse_args() -> argparse.Namespace:
     feature_parser.add_argument("--analysis-mode", default="event-study")
     feature_parser.add_argument("--benchmark", default="hs300")
     feature_parser.add_argument("--event-windows", default="1,3,5")
+    feature_parser.add_argument("--tushare-token", default="")
+    feature_parser.add_argument("--tushare-token-file", default="")
     feature_parser.add_argument("--run-id", default="")
 
     sub.add_parser("view", help="open streamlit data viewer")
@@ -109,6 +111,10 @@ def main() -> None:
             "--event-windows",
             args.event_windows,
         ]
+        if args.tushare_token:
+            cmd.extend(["--tushare-token", args.tushare_token])
+        if args.tushare_token_file:
+            cmd.extend(["--tushare-token-file", args.tushare_token_file])
         if args.run_id:
             cmd.extend(["--run-id", args.run_id])
         run(cmd)

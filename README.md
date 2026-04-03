@@ -135,6 +135,15 @@ python3 src/cli/task1.py feature --db stock_event_mining --min-link-score 0.35 -
 
 事件研究增强默认优先使用 `TUSHARE_TOKEN`（若存在），不可用时回退到新浪行情接口并在报告中标记数据源。
 
+推荐把 token 放到本地文件（不入库）：
+
+```bash
+mkdir -p .secrets
+printf '%s\n' '你的TushareToken' > .secrets/tushare_token.txt
+chmod 600 .secrets/tushare_token.txt
+python3 src/cli/task1.py feature --db stock_event_mining --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --tushare-token-file .secrets/tushare_token.txt
+```
+
 ## 直观看表
 
 命令行查询：

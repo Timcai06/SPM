@@ -1,11 +1,12 @@
 # 任务1事件研究法（异常收益）报告
 
-- run_id：RUN_FINAL_AFTER_EXPAND_001
-- 生成时间：2026-04-03 11:50:36
+- run_id：TOKEN_FIX_CHECK_20260403
+- 生成时间：2026-04-03 12:10:57
 - 分析模式：event-study
 - 事件-公司有效样本：88
 - 链接来源：event_company_links
 - 基准：hs300（sina_index_fallback）
+- token来源：missing
 - 事件窗：1,3,5
 
 ## 一、总体CAR统计

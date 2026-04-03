@@ -147,10 +147,36 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--analysis-mode", default="event-study", help="Analysis mode, currently only event-study.")
     parser.add_argument("--benchmark", default="hs300", help="Benchmark id, default hs300.")
     parser.add_argument("--event-windows", default="1,3,5", help="Event windows in days, comma-separated.")
+    parser.add_argument("--tushare-token", default="", help="Explicit Tushare token. Prefer env/file in shared environments.")
+    parser.add_argument("--tushare-token-file", default="", help="Path to local file containing Tushare token.")
     parser.add_argument("--report-path", default=str(DEFAULT_REPORT), help="Markdown report output path.")
     parser.add_argument("--dataset-path", default=str(DEFAULT_DATASET), help="CSV dataset output path.")
     parser.add_argument("--run-id", default="", help="Run identifier for traceability.")
     return parser.parse_args()
+
+
+def resolve_tushare_token(args: argparse.Namespace) -> tuple[str, str]:
+    if args.tushare_token.strip():
+        return args.tushare_token.strip(), "cli_arg"
+    if args.tushare_token_file.strip():
+        token_path = Path(args.tushare_token_file).expanduser().resolve()
+        if token_path.exists():
+            content = token_path.read_text(encoding="utf-8").strip()
+            if content:
+                return content, f"file:{token_path.name}"
+    default_paths = [
+        ROOT / ".secrets" / "tushare_token.txt",
+        Path.home() / ".config" / "stock_event_mining" / "tushare_token.txt",
+    ]
+    for token_path in default_paths:
+        if token_path.exists():
+            content = token_path.read_text(encoding="utf-8").strip()
+            if content:
+                return content, f"file:{token_path.name}"
+    env_token = os.getenv("TUSHARE_TOKEN", "").strip()
+    if env_token:
+        return env_token, "env:TUSHARE_TOKEN"
+    return "", "missing"
 
 
 def main() -> None:
@@ -213,10 +239,11 @@ def main() -> None:
         rows = run_psql_csv(args.db, sql_fallback)
         link_source = "raw_documents_symbol_or_subject"
 
-    token = os.getenv("TUSHARE_TOKEN", "").strip()
+    token, token_source = resolve_tushare_token(args)
     ts_module = load_tushare() if token else None
     use_tushare = ts_module is not None
 
+    reason_counts: defaultdict[str, int] = defaultdict(int)
     benchmark_returns: Dict[str, float] = {}
     benchmark_source = "none"
     try:
@@ -224,8 +251,10 @@ def main() -> None:
             ret_obj = fetch_index_returns(ts_module, token, INDEX_CODE_MAP[benchmark_key], "20200101", datetime.now().strftime("%Y%m%d"))
             benchmark_returns = ret_obj.returns
             benchmark_source = ret_obj.source
-    except Exception:
+    except Exception as exc:
         benchmark_returns = {}
+        reason_counts["tushare_index_error"] += 1
+        benchmark_source = f"tushare_failed:{exc.__class__.__name__}"
     if not benchmark_returns:
         symbol = INDEX_SINA_SYMBOL_MAP[benchmark_key]
         benchmark_returns = close_series_to_returns(fetch_sina_kline(symbol))
@@ -233,7 +262,6 @@ def main() -> None:
 
     stock_cache: Dict[str, Dict[str, float]] = {}
     stock_source_map: Dict[str, str] = {}
-    reason_counts: defaultdict[str, int] = defaultdict(int)
     dataset_rows: List[Dict[str, str]] = []
 
     for row in rows:
@@ -249,8 +277,9 @@ def main() -> None:
                     ret_obj = fetch_stock_returns(ts_module, token, ts_code, "20200101", datetime.now().strftime("%Y%m%d"))
                     returns = ret_obj.returns
                     source_name = ret_obj.source
-                except Exception:
+                except Exception as exc:
                     returns = {}
+                    reason_counts[f"tushare_stock_error:{exc.__class__.__name__}"] += 1
             if not returns:
                 sina_symbol = ts_to_sina_symbol(ts_code)
                 if sina_symbol:
@@ -312,6 +341,7 @@ def main() -> None:
                 "analysis_mode": args.analysis_mode,
                 "benchmark": benchmark_key,
                 "benchmark_source": benchmark_source,
+                "token_source": token_source,
                 "stock_source": stock_source_map.get(ts_code, "none"),
                 "estimation_window": "[-120,-20]",
                 "event_windows": ",".join(str(x) for x in event_windows),
@@ -334,7 +364,7 @@ def main() -> None:
         else:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["run_id", "message", "analysis_mode", "benchmark", "benchmark_source", "link_source"],
+                fieldnames=["run_id", "message", "analysis_mode", "benchmark", "benchmark_source", "token_source", "link_source"],
             )
             writer.writeheader()
             writer.writerow(
@@ -344,6 +374,7 @@ def main() -> None:
                     "analysis_mode": args.analysis_mode,
                     "benchmark": benchmark_key,
                     "benchmark_source": benchmark_source,
+                    "token_source": token_source,
                     "link_source": link_source,
                 }
             )
@@ -362,6 +393,7 @@ def main() -> None:
         f"- 事件-公司有效样本：{len(dataset_rows)}",
         f"- 链接来源：{link_source}",
         f"- 基准：{benchmark_key}（{benchmark_source}）",
+        f"- token来源：{token_source}",
         f"- 事件窗：{','.join(str(x) for x in event_windows)}",
         "",
         "## 一、总体CAR统计",
@@ -416,4 +448,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
