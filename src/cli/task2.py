@@ -28,6 +28,14 @@ def parse_args() -> argparse.Namespace:
     load_parser.add_argument("--db", default="stock_event_mining")
     load_parser.add_argument("--input", default="data/companies_seed.csv")
 
+    import_parser = sub.add_parser("import-companies", help="import company basics from Tushare")
+    import_parser.add_argument("--output", default="data/companies_a_share.csv")
+    import_parser.add_argument("--tushare-token", default="")
+    import_parser.add_argument("--tushare-token-file", default="")
+
+    import_public_parser = sub.add_parser("import-companies-public", help="build company seed from collected public sources")
+    import_public_parser.add_argument("--output", default="data/companies_public.csv")
+
     link_parser = sub.add_parser("link-events", help="generate event-company links")
     link_parser.add_argument("--db", default="stock_event_mining")
     link_parser.add_argument("--top-k", type=int, default=3)
@@ -61,6 +69,31 @@ def main() -> None:
                 args.db,
                 "--input",
                 args.input,
+            ]
+        )
+        return
+
+    if args.command == "import-companies":
+        cmd = [
+            "python3",
+            "src/capabilities/storage/import_companies_tushare.py",
+            "--output",
+            args.output,
+        ]
+        if args.tushare_token:
+            cmd.extend(["--tushare-token", args.tushare_token])
+        if args.tushare_token_file:
+            cmd.extend(["--tushare-token-file", args.tushare_token_file])
+        run(cmd)
+        return
+
+    if args.command == "import-companies-public":
+        run(
+            [
+                "python3",
+                "src/capabilities/storage/import_companies_public.py",
+                "--output",
+                args.output,
             ]
         )
         return

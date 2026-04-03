@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import sys
 from pathlib import Path
 
@@ -35,6 +36,19 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def normalize_json_list(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return "[]"
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        parsed = [part.strip() for part in raw.split("|") if part.strip()]
+    if not isinstance(parsed, list):
+        parsed = [str(parsed)]
+    return json.dumps(parsed, ensure_ascii=False)
+
+
 def main() -> None:
     args = parse_args()
     rows = read_rows(Path(args.input).resolve())
@@ -46,7 +60,6 @@ def main() -> None:
     ):
         with psycopg.connect(dsn_for(args.db)) as conn:
             with conn.cursor() as cur:
-                cur.execute("TRUNCATE TABLE companies RESTART IDENTITY CASCADE")
                 for row in rows:
                     cur.execute(
                         """
@@ -55,18 +68,29 @@ def main() -> None:
                             business_scope, core_products, concept_tags
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                        ON CONFLICT (ts_code) DO UPDATE
+                        SET company_name = EXCLUDED.company_name,
+                            exchange = EXCLUDED.exchange,
+                            industry_l1 = EXCLUDED.industry_l1,
+                            industry_l2 = EXCLUDED.industry_l2,
+                            business_scope = EXCLUDED.business_scope,
+                            core_products = EXCLUDED.core_products,
+                            concept_tags = EXCLUDED.concept_tags,
+                            is_active = TRUE,
+                            updated_at = NOW()
                         """,
                         (
                             row["ts_code"],
                             row["company_name"],
-                            row["exchange"],
-                            row["industry_l1"],
-                            row["industry_l2"],
-                            row["business_scope"],
-                            row["core_products"],
-                            row["concept_tags"],
+                            row.get("exchange", ""),
+                            row.get("industry_l1", ""),
+                            row.get("industry_l2", ""),
+                            row.get("business_scope", ""),
+                            row.get("core_products", ""),
+                            normalize_json_list(row.get("concept_tags", "")),
                         ),
                     )
+            conn.commit()
     print(f"Loaded {len(rows)} companies into {args.db}")
 
 

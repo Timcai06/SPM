@@ -17,6 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--min-score", type=float, default=0.35)
+    parser.add_argument("--input", default="data/companies_seed.csv")
     return parser.parse_args()
 
 
@@ -26,7 +27,7 @@ def run(cmd: list[str]) -> None:
 
 def main() -> None:
     args = parse_args()
-    run(["python3", "src/capabilities/storage/load_companies.py", "--db", args.db])
+    run(["python3", "src/capabilities/storage/load_companies.py", "--db", args.db, "--input", args.input])
     run(
         [
             "python3",
