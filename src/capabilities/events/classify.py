@@ -44,6 +44,7 @@ from capabilities.events.rules import (
     IMPACT_SCOPE_DEFAULT,
     IMPACT_SCOPE_ENUM,
     IMPACT_WIDE_KEYWORDS,
+    GENERIC_ENTITY_TOKENS,
     INDUSTRY_DEFAULT,
     INDUSTRY_ENUM,
     INDUSTRY_RULES,
@@ -62,6 +63,7 @@ from capabilities.events.rules import (
     PREDICTABILITY_ENUM,
     PREDICTABILITY_RULES,
     RULE_VERSION,
+    ROUTINE_ANNOUNCEMENT_KEYWORDS,
     SENTIMENT_ENUM,
     SOURCE_WEIGHT_DEFAULT,
     SOURCE_WEIGHT_TOKENS,
@@ -115,6 +117,7 @@ STRUCTURED_EVENT_FIELDS = [
 ]
 
 ENTITY_PATTERN = re.compile(r"[A-Z]{2,}\-?\d*|[0-9]{6}\.(?:SZ|SH)|印巴|克什米尔|歼\-?10CE|中航成飞|储能|机器人")
+GENERIC_EVENT_HITS = {"公告"}
 
 
 def _copy_rules(source: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -239,7 +242,9 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
     publish_time = normalize_datetime(row["publish_time"])
     non_event_hits = keyword_hits(full_text, NON_EVENT_KEYWORDS)
     weak_hits = keyword_hits(full_text, WEAK_NEUTRAL_KEYWORDS)
+    routine_hits = keyword_hits(full_text, ROUTINE_ANNOUNCEMENT_KEYWORDS)
     event_hits = keyword_hits(full_text, ACTIVE_EVENT_KEYWORDS)
+    strong_event_hits = [kw for kw in event_hits if kw not in GENERIC_EVENT_HITS]
 
     if non_event_hits:
         return CandidateResult(
@@ -264,6 +269,34 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             is_event=False,
             filter_reason="routine_disclosure_without_signal",
             evidence="常规披露且无显著事件关键词: " + "|".join(weak_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
+            score_hint=1,
+            event_score=1,
+            event_threshold=EVENT_SCORE_THRESHOLD,
+        )
+
+    if routine_hits and not strong_event_hits:
+        return CandidateResult(
+            row=row,
+            normalized_publish_time=publish_time,
+            dedup_key=dedup_key(row),
+            duplicate_group_size=duplicate_group_size,
+            is_event=False,
+            filter_reason="routine_announcement_without_signal",
+            evidence="常规公告且缺少强事件关键词: " + "|".join(routine_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
+            score_hint=1,
+            event_score=1,
+            event_threshold=EVENT_SCORE_THRESHOLD,
+        )
+
+    if row.get("source", "").startswith(("上交所", "深交所", "巨潮资讯网")) and not strong_event_hits:
+        return CandidateResult(
+            row=row,
+            normalized_publish_time=publish_time,
+            dedup_key=dedup_key(row),
+            duplicate_group_size=duplicate_group_size,
+            is_event=False,
+            filter_reason="generic_announcement_without_signal",
+            evidence="公告源文本仅含通用披露词; score=1; threshold=" + str(EVENT_SCORE_THRESHOLD),
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,
@@ -345,6 +378,8 @@ def compute_impact_scope(subject_type: str, industry_type: str, text: str) -> st
 def extract_subject_entities(text: str) -> List[str]:
     seen = []
     for match in ENTITY_PATTERN.findall(text):
+        if match in GENERIC_ENTITY_TOKENS:
+            continue
         if match not in seen:
             seen.append(match)
     return seen

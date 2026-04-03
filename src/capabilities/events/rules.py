@@ -51,6 +51,28 @@ POSITIVE_WORDS = ("利好", "支持", "积极", "增长", "提升", "带动", "�
 NEGATIVE_WORDS = ("利空", "下滑", "亏损", "处罚", "暴跌", "风险", "停牌", "冲突升级")
 NON_EVENT_KEYWORDS = ("明星", "综艺", "娱乐", "广告", "直播带货")
 WEAK_NEUTRAL_KEYWORDS = ("年度报告摘要", "常规信息", "董事会报告", "财务报表")
+ROUTINE_ANNOUNCEMENT_KEYWORDS = (
+    "会议决议",
+    "股东会",
+    "业绩说明会",
+    "法律意见书",
+    "募集资金进行现金管理",
+    "自有资金进行现金管理",
+    "进展公告",
+    "提示性公告",
+    "解除质押",
+    "质押",
+    "持股比例",
+    "减持股份",
+    "过户登记",
+    "辞职",
+    "本息兑付",
+    "工商变更登记",
+    "换发安全生产许可证",
+    "临时股东会",
+    "持股计划",
+)
+GENERIC_ENTITY_TOKENS = ("LC", "ST", "SZCY", "SZZB", "TOP50", "SK", "CP", "CMG", "CCTV", "IPO", "IRGC", "CRU", "CPU", "CPO", "ESG", "AI")
 TITLE_EMPHASIS_WORDS = ("重大", "爆发", "发布", "签订", "支持", "击落", "突破")
 IMPACT_WIDE_KEYWORDS = ("全国", "全市场", "行业")
 INTENSITY_SHOCK_KEYWORDS = ("重大", "击落", "爆发")
