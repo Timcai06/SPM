@@ -69,13 +69,34 @@ def main() -> None:
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                         ON CONFLICT (ts_code) DO UPDATE
-                        SET company_name = EXCLUDED.company_name,
-                            exchange = EXCLUDED.exchange,
-                            industry_l1 = EXCLUDED.industry_l1,
-                            industry_l2 = EXCLUDED.industry_l2,
-                            business_scope = EXCLUDED.business_scope,
-                            core_products = EXCLUDED.core_products,
-                            concept_tags = EXCLUDED.concept_tags,
+                        SET company_name = CASE
+                                WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name
+                                ELSE companies.company_name
+                            END,
+                            exchange = CASE
+                                WHEN EXCLUDED.exchange <> '' THEN EXCLUDED.exchange
+                                ELSE companies.exchange
+                            END,
+                            industry_l1 = CASE
+                                WHEN EXCLUDED.industry_l1 <> '' AND EXCLUDED.industry_l1 <> '其他' THEN EXCLUDED.industry_l1
+                                ELSE companies.industry_l1
+                            END,
+                            industry_l2 = CASE
+                                WHEN EXCLUDED.industry_l2 <> '' AND EXCLUDED.industry_l2 <> '其他' THEN EXCLUDED.industry_l2
+                                ELSE companies.industry_l2
+                            END,
+                            business_scope = CASE
+                                WHEN EXCLUDED.business_scope <> '' THEN EXCLUDED.business_scope
+                                ELSE companies.business_scope
+                            END,
+                            core_products = CASE
+                                WHEN EXCLUDED.core_products <> '' AND EXCLUDED.core_products <> '其他' THEN EXCLUDED.core_products
+                                ELSE companies.core_products
+                            END,
+                            concept_tags = CASE
+                                WHEN EXCLUDED.concept_tags <> '[]'::jsonb THEN EXCLUDED.concept_tags
+                                ELSE companies.concept_tags
+                            END,
                             is_active = TRUE,
                             updated_at = NOW()
                         """,

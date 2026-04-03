@@ -12,6 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = ROOT / "data" / "companies_public.csv"
+DEFAULT_SEED = ROOT / "data" / "companies_seed.csv"
+DEFAULT_MANUAL = ROOT / "data" / "companies_manual.csv"
 SOURCE_FILES = [
     ROOT / "data" / "source_sse.csv",
     ROOT / "data" / "source_szse.csv",
@@ -29,6 +31,8 @@ BOARD_RE = re.compile(r"板块[:：]\s*([A-Z]+)")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build public company seed CSV from collected sources.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
+    parser.add_argument("--seed", default=str(DEFAULT_SEED))
+    parser.add_argument("--manual", default=str(DEFAULT_MANUAL))
     return parser.parse_args()
 
 
@@ -36,6 +40,10 @@ def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         cleaned = (line.replace("\x00", "") for line in f)
         return list(csv.DictReader(cleaned))
+
+
+def normalize_name(value: str) -> str:
+    return re.sub(r"\s+", "", (value or "").strip())
 
 
 def exchange_from_code(code: str) -> str:
@@ -80,10 +88,10 @@ def extract_short_name(row: dict[str, str]) -> str:
     content = (row.get("content") or "").strip()
     m = SHORT_NAME_RE.search(content)
     if m:
-        return m.group(1).strip()
+        return normalize_name(m.group(1))
     m = SHORT_NAME_SZSE_RE.match(title)
     if m:
-        return m.group(1).strip()
+        return normalize_name(m.group(1))
     return ""
 
 
@@ -116,9 +124,14 @@ def concept_tags(row: dict[str, str], short_name: str, full_name: str, industry_
 
 def merge_record(existing: dict[str, str], incoming: dict[str, str]) -> dict[str, str]:
     result = dict(existing)
-    for key in ["company_name", "business_scope", "core_products", "exchange", "industry_l1", "industry_l2"]:
+    for key in ["exchange", "company_name", "business_scope"]:
         if (not result.get(key)) and incoming.get(key):
             result[key] = incoming[key]
+    for key in ["industry_l1", "industry_l2", "core_products"]:
+        existing_value = (result.get(key) or "").strip()
+        incoming_value = (incoming.get(key) or "").strip()
+        if (not existing_value or existing_value == "其他") and incoming_value:
+            result[key] = incoming_value
     old_tags = json.loads(result.get("concept_tags", "[]"))
     new_tags = json.loads(incoming.get("concept_tags", "[]"))
     merged_tags = []
@@ -129,9 +142,56 @@ def merge_record(existing: dict[str, str], incoming: dict[str, str]) -> dict[str
     return result
 
 
+def seed_records(path: Path) -> dict[str, dict[str, str]]:
+    records: dict[str, dict[str, str]] = {}
+    if not path.exists():
+        return records
+    for row in read_csv(path):
+        ts_code = (row.get("ts_code") or "").strip()
+        if not ts_code:
+            continue
+        records[ts_code] = {
+            "ts_code": ts_code,
+            "company_name": normalize_name(row.get("company_name", "")),
+            "exchange": row.get("exchange", ""),
+            "industry_l1": row.get("industry_l1", "其他") or "其他",
+            "industry_l2": row.get("industry_l2", "其他") or "其他",
+            "business_scope": row.get("business_scope", ""),
+            "core_products": row.get("core_products", row.get("industry_l1", "其他")) or "其他",
+            "concept_tags": json.dumps(json.loads(row.get("concept_tags", "[]")), ensure_ascii=False),
+        }
+    return records
+
+
+def apply_manual_overrides(records: dict[str, dict[str, str]], path: Path) -> dict[str, dict[str, str]]:
+    if not path.exists():
+        return records
+    for row in read_csv(path):
+        ts_code = (row.get("ts_code") or "").strip()
+        if not ts_code:
+            continue
+        override = {
+            "ts_code": ts_code,
+            "company_name": normalize_name(row.get("company_name", "")),
+            "exchange": row.get("exchange", ""),
+            "industry_l1": row.get("industry_l1", "其他") or "其他",
+            "industry_l2": row.get("industry_l2", "其他") or "其他",
+            "business_scope": row.get("business_scope", ""),
+            "core_products": row.get("core_products", row.get("industry_l1", "其他")) or "其他",
+            "concept_tags": json.dumps(json.loads(row.get("concept_tags", "[]")), ensure_ascii=False),
+        }
+        if ts_code in records:
+            merged = dict(records[ts_code])
+            merged.update({k: v for k, v in override.items() if v})
+            records[ts_code] = merged
+        else:
+            records[ts_code] = override
+    return records
+
+
 def main() -> None:
     args = parse_args()
-    records: dict[str, dict[str, str]] = {}
+    records = seed_records(Path(args.seed).resolve())
 
     for source_file in SOURCE_FILES:
         if not source_file.exists():
@@ -157,6 +217,8 @@ def main() -> None:
                 records[incoming["ts_code"]] = merge_record(records[incoming["ts_code"]], incoming)
             else:
                 records[incoming["ts_code"]] = incoming
+
+    records = apply_manual_overrides(records, Path(args.manual).resolve())
 
     output_path = Path(args.output).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
