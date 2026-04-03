@@ -13,11 +13,13 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+import psycopg
+
 SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage.db_guard import write_guard
+from capabilities.storage.db_guard import dsn_for, write_guard
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -83,17 +85,21 @@ def load_raw_documents() -> list[dict[str, str]]:
         for row in read_csv(path):
             if row.get("url") == "local://manual-seed":
                 continue
+            title = (row.get("title") or "").strip()
+            content = (row.get("content") or "").strip()
+            if not content:
+                content = title or "(empty)"
             content_hash = hashlib.md5(
-                f'{row["title"]}::{row["content"]}'.encode("utf-8")
+                f"{title}::{content}".encode("utf-8")
             ).hexdigest()
             rows.append(
                 {
-                    "source": row["source"],
+                    "source": row.get("source", "unknown"),
                     "source_type": "text_source",
-                    "title": row["title"],
-                    "content": row["content"],
-                    "publish_time": normalize_datetime(row["publish_time"]),
-                    "url": row["url"],
+                    "title": title,
+                    "content": content,
+                    "publish_time": safe_normalize_datetime(row.get("publish_time", "")),
+                    "url": row.get("url", ""),
                     "symbol_or_subject": row.get("symbol_or_subject", ""),
                     "content_hash": content_hash,
                 }
@@ -111,6 +117,13 @@ def normalize_datetime(value: str) -> str:
     raise ValueError(f"Unsupported datetime format: {value}")
 
 
+def safe_normalize_datetime(value: str) -> str:
+    try:
+        return normalize_datetime(value)
+    except Exception:
+        return "1970-01-01 00:00:00"
+
+
 def run_psql(db: str, sql: str) -> None:
     subprocess.run(
         ["psql", "-d", db, "-v", "ON_ERROR_STOP=1", "-c", sql],
@@ -119,14 +132,15 @@ def run_psql(db: str, sql: str) -> None:
     )
 
 
-def copy_csv_to_table(db: str, rows: list[dict[str, str]], fieldnames: list[str], table_name: str) -> None:
+def copy_csv_to_table(db: str, rows: list[dict[str, str]], fieldnames: list[str], table_name: str, truncate: bool = True) -> None:
     with NamedTemporaryFile("w", encoding="utf-8", newline="", suffix=".csv", delete=False) as tmp:
         writer = csv.DictWriter(tmp, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
         temp_path = tmp.name
     try:
-        run_psql(db, f"TRUNCATE TABLE {table_name} RESTART IDENTITY CASCADE;")
+        if truncate:
+            run_psql(db, f"TRUNCATE TABLE {table_name} RESTART IDENTITY CASCADE;")
         sql = (
             f"\\copy {table_name} ({', '.join(fieldnames)}) "
             f"FROM '{temp_path}' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"
@@ -138,6 +152,27 @@ def copy_csv_to_table(db: str, rows: list[dict[str, str]], fieldnames: list[str]
         )
     finally:
         Path(temp_path).unlink(missing_ok=True)
+
+
+def upsert_raw_documents(db: str, rows: list[dict[str, str]]) -> None:
+    if not rows:
+        return
+    sql = """
+        INSERT INTO raw_documents (source, source_type, title, content, publish_time, url, symbol_or_subject, content_hash)
+        VALUES (%(source)s, %(source_type)s, %(title)s, %(content)s, %(publish_time)s, %(url)s, %(symbol_or_subject)s, %(content_hash)s)
+        ON CONFLICT (url) DO UPDATE
+        SET source = EXCLUDED.source,
+            source_type = EXCLUDED.source_type,
+            title = EXCLUDED.title,
+            content = EXCLUDED.content,
+            publish_time = EXCLUDED.publish_time,
+            symbol_or_subject = EXCLUDED.symbol_or_subject,
+            content_hash = EXCLUDED.content_hash;
+    """
+    with psycopg.connect(dsn_for(db)) as conn:
+        with conn.cursor() as cur:
+            cur.executemany(sql, rows)
+        conn.commit()
 
 
 def build_candidate_stage_rows(raw_candidates: list[dict[str, str]], raw_documents: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -184,18 +219,20 @@ def build_structured_stage_rows(structured_events: list[dict[str, str]]) -> list
 
 
 def load_stage_tables(db: str, raw_documents: list[dict[str, str]], raw_candidates: list[dict[str, str]], structured_events: list[dict[str, str]]) -> None:
-    copy_csv_to_table(db, raw_documents, RAW_DOCUMENT_FIELDS, "raw_documents")
+    upsert_raw_documents(db, raw_documents)
     copy_csv_to_table(
         db,
         build_candidate_stage_rows(raw_candidates, raw_documents),
         CANDIDATE_STAGE_FIELDS,
         "event_candidates_stage",
+        truncate=True,
     )
     copy_csv_to_table(
         db,
         build_structured_stage_rows(structured_events),
         STRUCTURED_STAGE_FIELDS,
         "structured_events_stage",
+        truncate=True,
     )
 
 
@@ -213,7 +250,14 @@ def insert_final_tables(db: str) -> None:
                NULLIF(s.score_hint, '')::integer
         FROM event_candidates_stage s
         JOIN raw_documents d ON d.url = s.raw_document_url
-        ORDER BY d.id;
+        ORDER BY d.id
+        ON CONFLICT (raw_document_id) DO UPDATE
+        SET dedup_key = EXCLUDED.dedup_key,
+            duplicate_group_size = EXCLUDED.duplicate_group_size,
+            is_event = EXCLUDED.is_event,
+            filter_reason = EXCLUDED.filter_reason,
+            evidence = EXCLUDED.evidence,
+            score_hint = EXCLUDED.score_hint;
         """,
     )
     run_psql(
@@ -246,7 +290,39 @@ def insert_final_tables(db: str) -> None:
         FROM structured_events_stage s
         JOIN raw_documents d ON d.url = s.raw_text_ref
         JOIN event_candidates c ON c.raw_document_id = d.id
-        ORDER BY c.id;
+        ORDER BY c.id
+        ON CONFLICT (candidate_id) DO UPDATE
+        SET event_id = EXCLUDED.event_id,
+            event_name = EXCLUDED.event_name,
+            event_date = EXCLUDED.event_date,
+            source = EXCLUDED.source,
+            event_subject_type = EXCLUDED.event_subject_type,
+            duration_type = EXCLUDED.duration_type,
+            predictability_type = EXCLUDED.predictability_type,
+            industry_type = EXCLUDED.industry_type,
+            sentiment = EXCLUDED.sentiment,
+            heat_score = EXCLUDED.heat_score,
+            intensity_score = EXCLUDED.intensity_score,
+            impact_scope = EXCLUDED.impact_scope,
+            event_summary = EXCLUDED.event_summary,
+            subject_entities = EXCLUDED.subject_entities,
+            raw_text_ref = EXCLUDED.raw_text_ref,
+            classification_evidence = EXCLUDED.classification_evidence;
+        """,
+    )
+    run_psql(
+        db,
+        """
+        DELETE FROM structured_events se
+        USING event_candidates ec
+        WHERE se.candidate_id = ec.id
+          AND ec.id IN (
+              SELECT c.id
+              FROM event_candidates_stage s
+              JOIN raw_documents d ON d.url = s.raw_document_url
+              JOIN event_candidates c ON c.raw_document_id = d.id
+          )
+          AND ec.is_event = false;
         """,
     )
 

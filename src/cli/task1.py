@@ -9,6 +9,22 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+CLASSIFY_INPUT_FILES = [
+    "data/demo_news.csv",
+    "data/source_gov.csv",
+    "data/source_ndrc.csv",
+    "data/source_csrc.csv",
+    "data/source_sse.csv",
+    "data/source_cninfo.csv",
+    "data/source_szse.csv",
+    "data/source_szse_suspension.csv",
+    "data/source_yicai.csv",
+    "data/source_eastmoney.csv",
+    "data/source_36kr.csv",
+    "data/source_caixin.csv",
+    "data/source_miit.csv",
+    "data/manual_news.csv",
+]
 
 
 def run(cmd: list[str]) -> None:
@@ -80,6 +96,8 @@ def main() -> None:
 
     if args.command == "classify":
         cmd = ["python3", "src/capabilities/events/classify.py", "--db", args.db]
+        for input_file in CLASSIFY_INPUT_FILES:
+            cmd.extend(["--input", input_file])
         if args.skip_db_load:
             cmd.append("--skip-db-load")
         run(cmd)
