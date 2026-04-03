@@ -32,8 +32,7 @@
 - 任务 1 一键总入口：`src/pipelines/task1.py`
 - 任务 1 统一命令入口：`src/cli/task1.py`
 - 任务 2 表结构：`sql/create_task2_tables.sql`
-- 任务 1 规范说明：`docs_task1.md`
-- 任务 1 规则说明（答辩版）：`docs_task1_rulebook.md`
+- 任务 1 规则说明（答辩版）：`docs/docs_task1_rulebook.md`
 - 附录 2 来源目录：`data/appendix2_sources.csv`
 - 公司导入脚本：`src/capabilities/storage/load_companies.py`
 - 事件-公司关联打分脚本：`src/capabilities/linking/link_events.py`
@@ -43,6 +42,7 @@
 - 任务 3 事件传播构建：`src/capabilities/graph/propagate_event_links.py`
 - 任务 3 一键入口：`src/pipelines/task3.py`
 - 任务 3 统一命令入口：`src/cli/task3.py`
+- 当前综合进展报告：`report/project_progress_20260403.md`
 
 ## 已覆盖的任务 1 能力
 
