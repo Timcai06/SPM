@@ -39,6 +39,9 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 def main() -> None:
     args = parse_args()
     rows = read_rows(Path(args.input).resolve())
+    inserted = 0
+    updated = 0
+    skipped = 0
 
     with write_guard(
         db_name=args.db,
@@ -47,13 +50,20 @@ def main() -> None:
     ):
         with psycopg.connect(dsn_for(args.db), row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
+                cur.execute("DELETE FROM company_relations WHERE is_manual_override = TRUE")
                 for row in rows:
                     cur.execute("SELECT id FROM companies WHERE ts_code = %s", (row["source_ts_code"],))
                     source = cur.fetchone()
                     cur.execute("SELECT id FROM companies WHERE ts_code = %s", (row["target_ts_code"],))
                     target = cur.fetchone()
                     if not source or not target:
+                        skipped += 1
                         continue
+                    source_id = source["id"]
+                    target_id = target["id"]
+                    direction = row.get("direction", "undirected")
+                    if direction == "undirected" and source_id > target_id:
+                        source_id, target_id = target_id, source_id
                     cur.execute(
                         """
                         INSERT INTO company_relations (
@@ -69,16 +79,30 @@ def main() -> None:
                             updated_at = NOW()
                         """,
                         (
-                            source["id"],
-                            target["id"],
+                            source_id,
+                            target_id,
                             row["relation_type"],
                             row.get("relation_strength", "0.5000"),
-                            row.get("direction", "undirected"),
-                            json.dumps({"evidence_note": row.get("evidence_note", "")}, ensure_ascii=False),
+                            direction,
+                            json.dumps(
+                                {
+                                    "evidence_note": row.get("evidence_note", ""),
+                                    "source_ts_code": row["source_ts_code"],
+                                    "target_ts_code": row["target_ts_code"],
+                                },
+                                ensure_ascii=False,
+                            ),
                         ),
                     )
+                    if cur.rowcount == 1:
+                        inserted += 1
+                    else:
+                        updated += 1
             conn.commit()
-    print(f"Loaded {len(rows)} company relations into {args.db}")
+    print(
+        f"Processed {len(rows)} relation rows into {args.db} "
+        f"(inserted_or_updated={inserted + updated}, skipped={skipped})"
+    )
 
 
 if __name__ == "__main__":
