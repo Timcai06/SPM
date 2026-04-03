@@ -36,6 +36,7 @@ from capabilities.events.rules import (
     EVENT_DUPLICATE_BONUS_CAP,
     EVENT_SCORE_THRESHOLD,
     EVENT_SUBJECT_ENUM,
+    GOV_NARRATIVE_KEYWORDS,
     HEAT_DUPLICATE_CAP,
     HEAT_DUPLICATE_PER_COUNT,
     HEAT_SOURCE_MULTIPLIER,
@@ -57,8 +58,10 @@ from capabilities.events.rules import (
     INTENSITY_SHOCK_KEYWORDS,
     INTENSITY_SURPRISE_BONUS,
     INTENSITY_TOTAL_CAP,
+    MACRO_DATA_KEYWORDS,
     NEGATIVE_WORDS,
     NON_EVENT_KEYWORDS,
+    POLICY_ACTION_KEYWORDS,
     POSITIVE_WORDS,
     PREDICTABILITY_DEFAULT,
     PREDICTABILITY_ENUM,
@@ -245,6 +248,9 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
     weak_hits = keyword_hits(full_text, WEAK_NEUTRAL_KEYWORDS)
     routine_hits = keyword_hits(full_text, ROUTINE_ANNOUNCEMENT_KEYWORDS)
     template_hits = keyword_hits(full_text, ANNOUNCEMENT_TEMPLATE_KEYWORDS)
+    title_narrative_hits = keyword_hits(row["title"], GOV_NARRATIVE_KEYWORDS)
+    title_policy_action_hits = keyword_hits(row["title"], POLICY_ACTION_KEYWORDS)
+    title_macro_data_hits = keyword_hits(row["title"], MACRO_DATA_KEYWORDS)
     event_hits = keyword_hits(full_text, ACTIVE_EVENT_KEYWORDS)
     strong_event_hits = [kw for kw in event_hits if kw not in GENERIC_EVENT_HITS]
 
@@ -313,6 +319,20 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             is_event=False,
             filter_reason="generic_announcement_without_signal",
             evidence="公告源文本仅含通用披露词; score=1; threshold=" + str(EVENT_SCORE_THRESHOLD),
+            score_hint=1,
+            event_score=1,
+            event_threshold=EVENT_SCORE_THRESHOLD,
+        )
+
+    if row.get("source", "").startswith("中国政府网") and title_narrative_hits and not title_policy_action_hits and not title_macro_data_hits:
+        return CandidateResult(
+            row=row,
+            normalized_publish_time=publish_time,
+            dedup_key=dedup_key(row),
+            duplicate_group_size=duplicate_group_size,
+            is_event=False,
+            filter_reason="government_narrative_without_action",
+            evidence="官媒叙事型标题且缺少正式政策动作/数据词: " + "|".join(title_narrative_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,

@@ -83,6 +83,45 @@ ANNOUNCEMENT_TEMPLATE_KEYWORDS = (
     "SZCY",
 )
 GENERIC_ENTITY_TOKENS = ("LC", "ST", "SZCY", "SZZB", "TOP50", "SK", "CP", "CMG", "CCTV", "IPO", "IRGC", "CRU", "CPU", "CPO", "ESG", "AI")
+GOV_NARRATIVE_KEYWORDS = (
+    "学习贯彻",
+    "述评",
+    "调研时强调",
+    "激励广大干部群众",
+    "春光正好",
+    "新活力",
+    "开创新局面",
+    "真抓实干",
+    "锐意进取",
+    "观察",
+    "综述",
+)
+POLICY_ACTION_KEYWORDS = (
+    "印发",
+    "发布",
+    "出台",
+    "通知",
+    "意见",
+    "方案",
+    "措施",
+    "规划",
+    "办法",
+    "指导意见",
+    "实施方案",
+)
+MACRO_DATA_KEYWORDS = (
+    "同比",
+    "环比",
+    "增加值",
+    "CPI",
+    "PPI",
+    "GDP",
+    "PMI",
+    "出口",
+    "进口",
+    "社融",
+    "工业企业利润",
+)
 TITLE_EMPHASIS_WORDS = ("重大", "爆发", "发布", "签订", "支持", "击落", "突破")
 IMPACT_WIDE_KEYWORDS = ("全国", "全市场", "行业")
 INTENSITY_SHOCK_KEYWORDS = ("重大", "击落", "爆发")
