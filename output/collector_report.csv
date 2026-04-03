@@ -1,0 +1,13 @@
+collector,success,failure_category,row_count,duration_ms,output_path,error,run_at
+government,true,,17,34817,/Users/tim/股市预测模型/data/source_gov.csv,,2026-04-03 11:43:47
+ndrc,true,,18,32126,/Users/tim/股市预测模型/data/source_ndrc.csv,,2026-04-03 11:44:19
+csrc,true,,16,44489,/Users/tim/股市预测模型/data/source_csrc.csv,,2026-04-03 11:45:03
+sse,true,,20,2821,/Users/tim/股市预测模型/data/source_sse.csv,,2026-04-03 11:45:06
+cninfo,true,,20,2011,/Users/tim/股市预测模型/data/source_cninfo.csv,,2026-04-03 11:45:08
+szse,true,,20,7940,/Users/tim/股市预测模型/data/source_szse.csv,,2026-04-03 11:45:16
+szse_suspension,true,empty_data,0,2678,/Users/tim/股市预测模型/data/source_szse_suspension.csv,,2026-04-03 11:45:19
+yicai,true,,20,2566,/Users/tim/股市预测模型/data/source_yicai.csv,,2026-04-03 11:45:21
+eastmoney,true,,20,91328,/Users/tim/股市预测模型/data/source_eastmoney.csv,,2026-04-03 11:46:53
+36kr,true,,20,2770,/Users/tim/股市预测模型/data/source_36kr.csv,,2026-04-03 11:46:55
+caixin,true,,20,2980,/Users/tim/股市预测模型/data/source_caixin.csv,,2026-04-03 11:46:58
+miit,true,,20,62819,/Users/tim/股市预测模型/data/source_miit.csv,,2026-04-03 11:48:01

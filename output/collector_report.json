@@ -1,0 +1,122 @@
+[
+  {
+    "collector": "government",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "17",
+    "duration_ms": "34817",
+    "output_path": "/Users/tim/股市预测模型/data/source_gov.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:43:47"
+  },
+  {
+    "collector": "ndrc",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "18",
+    "duration_ms": "32126",
+    "output_path": "/Users/tim/股市预测模型/data/source_ndrc.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:44:19"
+  },
+  {
+    "collector": "csrc",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "16",
+    "duration_ms": "44489",
+    "output_path": "/Users/tim/股市预测模型/data/source_csrc.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:45:03"
+  },
+  {
+    "collector": "sse",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "20",
+    "duration_ms": "2821",
+    "output_path": "/Users/tim/股市预测模型/data/source_sse.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:45:06"
+  },
+  {
+    "collector": "cninfo",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "20",
+    "duration_ms": "2011",
+    "output_path": "/Users/tim/股市预测模型/data/source_cninfo.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:45:08"
+  },
+  {
+    "collector": "szse",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "20",
+    "duration_ms": "7940",
+    "output_path": "/Users/tim/股市预测模型/data/source_szse.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:45:16"
+  },
+  {
+    "collector": "szse_suspension",
+    "success": "true",
+    "failure_category": "empty_data",
+    "row_count": "0",
+    "duration_ms": "2678",
+    "output_path": "/Users/tim/股市预测模型/data/source_szse_suspension.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:45:19"
+  },
+  {
+    "collector": "yicai",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "20",
+    "duration_ms": "2566",
+    "output_path": "/Users/tim/股市预测模型/data/source_yicai.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:45:21"
+  },
+  {
+    "collector": "eastmoney",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "20",
+    "duration_ms": "91328",
+    "output_path": "/Users/tim/股市预测模型/data/source_eastmoney.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:46:53"
+  },
+  {
+    "collector": "36kr",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "20",
+    "duration_ms": "2770",
+    "output_path": "/Users/tim/股市预测模型/data/source_36kr.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:46:55"
+  },
+  {
+    "collector": "caixin",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "20",
+    "duration_ms": "2980",
+    "output_path": "/Users/tim/股市预测模型/data/source_caixin.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:46:58"
+  },
+  {
+    "collector": "miit",
+    "success": "true",
+    "failure_category": "",
+    "row_count": "20",
+    "duration_ms": "62819",
+    "output_path": "/Users/tim/股市预测模型/data/source_miit.csv",
+    "error": "",
+    "run_at": "2026-04-03 11:48:01"
+  }
+]
