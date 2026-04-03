@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simple Streamlit viewer for Task 1 PostgreSQL tables."""
+"""Simple Streamlit viewer for Task 1/2/3 PostgreSQL tables."""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ def load_dataframe(conn, query: str, params=None) -> pd.DataFrame:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Task 1 Data Viewer", layout="wide")
-    st.title("Task 1 Data Viewer")
+    st.set_page_config(page_title="Task 1/2/3 Data Viewer", layout="wide")
+    st.title("Task 1/2/3 Data Viewer")
 
     db_name = st.sidebar.text_input("Database", DEFAULT_DB)
     limit = st.sidebar.slider("Rows per table", min_value=10, max_value=200, value=50, step=10)
@@ -51,6 +51,10 @@ def main() -> None:
             SELECT 'companies', count(*) FROM companies
             UNION ALL
             SELECT 'event_company_links', count(*) FROM event_company_links
+            UNION ALL
+            SELECT 'company_relations', count(*) FROM company_relations
+            UNION ALL
+            SELECT 'event_propagation_links', count(*) FROM event_propagation_links
             """
         )
         st.subheader("Summary")
@@ -143,6 +147,52 @@ def main() -> None:
             (limit,),
         )
         st.dataframe(links, width="stretch", hide_index=True)
+
+        st.subheader("Company Relations")
+        relations = load_dataframe(
+            conn,
+            """
+            SELECT r.id,
+                   sc.ts_code AS source_ts_code,
+                   sc.company_name AS source_company_name,
+                   tc.ts_code AS target_ts_code,
+                   tc.company_name AS target_company_name,
+                   r.relation_type,
+                   r.relation_strength,
+                   r.direction
+            FROM company_relations r
+            JOIN companies sc ON sc.id = r.source_company_id
+            JOIN companies tc ON tc.id = r.target_company_id
+            ORDER BY r.relation_strength DESC, r.id DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        st.dataframe(relations, width="stretch", hide_index=True)
+
+        st.subheader("Event Propagation Links")
+        propagations = load_dataframe(
+            conn,
+            """
+            SELECT p.id,
+                   e.event_name,
+                   sc.company_name AS source_company_name,
+                   tc.company_name AS target_company_name,
+                   p.propagation_type,
+                   p.propagation_score,
+                   p.source_link_score,
+                   p.relation_strength,
+                   p.propagation_path
+            FROM event_propagation_links p
+            JOIN structured_events e ON e.id = p.structured_event_id
+            JOIN companies sc ON sc.id = p.source_company_id
+            JOIN companies tc ON tc.id = p.target_company_id
+            ORDER BY p.propagation_score DESC, p.id DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        st.dataframe(propagations, width="stretch", hide_index=True)
 
     conn.close()
 

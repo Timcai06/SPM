@@ -39,6 +39,10 @@
 - 事件-公司关联打分脚本：`src/capabilities/linking/link_events.py`
 - 任务 2 一键入口：`src/pipelines/task2.py`
 - 任务 2 统一命令入口：`src/cli/task2.py`
+- 任务 3 图谱关系导入：`src/capabilities/storage/load_task3_relations.py`
+- 任务 3 事件传播构建：`src/capabilities/graph/propagate_event_links.py`
+- 任务 3 一键入口：`src/pipelines/task3.py`
+- 任务 3 统一命令入口：`src/cli/task3.py`
 
 ## 已覆盖的任务 1 能力
 
@@ -90,6 +94,17 @@ python3 src/cli/task2.py run --db stock_event_mining --top-k 3 --min-score 0.35
 - 首批公司样本导入 `companies`
 - 对 `structured_events` 做最小关联打分
 - 把结果写入 `event_company_links`
+
+任务 3 准备闭环：
+
+```bash
+python3 src/cli/task3.py run --db stock_event_mining --input data/company_relations_seed.csv --min-source-score 0.35 --min-propagation-score 0.20
+```
+
+这条命令会自动执行：
+- 把公司关系边导入 `company_relations`
+- 基于 `event_company_links` 构造一跳传播结果
+- 把传播结果写入 `event_propagation_links`
 
 默认情况下，`task1 classify` 在写出 CSV 后会继续把结果直接写入 PostgreSQL 的 `stock_event_mining` 数据库。
 
@@ -164,6 +179,10 @@ python3 src/cli/task1.py view
 - `companies`
 - `event_company_links`
 
+任务 3 当前新增两张基础表：
+- `company_relations`
+- `event_propagation_links`
+
 ## 数据说明
 
 首版现在支持两类输入：
@@ -195,3 +214,5 @@ python3 src/cli/task1.py view
 - 用模型补强规则分类和摘要质量
 - 把输出接入任务 2 的事件-公司关联模块
 - 把 `companies_seed.csv` 扩成真实全市场公司主数据
+- 把 `company_relations_seed.csv` 扩成真实供应链/同概念/控股关系图
+- 把一跳传播扩展到多跳传播与路径解释
