@@ -29,6 +29,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.events.rules import (
+    ANNOUNCEMENT_TEMPLATE_KEYWORDS,
     DURATION_DEFAULT,
     DURATION_ENUM,
     DURATION_RULES,
@@ -116,7 +117,7 @@ STRUCTURED_EVENT_FIELDS = [
     "classification_evidence",
 ]
 
-ENTITY_PATTERN = re.compile(r"[A-Z]{2,}\-?\d*|[0-9]{6}\.(?:SZ|SH)|印巴|克什米尔|歼\-?10CE|中航成飞|储能|机器人")
+ENTITY_PATTERN = re.compile(r"[0-9]{6}\.(?:SZ|SH)|印巴|克什米尔|歼\-?10CE|中航成飞|储能|机器人")
 GENERIC_EVENT_HITS = {"公告"}
 
 
@@ -243,6 +244,7 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
     non_event_hits = keyword_hits(full_text, NON_EVENT_KEYWORDS)
     weak_hits = keyword_hits(full_text, WEAK_NEUTRAL_KEYWORDS)
     routine_hits = keyword_hits(full_text, ROUTINE_ANNOUNCEMENT_KEYWORDS)
+    template_hits = keyword_hits(full_text, ANNOUNCEMENT_TEMPLATE_KEYWORDS)
     event_hits = keyword_hits(full_text, ACTIVE_EVENT_KEYWORDS)
     strong_event_hits = [kw for kw in event_hits if kw not in GENERIC_EVENT_HITS]
 
@@ -283,6 +285,20 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             is_event=False,
             filter_reason="routine_announcement_without_signal",
             evidence="常规公告且缺少强事件关键词: " + "|".join(routine_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
+            score_hint=1,
+            event_score=1,
+            event_threshold=EVENT_SCORE_THRESHOLD,
+        )
+
+    if template_hits and not strong_event_hits:
+        return CandidateResult(
+            row=row,
+            normalized_publish_time=publish_time,
+            dedup_key=dedup_key(row),
+            duplicate_group_size=duplicate_group_size,
+            is_event=False,
+            filter_reason="announcement_template_without_signal",
+            evidence="公告模板词且缺少强事件关键词: " + "|".join(template_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,

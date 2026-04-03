@@ -72,6 +72,16 @@ ROUTINE_ANNOUNCEMENT_KEYWORDS = (
     "临时股东会",
     "持股计划",
 )
+ANNOUNCEMENT_TEMPLATE_KEYWORDS = (
+    "公告类型：",
+    "_LC_BULLETIN",
+    "_M_BULLETIN",
+    "_S_BULLETIN",
+    "K_LC_BULLETIN",
+    "M_LC_BULLETIN",
+    "SZZB",
+    "SZCY",
+)
 GENERIC_ENTITY_TOKENS = ("LC", "ST", "SZCY", "SZZB", "TOP50", "SK", "CP", "CMG", "CCTV", "IPO", "IRGC", "CRU", "CPU", "CPO", "ESG", "AI")
 TITLE_EMPHASIS_WORDS = ("重大", "爆发", "发布", "签订", "支持", "击落", "突破")
 IMPACT_WIDE_KEYWORDS = ("全国", "全市场", "行业")
