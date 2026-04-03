@@ -50,6 +50,10 @@
 
 全部参数统一定义在：`src/capabilities/events/rules.py`，避免散落在业务代码中。
 
+误判/漏判回流词典：
+- 文件：`data/rule_feedback_keywords.csv`
+- 规则：仅允许补充白名单维度关键词（subject/industry/predictability/duration），不改评分公式。
+
 ## 5. 正负例示例
 
 ### 正例（应识别为事件）

@@ -18,6 +18,7 @@ CLASSIFY_INPUT_FILES = [
     "data/source_sse.csv",
     "data/source_cninfo.csv",
     "data/source_szse.csv",
+    "data/source_szse_suspension.csv",
     "data/source_yicai.csv",
     "data/source_eastmoney.csv",
     "data/source_36kr.csv",
@@ -41,6 +42,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip validation after loading.",
     )
+    parser.add_argument("--with-analysis", action="store_true", help="Run event-study analysis after validation.")
+    parser.add_argument("--analysis-mode", default="event-study", help="Analysis mode for feature step.")
+    parser.add_argument("--benchmark", default="hs300", help="Benchmark id for analysis.")
+    parser.add_argument("--event-windows", default="1,3,5", help="Event windows for analysis.")
     return parser.parse_args()
 
 
@@ -65,6 +70,22 @@ def main() -> None:
 
     if not args.skip_validate:
         run(["python3", "src/capabilities/quality/check.py"])
+
+    if args.with_analysis:
+        run(
+            [
+                "python3",
+                "src/capabilities/analysis/feature_return.py",
+                "--db",
+                args.db,
+                "--analysis-mode",
+                args.analysis_mode,
+                "--benchmark",
+                args.benchmark,
+                "--event-windows",
+                args.event_windows,
+            ]
+        )
 
     print(f"Task 1 workflow completed for database: {args.db}")
 

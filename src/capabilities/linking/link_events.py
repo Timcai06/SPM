@@ -5,9 +5,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from decimal import Decimal
+from pathlib import Path
 
 import psycopg
+
+SRC_ROOT = Path(__file__).resolve().parents[2]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from capabilities.storage.db_guard import dsn_for, write_guard
 
 
 DEFAULT_DB = "stock_event_mining"
@@ -33,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--top-k", type=int, default=3, help="Max companies per event.")
     parser.add_argument("--min-score", type=float, default=0.35)
+    parser.add_argument("--lock-timeout-sec", type=int, default=120, help="Max seconds to wait for DB write lock.")
     return parser.parse_args()
 
 
@@ -84,60 +93,65 @@ def score_link(event: dict, company: dict) -> tuple[float, dict]:
 
 def main() -> None:
     args = parse_args()
-    with psycopg.connect(f"dbname={args.db} user=tim host=127.0.0.1 port=5432", row_factory=psycopg.rows.dict_row) as conn:
-        with conn.cursor() as cur:
-            cur.execute("TRUNCATE TABLE event_company_links RESTART IDENTITY")
-            cur.execute(
-                """
-                SELECT id, event_name, event_subject_type, industry_type, event_summary
-                FROM structured_events
-                ORDER BY id
-                """
-            )
-            events = cur.fetchall()
-            cur.execute(
-                """
-                SELECT id, ts_code, company_name, industry_l1, industry_l2, business_scope, core_products, concept_tags
-                FROM companies
-                WHERE is_active = TRUE
-                ORDER BY id
-                """
-            )
-            companies = cur.fetchall()
+    with write_guard(
+        db_name=args.db,
+        required_tables=["companies", "structured_events", "event_company_links"],
+        lock_timeout_sec=args.lock_timeout_sec,
+    ):
+        with psycopg.connect(dsn_for(args.db), row_factory=psycopg.rows.dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute("TRUNCATE TABLE event_company_links RESTART IDENTITY")
+                cur.execute(
+                    """
+                    SELECT id, event_name, event_subject_type, industry_type, event_summary
+                    FROM structured_events
+                    ORDER BY id
+                    """
+                )
+                events = cur.fetchall()
+                cur.execute(
+                    """
+                    SELECT id, ts_code, company_name, industry_l1, industry_l2, business_scope, core_products, concept_tags
+                    FROM companies
+                    WHERE is_active = TRUE
+                    ORDER BY id
+                    """
+                )
+                companies = cur.fetchall()
 
-            inserted = 0
-            for event in events:
-                scored = []
-                for company in companies:
-                    final_score, details = score_link(event, company)
-                    if final_score >= args.min_score:
-                        scored.append((final_score, company, details))
-                scored.sort(key=lambda item: item[0], reverse=True)
-                for final_score, company, details in scored[: args.top_k]:
-                    link_type = "industry_match" if details["industry_match_score"] >= 1 else "candidate"
-                    cur.execute(
-                        """
-                        INSERT INTO event_company_links (
-                            structured_event_id, company_id, link_type, relation_path,
-                            text_similarity_score, industry_match_score, chain_position_score,
-                            event_match_score, final_link_score, evidence
+                inserted = 0
+                for event in events:
+                    scored = []
+                    for company in companies:
+                        final_score, details = score_link(event, company)
+                        if final_score >= args.min_score:
+                            scored.append((final_score, company, details))
+                    scored.sort(key=lambda item: item[0], reverse=True)
+                    for final_score, company, details in scored[: args.top_k]:
+                        link_type = "industry_match" if details["industry_match_score"] >= 1 else "candidate"
+                        cur.execute(
+                            """
+                            INSERT INTO event_company_links (
+                                structured_event_id, company_id, link_type, relation_path,
+                                text_similarity_score, industry_match_score, chain_position_score,
+                                event_match_score, final_link_score, evidence
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                            """,
+                            (
+                                event["id"],
+                                company["id"],
+                                link_type,
+                                f'{event["event_name"]} -> {company["industry_l2"]} -> {company["company_name"]}',
+                                Decimal(str(details["text_similarity_score"])),
+                                Decimal(str(details["industry_match_score"])),
+                                Decimal(str(details["chain_position_score"])),
+                                Decimal(str(details["event_match_score"])),
+                                Decimal(str(final_score)),
+                                json.dumps(details["evidence"], ensure_ascii=False),
+                            ),
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
-                        """,
-                        (
-                            event["id"],
-                            company["id"],
-                            link_type,
-                            f'{event["event_name"]} -> {company["industry_l2"]} -> {company["company_name"]}',
-                            Decimal(str(details["text_similarity_score"])),
-                            Decimal(str(details["industry_match_score"])),
-                            Decimal(str(details["chain_position_score"])),
-                            Decimal(str(details["event_match_score"])),
-                            Decimal(str(final_score)),
-                            json.dumps(details["evidence"], ensure_ascii=False),
-                        ),
-                    )
-                    inserted += 1
+                        inserted += 1
     print(f"Inserted {inserted} event-company links into {args.db}")
 
 

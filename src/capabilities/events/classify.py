@@ -74,6 +74,7 @@ from capabilities.events.rules import (
 
 ROOT = Path(__file__).resolve().parents[3]
 INPUT_PATH = ROOT / "data" / "demo_news.csv"
+RULE_FEEDBACK_PATH = ROOT / "data" / "rule_feedback_keywords.csv"
 OUTPUT_DIR = ROOT / "output"
 RAW_OUTPUT_PATH = OUTPUT_DIR / "raw_event_candidates.csv"
 STRUCTURED_OUTPUT_PATH = OUTPUT_DIR / "structured_events.csv"
@@ -113,8 +114,54 @@ STRUCTURED_EVENT_FIELDS = [
     "classification_evidence",
 ]
 
-EVENT_KEYWORDS = sorted({word for words in SUBJECT_RULES.values() for word in words})
 ENTITY_PATTERN = re.compile(r"[A-Z]{2,}\-?\d*|[0-9]{6}\.(?:SZ|SH)|印巴|克什米尔|歼\-?10CE|中航成飞|储能|机器人")
+
+
+def _copy_rules(source: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    return {label: list(words) for label, words in source.items()}
+
+
+def load_feedback_keywords(path: Path) -> Dict[str, Dict[str, List[str]]]:
+    result: Dict[str, Dict[str, List[str]]] = {
+        "subject": {},
+        "industry": {},
+        "predictability": {},
+        "duration": {},
+    }
+    if not path.exists():
+        return result
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            dimension = row.get("dimension", "").strip().lower()
+            label = row.get("label", "").strip()
+            keyword = row.get("keyword", "").strip()
+            enabled = row.get("enabled", "true").strip().lower()
+            if enabled in {"0", "false", "no"}:
+                continue
+            if dimension not in result or not label or not keyword:
+                continue
+            result[dimension].setdefault(label, [])
+            if keyword not in result[dimension][label]:
+                result[dimension][label].append(keyword)
+    return result
+
+
+def merge_rules(base_rules: Dict[str, List[str]], feedback_rules: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    merged = _copy_rules(base_rules)
+    for label, words in feedback_rules.items():
+        merged.setdefault(label, [])
+        for word in words:
+            if word not in merged[label]:
+                merged[label].append(word)
+    return merged
+
+
+_feedback = load_feedback_keywords(RULE_FEEDBACK_PATH)
+ACTIVE_SUBJECT_RULES = merge_rules(SUBJECT_RULES, _feedback["subject"])
+ACTIVE_INDUSTRY_RULES = merge_rules(INDUSTRY_RULES, _feedback["industry"])
+ACTIVE_PREDICTABILITY_RULES = merge_rules(PREDICTABILITY_RULES, _feedback["predictability"])
+ACTIVE_DURATION_RULES = merge_rules(DURATION_RULES, _feedback["duration"])
+ACTIVE_EVENT_KEYWORDS = sorted({word for words in ACTIVE_SUBJECT_RULES.values() for word in words})
 
 
 @dataclass
@@ -133,12 +180,17 @@ class CandidateResult:
 
 def load_rows(path: Path) -> List[Dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+        # Some upstream sources may include unexpected NUL bytes.
+        # Strip them at read time to keep the pipeline resilient.
+        cleaned_lines = (line.replace("\x00", "") for line in f)
+        return list(csv.DictReader(cleaned_lines))
 
 
 def load_rows_from_inputs(paths: List[Path]) -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
     for path in paths:
+        if not path.exists():
+            continue
         for row in load_rows(path):
             if row.get("url") == "local://manual-seed":
                 continue
@@ -187,7 +239,7 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
     publish_time = normalize_datetime(row["publish_time"])
     non_event_hits = keyword_hits(full_text, NON_EVENT_KEYWORDS)
     weak_hits = keyword_hits(full_text, WEAK_NEUTRAL_KEYWORDS)
-    event_hits = keyword_hits(full_text, EVENT_KEYWORDS)
+    event_hits = keyword_hits(full_text, ACTIVE_EVENT_KEYWORDS)
 
     if non_event_hits:
         return CandidateResult(
@@ -197,7 +249,7 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=False,
             filter_reason="non_financial_noise",
-            evidence="命中非金融关键词: " + "|".join(non_event_hits),
+            evidence="命中非金融关键词: " + "|".join(non_event_hits) + f"; score=0; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=0,
             event_score=0,
             event_threshold=EVENT_SCORE_THRESHOLD,
@@ -211,7 +263,7 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=False,
             filter_reason="routine_disclosure_without_signal",
-            evidence="常规披露且无显著事件关键词: " + "|".join(weak_hits),
+            evidence="常规披露且无显著事件关键词: " + "|".join(weak_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,
@@ -361,6 +413,24 @@ def load_outputs_to_postgres(db_name: str) -> None:
 
 
 def build_candidate_row(row: Dict[str, str], result: CandidateResult) -> Dict[str, object]:
+    full_text = f'{row["title"]} {row["content"]}'
+    _, subject_hits = choose_label(full_text, ACTIVE_SUBJECT_RULES, SUBJECT_DEFAULT)
+    _, industry_hits = choose_label(full_text, ACTIVE_INDUSTRY_RULES, INDUSTRY_DEFAULT)
+    _, predictability_hits = choose_label(full_text, ACTIVE_PREDICTABILITY_RULES, PREDICTABILITY_DEFAULT)
+    _, duration_hits = choose_label(full_text, ACTIVE_DURATION_RULES, DURATION_DEFAULT)
+    evidence = (
+        result.evidence
+        + f"; rule_version={RULE_VERSION}"
+        + "; dimensions="
+        + "|".join(
+            [
+                "subject:" + (",".join(subject_hits) if subject_hits else "none"),
+                "industry:" + (",".join(industry_hits) if industry_hits else "none"),
+                "predictability:" + (",".join(predictability_hits) if predictability_hits else "none"),
+                "duration:" + (",".join(duration_hits) if duration_hits else "none"),
+            ]
+        )
+    )
     return {
         "source": row["source"],
         "title": row["title"],
@@ -371,7 +441,7 @@ def build_candidate_row(row: Dict[str, str], result: CandidateResult) -> Dict[st
         "duplicate_group_size": result.duplicate_group_size,
         "is_event": str(result.is_event).lower(),
         "filter_reason": result.filter_reason,
-        "evidence": result.evidence,
+        "evidence": evidence,
         "score_hint": result.score_hint,
         "event_score": result.event_score,
         "event_threshold": result.event_threshold,
@@ -381,10 +451,10 @@ def build_candidate_row(row: Dict[str, str], result: CandidateResult) -> Dict[st
 
 def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[str, object]:
     full_text = f'{row["title"]} {row["content"]}'
-    subject_type, subject_hits = choose_label(full_text, SUBJECT_RULES, SUBJECT_DEFAULT)
-    industry_type, industry_hits = choose_label(full_text, INDUSTRY_RULES, INDUSTRY_DEFAULT)
-    predictability_type, predictability_hits = choose_label(full_text, PREDICTABILITY_RULES, PREDICTABILITY_DEFAULT)
-    duration_type, duration_hits = choose_label(full_text, DURATION_RULES, DURATION_DEFAULT)
+    subject_type, subject_hits = choose_label(full_text, ACTIVE_SUBJECT_RULES, SUBJECT_DEFAULT)
+    industry_type, industry_hits = choose_label(full_text, ACTIVE_INDUSTRY_RULES, INDUSTRY_DEFAULT)
+    predictability_type, predictability_hits = choose_label(full_text, ACTIVE_PREDICTABILITY_RULES, PREDICTABILITY_DEFAULT)
+    duration_type, duration_hits = choose_label(full_text, ACTIVE_DURATION_RULES, DURATION_DEFAULT)
     subject_type = freeze_enum(subject_type, EVENT_SUBJECT_ENUM, SUBJECT_DEFAULT)
     industry_type = freeze_enum(industry_type, INDUSTRY_ENUM, INDUSTRY_DEFAULT)
     predictability_type = freeze_enum(predictability_type, PREDICTABILITY_ENUM, PREDICTABILITY_DEFAULT)

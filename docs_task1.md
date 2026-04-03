@@ -20,6 +20,7 @@
 - 巨潮资讯网：最新公告
 - 上交所官网：最新公告
 - 深交所官网：上市公司公告
+- 深交所官网：停复牌细分公告
 - 证监会官网：证监会要闻
 - 第一财经：新闻列表
 - 东方财富行业频道：行业资讯
@@ -31,7 +32,7 @@
 
 - 深交所官网：停复牌、财报等细分接口待补
 - 各行业协会官网：行业/技术事件
-- Tushare：行情数据、财务数据
+- Tushare：已用于任务1事件研究法增强（基准与个股收益）
 - 聚宽：行情数据
 - 东方财富个股财务：关键财务指标
 
@@ -154,5 +155,6 @@
 - 源采集器：`src/capabilities/collectors/*.py`（每个真实源一个文件）
 - 来源目录生成：`src/capabilities/collectors/catalog.py`
 - 采集执行报告：`output/collector_report.csv` / `output/collector_report.json`
+  - 新增字段：`failure_category`（`network` / `parse` / `empty_data` / `unknown`）
 
 新增来源时，只需新增一个采集器并在入口注册，不再把所有抓取逻辑堆在单文件。

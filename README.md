@@ -11,6 +11,7 @@
 - 上交所公告采集结果：`data/source_sse.csv`
 - 巨潮公告采集结果：`data/source_cninfo.csv`
 - 深交所公告采集结果：`data/source_szse.csv`
+- 深交所停复牌公告采集结果：`data/source_szse_suspension.csv`
 - 第一财经新闻采集结果：`data/source_yicai.csv`
 - 东方财富行业资讯采集结果：`data/source_eastmoney.csv`
 - 36 氪股市快讯采集结果：`data/source_36kr.csv`
@@ -69,7 +70,7 @@ python3 src/cli/task1.py check
 推荐直接用一键总入口：
 
 ```bash
-python3 src/cli/task1.py run --limit 8
+python3 src/cli/task1.py run --limit 8 --with-analysis --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5
 ```
 
 这条命令会自动执行：
@@ -110,6 +111,7 @@ python3 src/capabilities/events/classify.py \
   --input data/source_sse.csv \
   --input data/source_cninfo.csv \
   --input data/source_szse.csv \
+  --input data/source_szse_suspension.csv \
   --input data/source_yicai.csv \
   --input data/source_eastmoney.csv \
   --input data/source_36kr.csv \
@@ -122,14 +124,16 @@ python3 src/cli/task1.py check
 生成任务1质量抽样与质量报告：
 
 ```bash
-python3 src/cli/task1.py quality --sample-size 30
+python3 src/cli/task1.py quality --sample-size 50
 ```
 
 生成任务1“特征与股价影响”初步统计报告：
 
 ```bash
-python3 src/cli/task1.py feature --db stock_event_mining --min-link-score 0.35
+python3 src/cli/task1.py feature --db stock_event_mining --min-link-score 0.35 --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5
 ```
+
+事件研究增强默认优先使用 `TUSHARE_TOKEN`（若存在），不可用时回退到新浪行情接口并在报告中标记数据源。
 
 ## 直观看表
 

@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Task 1 preliminary feature-return association analysis.
-
-This script links structured events to companies and computes forward stock
-returns (1/3/5 trading days) as a first-pass impact analysis.
-"""
+"""Task 1 event-study analysis with benchmark abnormal returns."""
 
 from __future__ import annotations
 
@@ -11,18 +7,29 @@ import argparse
 import csv
 import json
 import math
+import os
 import statistics
 import subprocess
+import sys
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
 
+SRC_ROOT = Path(__file__).resolve().parents[2]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from capabilities.analysis.tushare_adapter import fetch_index_returns, fetch_stock_returns, load_tushare
+
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REPORT = ROOT / "output" / "task1_feature_return_report.md"
 DEFAULT_DATASET = ROOT / "output" / "task1_event_return_dataset.csv"
+INDEX_CODE_MAP = {"hs300": "000300.SH"}
+INDEX_SINA_SYMBOL_MAP = {"hs300": "sh000300"}
 
 
 def ts_to_sina_symbol(ts_code: str) -> Optional[str]:
@@ -37,13 +44,10 @@ def ts_to_sina_symbol(ts_code: str) -> Optional[str]:
     return None
 
 
-def fetch_daily_prices(ts_code: str, max_rows: int = 300) -> List[Dict[str, str]]:
-    symbol = ts_to_sina_symbol(ts_code)
-    if not symbol:
-        return []
+def fetch_sina_kline(symbol: str, max_rows: int = 800) -> List[Dict[str, str]]:
     url = "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData"
     params = {"symbol": symbol, "scale": "240", "ma": "no", "datalen": str(max_rows)}
-    resp = requests.get(url, params=params, timeout=15)
+    resp = requests.get(url, params=params, timeout=20)
     resp.raise_for_status()
     text = resp.text.strip()
     if not text:
@@ -55,32 +59,21 @@ def fetch_daily_prices(ts_code: str, max_rows: int = 300) -> List[Dict[str, str]
     return [row for row in data if row.get("day") and row.get("close")]
 
 
-def find_event_close_and_forward(prices: List[Dict[str, str]], event_date: str) -> tuple[Optional[float], Dict[int, Optional[float]]]:
-    if not prices:
-        return None, {1: None, 3: None, 5: None}
-    rows = sorted(prices, key=lambda x: x["day"])
-    event_idx = None
-    for i, row in enumerate(rows):
-        if row["day"] >= event_date:
-            event_idx = i
-            break
-    if event_idx is None:
-        return None, {1: None, 3: None, 5: None}
-    try:
-        base = float(rows[event_idx]["close"])
-    except Exception:
-        return None, {1: None, 3: None, 5: None}
-    ret = {}
-    for k in (1, 3, 5):
-        if event_idx + k >= len(rows):
-            ret[k] = None
-            continue
+def close_series_to_returns(kline: List[Dict[str, str]]) -> Dict[str, float]:
+    rows = sorted(kline, key=lambda x: x["day"])
+    result: Dict[str, float] = {}
+    prev_close: Optional[float] = None
+    for row in rows:
+        day = row["day"]
         try:
-            future = float(rows[event_idx + k]["close"])
-            ret[k] = (future - base) / base
+            close = float(row["close"])
         except Exception:
-            ret[k] = None
-    return base, ret
+            prev_close = None
+            continue
+        if prev_close and prev_close != 0:
+            result[day] = (close - prev_close) / prev_close
+        prev_close = close
+    return result
 
 
 def run_psql_csv(db: str, sql: str) -> List[Dict[str, str]]:
@@ -113,17 +106,63 @@ def mean_and_t(values: List[float]) -> tuple[float, Optional[float]]:
     return mean_val, t_stat
 
 
+def fit_market_model(est_points: List[tuple[float, float]]) -> Optional[tuple[float, float]]:
+    if len(est_points) < 30:
+        return None
+    market = [m for _, m in est_points]
+    stock = [s for s, _ in est_points]
+    mean_m = statistics.mean(market)
+    mean_s = statistics.mean(stock)
+    var_m = sum((m - mean_m) ** 2 for m in market)
+    if var_m == 0:
+        return None
+    cov_sm = sum((s - mean_s) * (m - mean_m) for s, m in est_points)
+    beta = cov_sm / var_m
+    alpha = mean_s - beta * mean_m
+    return alpha, beta
+
+
+def parse_windows(raw: str) -> List[int]:
+    values = []
+    for part in raw.split(","):
+        p = part.strip()
+        if not p:
+            continue
+        values.append(int(p))
+    return sorted(set(values))
+
+
+def bucket3(value: float) -> str:
+    if value <= 33:
+        return "low"
+    if value <= 66:
+        return "mid"
+    return "high"
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Task1 feature-return association analysis.")
+    parser = argparse.ArgumentParser(description="Task1 event-study analysis.")
     parser.add_argument("--db", default="stock_event_mining", help="PostgreSQL database name.")
     parser.add_argument("--min-link-score", type=float, default=0.35, help="Minimum event-company link score.")
+    parser.add_argument("--analysis-mode", default="event-study", help="Analysis mode, currently only event-study.")
+    parser.add_argument("--benchmark", default="hs300", help="Benchmark id, default hs300.")
+    parser.add_argument("--event-windows", default="1,3,5", help="Event windows in days, comma-separated.")
     parser.add_argument("--report-path", default=str(DEFAULT_REPORT), help="Markdown report output path.")
     parser.add_argument("--dataset-path", default=str(DEFAULT_DATASET), help="CSV dataset output path.")
+    parser.add_argument("--run-id", default="", help="Run identifier for traceability.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.analysis_mode != "event-study":
+        raise ValueError(f"Unsupported analysis mode: {args.analysis_mode}")
+    event_windows = parse_windows(args.event_windows)
+    run_id = args.run_id or datetime.now().strftime("%Y%m%d_%H%M%S")
+    benchmark_key = args.benchmark.lower()
+    if benchmark_key not in INDEX_CODE_MAP:
+        raise ValueError(f"Unsupported benchmark: {args.benchmark}")
+
     sql_links = f"""
     SELECT
         e.id AS structured_event_id,
@@ -145,9 +184,8 @@ def main() -> None:
     ORDER BY e.event_date DESC, l.final_link_score DESC
     """
     rows = run_psql_csv(args.db, sql_links)
-    data_source = "event_company_links"
+    link_source = "event_company_links"
     if not rows:
-        # Fallback: use symbol_or_subject from raw documents for Task1-only stage.
         sql_fallback = """
         SELECT
             e.id AS structured_event_id,
@@ -173,21 +211,116 @@ def main() -> None:
         ORDER BY e.event_date DESC
         """
         rows = run_psql_csv(args.db, sql_fallback)
-        data_source = "raw_documents_symbol_or_subject"
+        link_source = "raw_documents_symbol_or_subject"
 
+    token = os.getenv("TUSHARE_TOKEN", "").strip()
+    ts_module = load_tushare() if token else None
+    use_tushare = ts_module is not None
+
+    benchmark_returns: Dict[str, float] = {}
+    benchmark_source = "none"
+    try:
+        if use_tushare:
+            ret_obj = fetch_index_returns(ts_module, token, INDEX_CODE_MAP[benchmark_key], "20200101", datetime.now().strftime("%Y%m%d"))
+            benchmark_returns = ret_obj.returns
+            benchmark_source = ret_obj.source
+    except Exception:
+        benchmark_returns = {}
+    if not benchmark_returns:
+        symbol = INDEX_SINA_SYMBOL_MAP[benchmark_key]
+        benchmark_returns = close_series_to_returns(fetch_sina_kline(symbol))
+        benchmark_source = "sina_index_fallback"
+
+    stock_cache: Dict[str, Dict[str, float]] = {}
+    stock_source_map: Dict[str, str] = {}
+    reason_counts: defaultdict[str, int] = defaultdict(int)
     dataset_rows: List[Dict[str, str]] = []
 
     for row in rows:
-        if not row.get("ts_code"):
+        ts_code = (row.get("ts_code") or "").strip()
+        if not ts_code:
+            reason_counts["missing_ts_code"] += 1
             continue
-        prices = fetch_daily_prices(row["ts_code"])
-        _, fwd = find_event_close_and_forward(prices, row["event_date"])
+        if ts_code not in stock_cache:
+            returns: Dict[str, float] = {}
+            source_name = "none"
+            if use_tushare:
+                try:
+                    ret_obj = fetch_stock_returns(ts_module, token, ts_code, "20200101", datetime.now().strftime("%Y%m%d"))
+                    returns = ret_obj.returns
+                    source_name = ret_obj.source
+                except Exception:
+                    returns = {}
+            if not returns:
+                sina_symbol = ts_to_sina_symbol(ts_code)
+                if sina_symbol:
+                    returns = close_series_to_returns(fetch_sina_kline(sina_symbol))
+                    source_name = "sina_stock_fallback"
+            stock_cache[ts_code] = returns
+            stock_source_map[ts_code] = source_name
+
+        stock_returns = stock_cache[ts_code]
+        common_dates = sorted(set(stock_returns.keys()) & set(benchmark_returns.keys()))
+        if not common_dates:
+            reason_counts["no_common_trade_dates"] += 1
+            continue
+
+        event_date = row["event_date"]
+        event_idx = next((i for i, d in enumerate(common_dates) if d >= event_date), None)
+        if event_idx is None:
+            reason_counts["event_outside_trade_dates"] += 1
+            continue
+        if event_idx - 120 < 0:
+            reason_counts["insufficient_estimation_window"] += 1
+            continue
+
+        est_start = event_idx - 120
+        est_end = event_idx - 20
+        est_points: List[tuple[float, float]] = []
+        for idx in range(est_start, est_end + 1):
+            day = common_dates[idx]
+            est_points.append((stock_returns[day], benchmark_returns[day]))
+        fit = fit_market_model(est_points)
+        if fit is None:
+            reason_counts["invalid_market_model_fit"] += 1
+            continue
+        alpha, beta = fit
+
+        metrics: Dict[str, str] = {}
+        valid_any = False
+        for w in event_windows:
+            if event_idx + w >= len(common_dates):
+                metrics[f"car_w{w}"] = ""
+                continue
+            ar_values = []
+            for idx in range(event_idx, event_idx + w + 1):
+                day = common_dates[idx]
+                ri = stock_returns[day]
+                rm = benchmark_returns[day]
+                ar_values.append(ri - (alpha + beta * rm))
+            car = sum(ar_values)
+            metrics[f"car_w{w}"] = f"{car:.6f}"
+            valid_any = True
+        if not valid_any:
+            reason_counts["insufficient_event_window"] += 1
+            continue
+
         dataset_rows.append(
             {
+                "run_id": run_id,
                 **row,
-                "fwd_ret_1d": "" if fwd[1] is None else f"{fwd[1]:.6f}",
-                "fwd_ret_3d": "" if fwd[3] is None else f"{fwd[3]:.6f}",
-                "fwd_ret_5d": "" if fwd[5] is None else f"{fwd[5]:.6f}",
+                "analysis_mode": args.analysis_mode,
+                "benchmark": benchmark_key,
+                "benchmark_source": benchmark_source,
+                "stock_source": stock_source_map.get(ts_code, "none"),
+                "estimation_window": "[-120,-20]",
+                "event_windows": ",".join(str(x) for x in event_windows),
+                "estimation_points": str(len(est_points)),
+                "alpha": f"{alpha:.8f}",
+                "beta": f"{beta:.8f}",
+                "heat_bucket": bucket3(float(row.get("heat_score") or 0.0)),
+                "intensity_bucket": bucket3(float(row.get("intensity_score") or 0.0)),
+                **metrics,
             }
         )
 
@@ -199,63 +332,88 @@ def main() -> None:
             writer.writeheader()
             writer.writerows(dataset_rows)
         else:
-            writer = csv.writer(f)
-            writer.writerow(["message"])
-            writer.writerow(["no data"])
+            writer = csv.DictWriter(
+                f,
+                fieldnames=["run_id", "message", "analysis_mode", "benchmark", "benchmark_source", "link_source"],
+            )
+            writer.writeheader()
+            writer.writerow(
+                {
+                    "run_id": run_id,
+                    "message": "no_data",
+                    "analysis_mode": args.analysis_mode,
+                    "benchmark": benchmark_key,
+                    "benchmark_source": benchmark_source,
+                    "link_source": link_source,
+                }
+            )
 
-    valid_1d = [float(r["fwd_ret_1d"]) for r in dataset_rows if r.get("fwd_ret_1d")]
-    valid_3d = [float(r["fwd_ret_3d"]) for r in dataset_rows if r.get("fwd_ret_3d")]
-    valid_5d = [float(r["fwd_ret_5d"]) for r in dataset_rows if r.get("fwd_ret_5d")]
-    mean1, t1 = mean_and_t(valid_1d)
-    mean3, t3 = mean_and_t(valid_3d)
-    mean5, t5 = mean_and_t(valid_5d)
-
-    by_scope: Dict[str, List[float]] = {}
-    for r in dataset_rows:
-        if not r.get("fwd_ret_3d"):
-            continue
-        by_scope.setdefault(r["impact_scope"], []).append(float(r["fwd_ret_3d"]))
+    def summarize_metric(metric: str) -> str:
+        vals = [float(r[metric]) for r in dataset_rows if r.get(metric)]
+        mean_v, t_v = mean_and_t(vals)
+        return f"- {metric}: 均值={mean_v:.4%}, t={'N/A' if t_v is None else f'{t_v:.3f}'}, 样本={len(vals)}"
 
     report_lines = [
-        "# 任务1特征-股价影响初步分析",
+        "# 任务1事件研究法（异常收益）报告",
         "",
+        f"- run_id：{run_id}",
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"- 事件-公司样本量：{len(dataset_rows)}",
-        f"- 数据来源：{data_source}",
-        f"- 最小关联分：{args.min_link_score}",
+        f"- 分析模式：{args.analysis_mode}",
+        f"- 事件-公司有效样本：{len(dataset_rows)}",
+        f"- 链接来源：{link_source}",
+        f"- 基准：{benchmark_key}（{benchmark_source}）",
+        f"- 事件窗：{','.join(str(x) for x in event_windows)}",
         "",
-        "## 一、整体前瞻收益统计",
-        f"- 1日收益均值：{mean1:.4%}，t统计量：{'N/A' if t1 is None else f'{t1:.3f}'}（样本={len(valid_1d)}）",
-        f"- 3日收益均值：{mean3:.4%}，t统计量：{'N/A' if t3 is None else f'{t3:.3f}'}（样本={len(valid_3d)}）",
-        f"- 5日收益均值：{mean5:.4%}，t统计量：{'N/A' if t5 is None else f'{t5:.3f}'}（样本={len(valid_5d)}）",
-        "",
-        "## 二、按影响范围分组（3日收益均值）",
+        "## 一、总体CAR统计",
     ]
-    if not by_scope:
-        report_lines.append("- 暂无可用样本。")
+    if dataset_rows:
+        for w in event_windows:
+            report_lines.append(summarize_metric(f"car_w{w}"))
     else:
-        for scope, vals in sorted(by_scope.items(), key=lambda kv: len(kv[1]), reverse=True):
-            mean_scope, t_scope = mean_and_t(vals)
+        report_lines.append("- 暂无可计算样本。")
+
+    report_lines.extend(["", "## 二、分组CAR对比"])
+    group_keys = ["impact_scope", "heat_bucket", "intensity_bucket"]
+    for key in group_keys:
+        report_lines.append(f"- 分组字段：{key}")
+        groups: defaultdict[str, List[float]] = defaultdict(list)
+        metric = f"car_w{event_windows[-1]}"
+        for r in dataset_rows:
+            if r.get(metric):
+                groups[r.get(key, "unknown")].append(float(r[metric]))
+        if not groups:
+            report_lines.append("  - 无可用样本")
+            continue
+        for group_name, vals in sorted(groups.items(), key=lambda item: len(item[1]), reverse=True):
+            mean_v, t_v = mean_and_t(vals)
             report_lines.append(
-                f"- {scope}: 均值={mean_scope:.4%}, t={'N/A' if t_scope is None else f'{t_scope:.3f}'}, 样本={len(vals)}"
+                f"  - {group_name}: 均值={mean_v:.4%}, t={'N/A' if t_v is None else f'{t_v:.3f}'}, 样本={len(vals)}"
             )
+
+    report_lines.extend(["", "## 三、不可计算样本原因"])
+    if not reason_counts:
+        report_lines.append("- 无")
+    else:
+        for reason, count in sorted(reason_counts.items(), key=lambda item: item[1], reverse=True):
+            report_lines.append(f"- {reason}: {count}")
+
     report_lines.extend(
         [
             "",
-            "## 三、说明",
-            "- 本分析用于任务1阶段的“特征与股价影响关联性”初步验证，非最终预测模型结果。",
-            "- 若需要更严格显著性分析，可在统计同学阶段引入行业/市场基准收益与异常收益模型。",
-            "",
-            f"数据明细见：`{dataset_path}`",
+            "## 四、说明",
+            "- 估计窗固定为[-120,-20]，事件窗为[t0,t0+w]。",
+            "- 若Tushare不可用，自动回退Sina行情接口并在报告中标记。",
+            f"- 数据明细见：`{dataset_path}`",
         ]
     )
 
     report_path = Path(args.report_path).resolve()
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(report_lines), encoding="utf-8")
-    print(f"Wrote feature-return dataset to {dataset_path}")
-    print(f"Wrote feature-return report to {report_path}")
+    print(f"Wrote event-study dataset to {dataset_path}")
+    print(f"Wrote event-study report to {report_path}")
 
 
 if __name__ == "__main__":
     main()
+

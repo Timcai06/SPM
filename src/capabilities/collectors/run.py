@@ -16,7 +16,20 @@ SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.collectors import caixin, cninfo, csrc, eastmoney, gov, kr36, miit, ndrc, sse, szse, yicai
+from capabilities.collectors import (
+    caixin,
+    cninfo,
+    csrc,
+    eastmoney,
+    gov,
+    kr36,
+    miit,
+    ndrc,
+    sse,
+    szse,
+    szse_suspension,
+    yicai,
+)
 from capabilities.collectors.catalog import write_source_catalog
 
 
@@ -64,10 +77,23 @@ def write_collector_report_csv(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["collector", "success", "row_count", "duration_ms", "output_path", "error", "run_at"],
+            fieldnames=["collector", "success", "failure_category", "row_count", "duration_ms", "output_path", "error", "run_at"],
         )
         writer.writeheader()
         writer.writerows(rows)
+
+
+def classify_failure(error: str, row_count: int, success: str) -> str:
+    if success == "true" and row_count == 0:
+        return "empty_data"
+    if not error:
+        return ""
+    lowered = error.lower()
+    if any(token in lowered for token in ("timeout", "timed out", "connection", "ssl", "urlopen", "network", "refused")):
+        return "network"
+    if any(token in lowered for token in ("json", "decode", "parse", "keyerror", "valueerror")):
+        return "parse"
+    return "unknown"
 
 
 def parse_args() -> argparse.Namespace:
@@ -80,6 +106,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sse-output", default=str(ROOT / "data" / "source_sse.csv"))
     parser.add_argument("--cninfo-output", default=str(ROOT / "data" / "source_cninfo.csv"))
     parser.add_argument("--szse-output", default=str(ROOT / "data" / "source_szse.csv"))
+    parser.add_argument("--szse-suspension-output", default=str(ROOT / "data" / "source_szse_suspension.csv"))
     parser.add_argument("--yicai-output", default=str(ROOT / "data" / "source_yicai.csv"))
     parser.add_argument("--eastmoney-output", default=str(ROOT / "data" / "source_eastmoney.csv"))
     parser.add_argument("--kr36-output", default=str(ROOT / "data" / "source_36kr.csv"))
@@ -102,6 +129,7 @@ def main() -> None:
         ("sse", Path(args.sse_output).resolve(), lambda: sse.collect(limit=args.limit)),
         ("cninfo", Path(args.cninfo_output).resolve(), lambda: cninfo.collect(limit=args.limit)),
         ("szse", Path(args.szse_output).resolve(), lambda: szse.collect(limit=args.limit)),
+        ("szse_suspension", Path(args.szse_suspension_output).resolve(), lambda: szse_suspension.collect(limit=args.limit)),
         ("yicai", Path(args.yicai_output).resolve(), lambda: yicai.collect(limit=args.limit)),
         ("eastmoney", Path(args.eastmoney_output).resolve(), lambda: eastmoney.collect(limit=args.limit)),
         ("36kr", Path(args.kr36_output).resolve(), lambda: kr36.collect(limit=args.limit)),
@@ -128,6 +156,7 @@ def main() -> None:
             {
                 "collector": name,
                 "success": success,
+                "failure_category": classify_failure(error, len(rows), success),
                 "row_count": str(len(rows)),
                 "duration_ms": str(duration_ms),
                 "output_path": str(out_path),

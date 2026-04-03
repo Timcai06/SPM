@@ -8,9 +8,16 @@ import csv
 import hashlib
 import json
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+
+SRC_ROOT = Path(__file__).resolve().parents[2]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from capabilities.storage.db_guard import write_guard
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -22,6 +29,7 @@ RAW_SOURCE_FILES = [
     ROOT / "data" / "source_sse.csv",
     ROOT / "data" / "source_cninfo.csv",
     ROOT / "data" / "source_szse.csv",
+    ROOT / "data" / "source_szse_suspension.csv",
     ROOT / "data" / "source_yicai.csv",
     ROOT / "data" / "source_eastmoney.csv",
     ROOT / "data" / "source_36kr.csv",
@@ -57,12 +65,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load Task 1 outputs into PostgreSQL.")
     parser.add_argument("--db", default="stock_event_mining", help="Target PostgreSQL database name.")
     parser.add_argument("--quiet", action="store_true", help="Reduce non-essential output.")
+    parser.add_argument("--lock-timeout-sec", type=int, default=120, help="Max seconds to wait for DB write lock.")
     return parser.parse_args()
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+        cleaned_lines = (line.replace("\x00", "") for line in f)
+        return list(csv.DictReader(cleaned_lines))
 
 
 def load_raw_documents() -> list[dict[str, str]]:
@@ -245,12 +255,22 @@ def main() -> None:
     args = parse_args()
     db = args.db
 
-    raw_documents = load_raw_documents()
-    raw_candidates = read_csv(RAW_CANDIDATES_PATH)
-    structured_events = read_csv(STRUCTURED_EVENTS_PATH)
-
-    load_stage_tables(db, raw_documents, raw_candidates, structured_events)
-    insert_final_tables(db)
+    with write_guard(
+        db_name=db,
+        required_tables=[
+            "raw_documents",
+            "event_candidates",
+            "structured_events",
+            "event_candidates_stage",
+            "structured_events_stage",
+        ],
+        lock_timeout_sec=args.lock_timeout_sec,
+    ):
+        raw_documents = load_raw_documents()
+        raw_candidates = read_csv(RAW_CANDIDATES_PATH)
+        structured_events = read_csv(STRUCTURED_EVENTS_PATH)
+        load_stage_tables(db, raw_documents, raw_candidates, structured_events)
+        insert_final_tables(db)
 
     if not args.quiet:
         print(f"Loaded {len(raw_documents)} raw documents into {db}")
