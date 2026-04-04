@@ -249,6 +249,10 @@ def main() -> None:
     token, token_source = resolve_tushare_token(args)
     ts_module = load_tushare() if token else None
     use_tushare = ts_module is not None
+    print(
+        f"[feature] init db={args.db}, analysis_mode={args.analysis_mode}, "
+        f"benchmark={benchmark_key}, token_source={token_source}, use_tushare={use_tushare}"
+    )
 
     reason_counts: defaultdict[str, int] = defaultdict(int)
     benchmark_returns: Dict[str, float] = {}
@@ -268,6 +272,9 @@ def main() -> None:
     except Exception as exc:
         benchmark_returns = {}
         reason_counts["tushare_index_error"] += 1
+        if "token不对" in str(exc):
+            use_tushare = False
+            print("[feature] tushare token invalid, fallback to sina and disable tushare stock fetch.")
         benchmark_source = f"tushare_failed:{exc.__class__.__name__}"
     if not benchmark_returns:
         symbol = INDEX_SINA_SYMBOL_MAP[benchmark_key]

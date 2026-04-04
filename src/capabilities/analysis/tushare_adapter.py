@@ -48,6 +48,10 @@ def _call_with_retry(callable_obj, retries: int = 2, wait_seconds: float = 1.2, 
                 break
             time.sleep(wait_seconds * (idx + 1))
         except Exception as exc:  # pragma: no cover
+            msg = str(exc)
+            # Invalid token should fail fast instead of retrying.
+            if "token不对" in msg or "token" in msg.lower() and "invalid" in msg.lower():
+                raise exc
             last_exc = exc
             if idx >= retries:
                 break
