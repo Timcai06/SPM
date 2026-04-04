@@ -121,16 +121,38 @@ async def collect_all_async(limit: int, include_non_keyword: bool) -> list[dict]
         ("akshare", lambda: akshare_api.collect(limit=limit)),
     ]
     
-    tasks = [run_collector(name, func) for name, func in jobs]
-    results = await asyncio.gather(*tasks)
-    
     all_combined_rows = []
     report_rows = []
-    for name, rows, report in results:
-        if rows:
-            all_combined_rows.extend(rows)
-        report_rows.append(report)
-        logger.info(f"Collector {name} finished, fetched {len(rows)} rows in {report['duration_ms']}ms")
+    total = len(jobs)
+    completed = 0
+    started = time.perf_counter()
+    heartbeat_sec = 5
+
+    pending_tasks = {asyncio.create_task(run_collector(name, func)) for name, func in jobs}
+    while pending_tasks:
+        done, pending_tasks = await asyncio.wait(
+            pending_tasks,
+            timeout=heartbeat_sec,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if not done:
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            logger.info(
+                f"[progress] running collectors... completed={completed}/{total}, elapsed={elapsed_ms}ms"
+            )
+            continue
+
+        for task in done:
+            name, rows, report = task.result()
+            completed += 1
+            if rows:
+                all_combined_rows.extend(rows)
+            report_rows.append(report)
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            logger.info(
+                f"[progress] {completed}/{total} done: {name}, rows={len(rows)}, "
+                f"duration={report['duration_ms']}ms, elapsed={elapsed_ms}ms"
+            )
     
     # Write reports
     write_collector_report_csv(DEFAULT_REPORT_CSV, report_rows)
