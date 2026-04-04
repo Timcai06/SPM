@@ -8,9 +8,15 @@ MAX_ROWS ?= 80
 API_TIMEOUT ?= 10
 PROGRESS_EVERY ?= 5
 TOKEN_FILE ?= .secrets/tushare_token.txt
+USE_TUSHARE ?= 0
 STATS_SOURCE ?= auto
 DAYS ?= 30
 NEG_MAX_PER_DAY ?= 100
+
+FEATURE_TOKEN_ARG :=
+ifeq ($(USE_TUSHARE),1)
+FEATURE_TOKEN_ARG := --tushare-token-file $(TOKEN_FILE)
+endif
 
 .PHONY: help \
 	collect link feature train status stats-import stats-load negatives \
@@ -36,16 +42,7 @@ link:
 	$(PY) src/cli/task2.py run --db $(DB) --top-k $(TOP_K) --min-score $(MIN_SCORE)
 
 feature:
-	$(PY) src/cli/task1.py feature \
-		--db $(DB) \
-		--analysis-mode event-study \
-		--benchmark hs300 \
-		--event-windows 1,3,5 \
-		--time-budget-sec $(TIME_BUDGET) \
-		--max-rows $(MAX_ROWS) \
-		--api-timeout-sec $(API_TIMEOUT) \
-		--progress-every $(PROGRESS_EVERY) \
-		--tushare-token-file $(TOKEN_FILE)
+	$(PY) src/cli/task1.py feature --db $(DB) --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --time-budget-sec $(TIME_BUDGET) --max-rows $(MAX_ROWS) --api-timeout-sec $(API_TIMEOUT) --progress-every $(PROGRESS_EVERY) $(FEATURE_TOKEN_ARG)
 
 train:
 	$(PY) src/cli/task1.py train-samples \

@@ -46,6 +46,7 @@ SOURCE_CATALOG = ROOT / "output" / "meta" / "appendix2_sources.csv"
 DEFAULT_REPORT_CSV = ROOT / "output" / "collector_report.csv"
 DEFAULT_REPORT_JSON = ROOT / "output" / "collector_report.json"
 DEFAULT_DB = "stock_event_mining"
+NETWORK_ERROR_TOKENS = ("timeout", "timed out", "connection", "ssl", "urlopen", "network", "refused", "eof")
 
 
 def write_collector_report_csv(path: Path, rows: list[dict[str, str]]) -> None:
@@ -65,7 +66,7 @@ def classify_failure(error: str, row_count: int, success: str) -> str:
     if not error:
         return ""
     lowered = error.lower()
-    if any(token in lowered for token in ("timeout", "timed out", "connection", "ssl", "urlopen", "network", "refused")):
+    if any(token in lowered for token in NETWORK_ERROR_TOKENS):
         return "network"
     if any(token in lowered for token in ("json", "decode", "parse", "keyerror", "valueerror")):
         return "parse"
@@ -77,17 +78,31 @@ async def run_collector(name: str, collect_func: Callable) -> tuple[str, list[di
     error = ""
     rows = []
     success = "false"
-    try:
-        # Properly handle both sync functions and coroutines/awaitables
-        res = collect_func()
-        if asyncio.iscoroutine(res) or asyncio.isfuture(res):
-            rows = await res
-        else:
-            rows = res
-        success = "true"
-    except Exception as exc:
-        error = str(exc)
-        logger.error(f"Collector {name} failed: {exc}")
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            # Properly handle both sync functions and coroutines/awaitables
+            res = collect_func()
+            if asyncio.iscoroutine(res) or asyncio.isfuture(res):
+                rows = await res
+            else:
+                rows = res
+            success = "true"
+            break
+        except Exception as exc:
+            msg = str(exc).strip()
+            error = msg or f"{exc.__class__.__name__}: <empty>"
+            lowered = error.lower()
+            is_network = any(token in lowered for token in NETWORK_ERROR_TOKENS)
+            if attempt < max_attempts and is_network:
+                wait_sec = attempt
+                logger.warning(
+                    f"Collector {name} attempt {attempt}/{max_attempts} failed ({error}), retry in {wait_sec}s"
+                )
+                await asyncio.sleep(wait_sec)
+                continue
+            logger.error(f"Collector {name} failed: {error}")
+            break
     
     duration_ms = int((time.perf_counter() - started) * 1000)
     report = {
