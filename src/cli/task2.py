@@ -14,7 +14,14 @@ if str(SRC_ROOT) not in sys.path:
 
 from capabilities.linking import link_events
 from capabilities.analysis import build_negative_samples
-from capabilities.storage import import_companies_public, import_companies_tushare, import_company_stats_tushare, load_companies, load_company_stats
+from capabilities.storage import (
+    import_companies_public,
+    import_companies_tushare,
+    import_company_stats_akshare,
+    import_company_stats_tushare,
+    load_companies,
+    load_company_stats,
+)
 from pipelines import task2 as task2_pipeline
 
 
@@ -50,11 +57,16 @@ def parse_args() -> argparse.Namespace:
     import_public_parser = sub.add_parser("import-companies-public", help="build company seed from collected public sources")
     import_public_parser.add_argument("--output", default="output/seeds/companies_public.csv")
 
-    import_stats_parser = sub.add_parser("import-company-stats", help="import company stats from Tushare")
+    import_stats_parser = sub.add_parser("import-company-stats", help="import company stats from Tushare or AKShare")
+    import_stats_parser.add_argument("--db", default="stock_event_mining")
     import_stats_parser.add_argument("--output", default="output/seeds/company_stats.csv")
+    import_stats_parser.add_argument("--source", choices=["auto", "tushare", "akshare"], default="auto")
     import_stats_parser.add_argument("--tushare-token", default="")
     import_stats_parser.add_argument("--tushare-token-file", default="")
     import_stats_parser.add_argument("--days", type=int, default=30)
+    import_stats_parser.add_argument("--max-symbols", type=int, default=300)
+    import_stats_parser.add_argument("--sleep-sec", type=float, default=0.05)
+    import_stats_parser.add_argument("--progress-every", type=int, default=20)
 
     load_stats_parser = sub.add_parser("load-company-stats", help="load company stats csv")
     load_stats_parser.add_argument("--db", default="stock_event_mining")
@@ -116,13 +128,37 @@ def main() -> None:
         return
 
     if args.command == "import-company-stats":
-        argv = ["import_company_stats_tushare.py", "--output", args.output, "--days", str(args.days)]
-        if args.tushare_token:
-            argv.extend(["--tushare-token", args.tushare_token])
-        if args.tushare_token_file:
-            argv.extend(["--tushare-token-file", args.tushare_token_file])
+        if args.source in ("tushare", "auto"):
+            argv = ["import_company_stats_tushare.py", "--output", args.output, "--days", str(args.days)]
+            if args.tushare_token:
+                argv.extend(["--tushare-token", args.tushare_token])
+            if args.tushare_token_file:
+                argv.extend(["--tushare-token-file", args.tushare_token_file])
+            try:
+                with patched_argv(argv):
+                    import_company_stats_tushare.main()
+                return
+            except Exception as exc:
+                if args.source == "tushare":
+                    raise
+                print(f"[import-company-stats] tushare failed, fallback to akshare: {exc}")
+        argv = [
+            "import_company_stats_akshare.py",
+            "--output",
+            args.output,
+            "--db",
+            args.db,
+            "--days",
+            str(args.days),
+            "--max-symbols",
+            str(args.max_symbols),
+            "--sleep-sec",
+            str(args.sleep_sec),
+            "--progress-every",
+            str(args.progress_every),
+        ]
         with patched_argv(argv):
-            import_company_stats_tushare.main()
+            import_company_stats_akshare.main()
         return
 
     if args.command == "load-company-stats":

@@ -8,6 +8,7 @@ MAX_ROWS ?= 80
 API_TIMEOUT ?= 10
 PROGRESS_EVERY ?= 5
 TOKEN_FILE ?= .secrets/tushare_token.txt
+STATS_SOURCE ?= auto
 DAYS ?= 30
 NEG_MAX_PER_DAY ?= 100
 
@@ -53,7 +54,7 @@ status:
 	$(PY) src/cli/task1.py db-status --db $(DB)
 
 stats-import:
-	$(PY) src/cli/task2.py import-company-stats --days $(DAYS) --tushare-token-file $(TOKEN_FILE)
+	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(DAYS) --tushare-token-file $(TOKEN_FILE)
 
 stats-load:
 	$(PY) src/cli/task2.py load-company-stats --db $(DB)
