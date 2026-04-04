@@ -12,19 +12,22 @@ STATS_SOURCE ?= auto
 DAYS ?= 30
 NEG_MAX_PER_DAY ?= 100
 
-.PHONY: help full collect link feature train status stats-import stats-load negatives full-with-stats
+.PHONY: help \
+	collect link feature train status stats-import stats-load negatives \
+	full full-with-stats \
+	go r q c l f t s si sl n
 
 help:
-	@echo "make full              # task1 run + task2 link + feature + train + status"
-	@echo "make collect           # task1 run --skip-validate"
-	@echo "make link              # task2 event-company linking"
-	@echo "make feature           # event-study labels"
-	@echo "make train             # build model_event_samples"
-	@echo "make status            # db-status"
-	@echo "make stats-import      # import company_stats from tushare"
-	@echo "make stats-load        # load company_stats into db"
-	@echo "make negatives         # build model_non_event_samples"
-	@echo "make full-with-stats   # full + company_stats + negatives"
+	@echo "最常用："
+	@echo "  make go              # 跑一轮核心数据链（collect+link+feature+train+status）"
+	@echo "  make r               # 完整训练底座（go + stats-import + stats-load + negatives + status）"
+	@echo "  make q               # 快速采集（collect + status）"
+	@echo ""
+	@echo "完整命令："
+	@echo "  make collect | link | feature | train | status"
+	@echo "  make stats-import | stats-load | negatives"
+	@echo ""
+	@echo "短别名：c l f t s si sl n"
 
 collect:
 	$(PY) src/cli/task1.py run --limit $(LIMIT) --skip-validate --db $(DB)
@@ -65,3 +68,16 @@ negatives:
 full: collect link feature train status
 
 full-with-stats: full stats-import stats-load negatives status
+
+# Short aliases
+go: full
+r: full-with-stats
+q: collect status
+c: collect
+l: link
+f: feature
+t: train
+s: status
+si: stats-import
+sl: stats-load
+n: negatives
