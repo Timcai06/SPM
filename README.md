@@ -33,13 +33,13 @@
 - 任务 1 质量评估脚本：`src/capabilities/quality/quality_report.py`
 - 任务 1 特征-收益初步分析：`src/capabilities/analysis/feature_return.py`
 - 训练样本构建脚本：`src/capabilities/analysis/build_model_samples.py`
-- 任务 1 可视化页面：`src/apps/view.py`
 - 任务 1 一键总入口：`src/pipelines/task1.py`
 - 任务 1 统一命令入口：`src/cli/task1.py`
 - 任务 2 表结构：`sql/create_task2_tables.sql`
 - 任务 1 规则说明（答辩版）：`docs/docs_task1_rulebook.md`
 - 附录 2 来源目录（运行时生成）：`output/meta/appendix2_sources.csv`
 - 公司导入脚本：`src/capabilities/storage/load_companies.py`
+- 公司统计特征导入脚本：`src/capabilities/storage/load_company_stats.py`
 - 事件-公司关联打分脚本：`src/capabilities/linking/link_events.py`
 - 任务 2 一键入口：`src/pipelines/task2.py`
 - 任务 2 统一命令入口：`src/cli/task2.py`
@@ -103,6 +103,14 @@ python3 src/cli/task2.py run --db stock_event_mining --top-k 3 --min-score 0.35
 - 首批公司样本导入 `companies`
 - 优先基于 `event_canonical_map.csv` 的标准事件簇做关联打分
 - 把结果写入 `event_company_links`
+
+导入公司统计特征并生成负样本：
+
+```bash
+python3 src/cli/task2.py import-company-stats --days 30 --tushare-token-file .secrets/tushare_token.txt
+python3 src/cli/task2.py load-company-stats --db stock_event_mining
+python3 src/cli/task2.py build-negative-samples --db stock_event_mining --max-per-day 100
+```
 
 任务 3 准备闭环：
 
@@ -193,21 +201,16 @@ python3 src/cli/task1.py feature --db stock_event_mining --analysis-mode event-s
 psql -d stock_event_mining
 ```
 
-本地网页查看：
+推荐直接使用 `pgAdmin4` 查看以下主表：
 
-```bash
-python3 src/cli/task1.py view
-```
-
-如果 `streamlit` 不在 PATH，可直接这样启动。
-
-页面里现在也会显示任务 2 的两张表：
+- `structured_events`
+- `canonical_events`
 - `companies`
 - `event_company_links`
-
-任务 3 当前新增两张基础表：
 - `company_relations`
 - `event_propagation_links`
+- `model_event_samples`
+- `model_non_event_samples`
 
 增加“易读表名层”（推荐）：
 

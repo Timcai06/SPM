@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = "stock_event_mining"
 DEFAULT_LABEL_DATASET = ROOT / "output" / "task1_event_return_dataset.csv"
 CREATE_SQL_PATH = ROOT / "sql" / "create_model_training_tables.sql"
+SUPPORT_SQL_PATH = ROOT / "sql" / "create_training_support_tables.sql"
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,10 +70,10 @@ def resolve_label_dataset(path: Path) -> Path:
     return path
 
 
-def load_label_map(path: Path) -> tuple[dict[tuple[int, str], dict[str, Optional[float] | str]], str]:
+def load_label_map(path: Path) -> tuple[dict[tuple[int, str], dict[str, object]], str]:
     if not path.exists():
         return {}, f"missing:{path}"
-    mapping: dict[tuple[int, str], dict[str, float | str | None]] = {}
+    mapping: dict[tuple[int, str], dict[str, object]] = {}
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
             sid_text = (row.get("structured_event_id") or "").strip()
@@ -95,8 +96,8 @@ def load_label_map(path: Path) -> tuple[dict[tuple[int, str], dict[str, Optional
     return mapping, str(path)
 
 
-def ensure_table(conn: psycopg.Connection) -> None:
-    sql = CREATE_SQL_PATH.read_text(encoding="utf-8")
+def ensure_tables(conn: psycopg.Connection) -> None:
+    sql = CREATE_SQL_PATH.read_text(encoding="utf-8") + "\n" + SUPPORT_SQL_PATH.read_text(encoding="utf-8")
     with conn.cursor() as cur:
         cur.execute(sql)
     conn.commit()
@@ -124,11 +125,28 @@ def fetch_base_rows(conn: psycopg.Connection, min_link_score: float) -> list[dic
             c.industry_l1 AS company_industry_l1,
             c.industry_l2 AS company_industry_l2,
             c.concept_tags,
-            cl.canonical_event_id
+            cl.canonical_event_id,
+            cs.trade_date AS company_stat_date,
+            cs.total_mv,
+            cs.circ_mv,
+            cs.pe_ttm,
+            cs.pb,
+            cs.turnover_rate,
+            cs.volume_ratio,
+            cs.trailing_return_20d,
+            cs.volatility_20d
         FROM structured_events se
         JOIN event_company_links l ON l.structured_event_id = se.id
         JOIN companies c ON c.id = l.company_id
         LEFT JOIN event_canonical_links cl ON cl.structured_event_id = se.id
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM company_stats cs
+            WHERE cs.ts_code = c.ts_code
+              AND cs.trade_date <= se.event_date
+            ORDER BY cs.trade_date DESC
+            LIMIT 1
+        ) cs ON TRUE
         WHERE l.final_link_score >= %s
         ORDER BY se.event_date DESC, l.final_link_score DESC
     """
@@ -148,7 +166,7 @@ def main() -> None:
         required_tables=["structured_events", "event_company_links", "companies"],
         lock_timeout_sec=args.lock_timeout_sec,
     ) as conn:
-        ensure_table(conn)
+        ensure_tables(conn)
         base_rows = fetch_base_rows(conn, args.min_link_score)
         upserted = 0
         with conn.cursor() as cur:
@@ -156,13 +174,12 @@ def main() -> None:
                 sid = int(row["structured_event_id"])
                 ts_code = (row["ts_code"] or "").upper()
                 labels = label_map.get((sid, ts_code), {})
-
                 car_w1 = labels.get("label_car_w1")
                 car_w3 = labels.get("label_car_w3")
                 car_w5 = labels.get("label_car_w5")
                 label_source = str(labels.get("label_source") or "none")
-
                 sample_key = f"{sid}:{int(row['company_id'])}:{row['event_date']}"
+
                 cur.execute(
                     """
                     INSERT INTO model_event_samples (
@@ -171,6 +188,8 @@ def main() -> None:
                         event_subject_type, duration_type, predictability_type, event_industry_type,
                         sentiment, heat_score, intensity_score, impact_scope,
                         link_type, final_link_score, company_industry_l1, company_industry_l2, concept_tags,
+                        company_stat_date, total_mv, circ_mv, pe_ttm, pb, turnover_rate, volume_ratio,
+                        trailing_return_20d, volatility_20d,
                         label_car_w1, label_car_w3, label_car_w5, label_up_w1, label_up_w3, label_up_w5, label_source,
                         updated_at
                     )
@@ -180,6 +199,8 @@ def main() -> None:
                         %s, %s, %s, %s,
                         %s, %s, %s, %s,
                         %s, %s, %s, %s, %s::jsonb,
+                        %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s,
                         %s, %s, %s, %s, %s, %s, %s,
                         NOW()
                     )
@@ -203,6 +224,15 @@ def main() -> None:
                         company_industry_l1 = EXCLUDED.company_industry_l1,
                         company_industry_l2 = EXCLUDED.company_industry_l2,
                         concept_tags = EXCLUDED.concept_tags,
+                        company_stat_date = EXCLUDED.company_stat_date,
+                        total_mv = EXCLUDED.total_mv,
+                        circ_mv = EXCLUDED.circ_mv,
+                        pe_ttm = EXCLUDED.pe_ttm,
+                        pb = EXCLUDED.pb,
+                        turnover_rate = EXCLUDED.turnover_rate,
+                        volume_ratio = EXCLUDED.volume_ratio,
+                        trailing_return_20d = EXCLUDED.trailing_return_20d,
+                        volatility_20d = EXCLUDED.volatility_20d,
                         label_car_w1 = EXCLUDED.label_car_w1,
                         label_car_w3 = EXCLUDED.label_car_w3,
                         label_car_w5 = EXCLUDED.label_car_w5,
@@ -235,6 +265,15 @@ def main() -> None:
                         row.get("company_industry_l1"),
                         row.get("company_industry_l2"),
                         json.dumps(row.get("concept_tags") or [], ensure_ascii=False),
+                        row.get("company_stat_date"),
+                        row.get("total_mv"),
+                        row.get("circ_mv"),
+                        row.get("pe_ttm"),
+                        row.get("pb"),
+                        row.get("turnover_rate"),
+                        row.get("volume_ratio"),
+                        row.get("trailing_return_20d"),
+                        row.get("volatility_20d"),
                         car_w1,
                         car_w3,
                         car_w5,

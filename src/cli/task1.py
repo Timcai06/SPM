@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -104,7 +103,6 @@ def parse_args() -> argparse.Namespace:
     train_sample_parser.add_argument("--label-dataset", default="output/task1_event_return_dataset.csv")
     train_sample_parser.add_argument("--run-id", default="")
 
-    sub.add_parser("view", help="open streamlit data viewer")
     return parser.parse_args()
 
 
@@ -234,11 +232,6 @@ def main() -> None:
         with patched_argv(argv):
             build_model_samples.main()
         return
-
-    if args.command == "view":
-        subprocess.run(["streamlit", "run", "src/apps/view.py"], check=True, cwd=str(ROOT))
-        return
-
 
 if __name__ == "__main__":
     main()
