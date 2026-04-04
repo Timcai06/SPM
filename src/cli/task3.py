@@ -4,15 +4,27 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
+import sys
+from contextlib import contextmanager
 from pathlib import Path
 
+SRC_ROOT = Path(__file__).resolve().parents[1]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-ROOT = Path(__file__).resolve().parents[2]
+from capabilities.graph import propagate_event_links
+from capabilities.storage import load_task3_relations
+from pipelines import task3 as task3_pipeline
 
 
-def run(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True, cwd=str(ROOT))
+@contextmanager
+def patched_argv(argv: list[str]):
+    old = sys.argv[:]
+    sys.argv = argv
+    try:
+        yield
+    finally:
+        sys.argv = old
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,10 +53,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     if args.command == "run":
-        run(
+        with patched_argv(
             [
-                "python3",
-                "src/pipelines/task3.py",
+                "task3.py",
                 "--db",
                 args.db,
                 "--input",
@@ -56,27 +67,19 @@ def main() -> None:
                 "--canonical-map",
                 args.canonical_map,
             ]
-        )
+        ):
+            task3_pipeline.main()
         return
 
     if args.command == "load-relations":
-        run(
-            [
-                "python3",
-                "src/capabilities/storage/load_task3_relations.py",
-                "--db",
-                args.db,
-                "--input",
-                args.input,
-            ]
-        )
+        with patched_argv(["load_task3_relations.py", "--db", args.db, "--input", args.input]):
+            load_task3_relations.main()
         return
 
     if args.command == "propagate":
-        run(
+        with patched_argv(
             [
-                "python3",
-                "src/capabilities/graph/propagate_event_links.py",
+                "propagate_event_links.py",
                 "--db",
                 args.db,
                 "--min-source-score",
@@ -86,7 +89,8 @@ def main() -> None:
                 "--canonical-map",
                 args.canonical_map,
             ]
-        )
+        ):
+            propagate_event_links.main()
 
 
 if __name__ == "__main__":

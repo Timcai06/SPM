@@ -4,15 +4,27 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
+import sys
+from contextlib import contextmanager
 from pathlib import Path
 
+SRC_ROOT = Path(__file__).resolve().parents[1]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-ROOT = Path(__file__).resolve().parents[2]
+from capabilities.linking import link_events
+from capabilities.storage import import_companies_public, import_companies_tushare, load_companies
+from pipelines import task2 as task2_pipeline
 
 
-def run(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True, cwd=str(ROOT))
+@contextmanager
+def patched_argv(argv: list[str]):
+    old = sys.argv[:]
+    sys.argv = argv
+    try:
+        yield
+    finally:
+        sys.argv = old
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,10 +60,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     if args.command == "run":
-        run(
+        with patched_argv(
             [
-                "python3",
-                "src/pipelines/task2.py",
+                "task2.py",
                 "--db",
                 args.db,
                 "--top-k",
@@ -61,52 +72,34 @@ def main() -> None:
                 "--canonical-map",
                 args.canonical_map,
             ]
-        )
+        ):
+            task2_pipeline.main()
         return
 
     if args.command == "load-companies":
-        run(
-            [
-                "python3",
-                "src/capabilities/storage/load_companies.py",
-                "--db",
-                args.db,
-                "--input",
-                args.input,
-            ]
-        )
+        with patched_argv(["load_companies.py", "--db", args.db, "--input", args.input]):
+            load_companies.main()
         return
 
     if args.command == "import-companies":
-        cmd = [
-            "python3",
-            "src/capabilities/storage/import_companies_tushare.py",
-            "--output",
-            args.output,
-        ]
+        argv = ["import_companies_tushare.py", "--output", args.output]
         if args.tushare_token:
-            cmd.extend(["--tushare-token", args.tushare_token])
+            argv.extend(["--tushare-token", args.tushare_token])
         if args.tushare_token_file:
-            cmd.extend(["--tushare-token-file", args.tushare_token_file])
-        run(cmd)
+            argv.extend(["--tushare-token-file", args.tushare_token_file])
+        with patched_argv(argv):
+            import_companies_tushare.main()
         return
 
     if args.command == "import-companies-public":
-        run(
-            [
-                "python3",
-                "src/capabilities/storage/import_companies_public.py",
-                "--output",
-                args.output,
-            ]
-        )
+        with patched_argv(["import_companies_public.py", "--output", args.output]):
+            import_companies_public.main()
         return
 
     if args.command == "link-events":
-        run(
+        with patched_argv(
             [
-                "python3",
-                "src/capabilities/linking/link_events.py",
+                "link_events.py",
                 "--db",
                 args.db,
                 "--top-k",
@@ -116,7 +109,8 @@ def main() -> None:
                 "--canonical-map",
                 args.canonical_map,
             ]
-        )
+        ):
+            link_events.main()
         return
 
 

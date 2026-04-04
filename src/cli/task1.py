@@ -5,8 +5,20 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
+from contextlib import contextmanager
 from pathlib import Path
 
+SRC_ROOT = Path(__file__).resolve().parents[1]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from capabilities.analysis import feature_return
+from capabilities.collectors import run as collector_run
+from capabilities.events import canonicalize, classify
+from capabilities.quality import check, quality_report
+from capabilities.storage import load_task1_canonical
+from pipelines import task1 as task1_pipeline
 
 ROOT = Path(__file__).resolve().parents[2]
 CLASSIFY_INPUT_FILES = [
@@ -27,8 +39,14 @@ CLASSIFY_INPUT_FILES = [
 ]
 
 
-def run(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True, cwd=str(ROOT))
+@contextmanager
+def patched_argv(argv: list[str]):
+    old = sys.argv[:]
+    sys.argv = argv
+    try:
+        yield
+    finally:
+        sys.argv = old
 
 
 def parse_args() -> argparse.Namespace:
@@ -82,46 +100,50 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     if args.command == "run":
-        cmd = ["python3", "src/pipelines/task1.py", "--limit", str(args.limit), "--db", args.db]
+        argv = ["task1.py", "--limit", str(args.limit), "--db", args.db]
         if args.skip_collect:
-            cmd.append("--skip-collect")
+            argv.append("--skip-collect")
         if args.skip_validate:
-            cmd.append("--skip-validate")
+            argv.append("--skip-validate")
         if args.with_analysis:
-            cmd.append("--with-analysis")
-        cmd.extend(["--analysis-mode", args.analysis_mode, "--benchmark", args.benchmark, "--event-windows", args.event_windows])
-        run(cmd)
+            argv.append("--with-analysis")
+        argv.extend(["--analysis-mode", args.analysis_mode, "--benchmark", args.benchmark, "--event-windows", args.event_windows])
+        with patched_argv(argv):
+            task1_pipeline.main()
         return
 
     if args.command == "collect":
-        cmd = ["python3", "src/capabilities/collectors/run.py", "--limit", str(args.limit)]
+        argv = ["run.py", "--limit", str(args.limit)]
         if args.include_non_keyword:
-            cmd.append("--include-non-keyword")
-        run(cmd)
+            argv.append("--include-non-keyword")
+        with patched_argv(argv):
+            collector_run.main()
         return
 
     if args.command == "classify":
-        cmd = ["python3", "src/capabilities/events/classify.py", "--db", args.db]
+        argv = ["classify.py", "--db", args.db]
         for input_file in CLASSIFY_INPUT_FILES:
-            cmd.extend(["--input", input_file])
+            argv.extend(["--input", input_file])
         if args.skip_db_load:
-            cmd.append("--skip-db-load")
-        run(cmd)
+            argv.append("--skip-db-load")
+        with patched_argv(argv):
+            classify.main()
         return
 
     if args.command == "check":
-        run(["python3", "src/capabilities/quality/check.py"])
+        with patched_argv(["check.py"]):
+            check.main()
         return
 
     if args.command == "canonicalize":
-        run(["python3", "src/capabilities/events/canonicalize.py"])
+        with patched_argv(["canonicalize.py"]):
+            canonicalize.main()
         return
 
     if args.command == "canonical-load":
-        run(
+        with patched_argv(
             [
-                "python3",
-                "src/capabilities/storage/load_task1_canonical.py",
+                "load_task1_canonical.py",
                 "--db",
                 args.db,
                 "--canonical-events",
@@ -129,20 +151,21 @@ def main() -> None:
                 "--canonical-map",
                 args.canonical_map,
             ]
-        )
+        ):
+            load_task1_canonical.main()
         return
 
     if args.command == "quality":
-        cmd = ["python3", "src/capabilities/quality/quality_report.py", "--sample-size", str(args.sample_size)]
+        argv = ["quality_report.py", "--sample-size", str(args.sample_size)]
         if args.run_id:
-            cmd.extend(["--run-id", args.run_id])
-        run(cmd)
+            argv.extend(["--run-id", args.run_id])
+        with patched_argv(argv):
+            quality_report.main()
         return
 
     if args.command == "feature":
-        cmd = [
-            "python3",
-            "src/capabilities/analysis/feature_return.py",
+        argv = [
+            "feature_return.py",
             "--db",
             args.db,
             "--min-link-score",
@@ -155,16 +178,17 @@ def main() -> None:
             args.event_windows,
         ]
         if args.tushare_token:
-            cmd.extend(["--tushare-token", args.tushare_token])
+            argv.extend(["--tushare-token", args.tushare_token])
         if args.tushare_token_file:
-            cmd.extend(["--tushare-token-file", args.tushare_token_file])
+            argv.extend(["--tushare-token-file", args.tushare_token_file])
         if args.run_id:
-            cmd.extend(["--run-id", args.run_id])
-        run(cmd)
+            argv.extend(["--run-id", args.run_id])
+        with patched_argv(argv):
+            feature_return.main()
         return
 
     if args.command == "view":
-        run(["streamlit", "run", "src/apps/view.py"])
+        subprocess.run(["streamlit", "run", "src/apps/view.py"], check=True, cwd=str(ROOT))
         return
 
 
