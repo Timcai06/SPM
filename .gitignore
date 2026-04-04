@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 
 # Runtime outputs (DB is source of truth)
+output/
 output/*.csv
 output/*.json
 output/sources/
