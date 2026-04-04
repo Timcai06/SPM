@@ -8,12 +8,15 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
+import psycopg
+
 SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.linking import link_events
 from capabilities.storage import load_companies
+from capabilities.storage.db_guard import dsn_for
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = "stock_event_mining"
@@ -41,8 +44,26 @@ def patched_argv(argv: list[str]):
 
 def main() -> None:
     args = parse_args()
-    with patched_argv(["load_companies.py", "--db", args.db, "--input", args.input]):
-        load_companies.main()
+    seed_path = Path(args.input).resolve()
+    if seed_path.exists():
+        with patched_argv(["load_companies.py", "--db", args.db, "--input", str(seed_path)]):
+            load_companies.main()
+    else:
+        with psycopg.connect(dsn_for(args.db)) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT count(*) FROM companies WHERE is_active = TRUE")
+                company_count = int(cur.fetchone()[0])
+        if company_count > 0:
+            print(
+                f"[task2] seed not found: {seed_path}. "
+                f"Use existing companies in DB (is_active={company_count})."
+            )
+        else:
+            raise FileNotFoundError(
+                f"Company seed file not found: {seed_path}. "
+                "And no active companies found in DB. "
+                "Please run import/load companies first."
+            )
     with patched_argv(
         [
             "link_events.py",
