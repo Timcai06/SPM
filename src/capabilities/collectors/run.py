@@ -45,12 +45,15 @@ MANUAL_TEMPLATE = ROOT / "output" / "seeds" / "manual_news.csv"
 SOURCE_CATALOG = ROOT / "output" / "meta" / "appendix2_sources.csv"
 DEFAULT_REPORT_CSV = ROOT / "output" / "collector_report.csv"
 DEFAULT_REPORT_JSON = ROOT / "output" / "collector_report.json"
+SOURCE_HEALTH_JSON = ROOT / "output" / "meta" / "collector_source_health.json"
 DEFAULT_DB = "stock_event_mining"
 NETWORK_ERROR_TOKENS = ("timeout", "timed out", "connection", "ssl", "urlopen", "network", "refused", "eof")
 DEFAULT_COLLECTOR_TIMEOUT_SEC = 25
 SOURCE_TIMEOUT_SEC = {
     "miit": 20,
 }
+BREAKER_FAILURE_THRESHOLD = 3
+BREAKER_COOLDOWN_SEC = 30 * 60
 
 
 def write_collector_report_csv(path: Path, rows: list[dict[str, str]]) -> None:
@@ -62,6 +65,41 @@ def write_collector_report_csv(path: Path, rows: list[dict[str, str]]) -> None:
         )
         writer.writeheader()
         writer.writerows(rows)
+
+
+def load_source_health(path: Path) -> dict[str, dict]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    raw_sources = payload.get("sources", {})
+    if not isinstance(raw_sources, dict):
+        return {}
+    health: dict[str, dict] = {}
+    for name, state in raw_sources.items():
+        if not isinstance(state, dict):
+            continue
+        health[str(name)] = {
+            "consecutive_failures": int(state.get("consecutive_failures", 0) or 0),
+            "skip_until_ts": int(state.get("skip_until_ts", 0) or 0),
+            "last_failure_category": str(state.get("last_failure_category", "")),
+            "last_error": str(state.get("last_error", "")),
+            "updated_at": str(state.get("updated_at", "")),
+        }
+    return health
+
+
+def save_source_health(path: Path, health: dict[str, dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "sources": health,
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def classify_failure(error: str, row_count: int, success: str) -> str:
@@ -155,14 +193,38 @@ async def collect_all_async(limit: int, include_non_keyword: bool) -> list[dict]
         ("akshare", lambda: akshare_api.collect(limit=limit)),
     ]
     
+    source_health = load_source_health(SOURCE_HEALTH_JSON)
+    now_ts = int(time.time())
+
     all_combined_rows = []
     report_rows = []
+    active_jobs = []
+    for name, func in jobs:
+        state = source_health.get(name, {})
+        skip_until = int(state.get("skip_until_ts", 0) or 0)
+        if skip_until > now_ts:
+            wait_sec = skip_until - now_ts
+            logger.warning(f"[breaker] skip collector {name}: cooldown {wait_sec}s remaining")
+            report_rows.append(
+                {
+                    "collector": name,
+                    "success": "false",
+                    "failure_category": "cooldown_skip",
+                    "row_count": "0",
+                    "duration_ms": "0",
+                    "error": f"source in cooldown, retry after {wait_sec}s",
+                    "run_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
+            continue
+        active_jobs.append((name, func))
+
     total = len(jobs)
-    completed = 0
+    completed = len(report_rows)
     started = time.perf_counter()
     heartbeat_sec = 5
 
-    pending_tasks = {asyncio.create_task(run_collector(name, func)) for name, func in jobs}
+    pending_tasks = {asyncio.create_task(run_collector(name, func)) for name, func in active_jobs}
     while pending_tasks:
         done, pending_tasks = await asyncio.wait(
             pending_tasks,
@@ -187,10 +249,43 @@ async def collect_all_async(limit: int, include_non_keyword: bool) -> list[dict]
                 f"[progress] {completed}/{total} done: {name}, rows={len(rows)}, "
                 f"duration={report['duration_ms']}ms, elapsed={elapsed_ms}ms"
             )
+            state = source_health.get(
+                name,
+                {
+                    "consecutive_failures": 0,
+                    "skip_until_ts": 0,
+                    "last_failure_category": "",
+                    "last_error": "",
+                    "updated_at": "",
+                },
+            )
+            category = str(report.get("failure_category", "")).strip()
+            if report.get("success") == "true":
+                state["consecutive_failures"] = 0
+                state["skip_until_ts"] = 0
+                state["last_failure_category"] = ""
+                state["last_error"] = ""
+            else:
+                if category in {"network", "unknown"}:
+                    state["consecutive_failures"] = int(state.get("consecutive_failures", 0) or 0) + 1
+                    if state["consecutive_failures"] >= BREAKER_FAILURE_THRESHOLD:
+                        state["skip_until_ts"] = int(time.time()) + BREAKER_COOLDOWN_SEC
+                        logger.warning(
+                            f"[breaker] collector {name} enters cooldown {BREAKER_COOLDOWN_SEC}s "
+                            f"after {state['consecutive_failures']} failures"
+                        )
+                else:
+                    state["consecutive_failures"] = 0
+                    state["skip_until_ts"] = 0
+                state["last_failure_category"] = category
+                state["last_error"] = str(report.get("error", ""))
+            state["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            source_health[name] = state
     
     # Write reports
     write_collector_report_csv(DEFAULT_REPORT_CSV, report_rows)
     DEFAULT_REPORT_JSON.write_text(json.dumps(report_rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_source_health(SOURCE_HEALTH_JSON, source_health)
     
     return all_combined_rows
 
