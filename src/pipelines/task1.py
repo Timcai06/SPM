@@ -4,9 +4,19 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
+import sys
+from contextlib import contextmanager
 from pathlib import Path
 
+SRC_ROOT = Path(__file__).resolve().parents[1]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from capabilities.analysis import feature_return
+from capabilities.collectors import run as collector_run
+from capabilities.events import canonicalize, classify
+from capabilities.quality import check
+from capabilities.storage import load_task1_canonical
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = "stock_event_mining"
@@ -49,33 +59,58 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True, cwd=str(ROOT))
+@contextmanager
+def patched_argv(argv: list[str]):
+    old = sys.argv[:]
+    sys.argv = argv
+    try:
+        yield
+    finally:
+        sys.argv = old
 
 
-def build_classify_cmd(db: str) -> list[str]:
-    cmd = ["python3", "src/capabilities/events/classify.py", "--db", db]
+def build_classify_argv(db: str) -> list[str]:
+    argv = ["classify.py", "--db", db]
     for input_file in CLASSIFY_INPUT_FILES:
-        cmd.extend(["--input", input_file])
-    return cmd
+        argv.extend(["--input", input_file])
+    return argv
 
 
 def main() -> None:
     args = parse_args()
 
     if not args.skip_collect:
-        run(["python3", "src/capabilities/collectors/run.py", "--limit", str(args.limit)])
+        with patched_argv(["run.py", "--limit", str(args.limit)]):
+            collector_run.main()
 
-    run(build_classify_cmd(args.db))
+    with patched_argv(build_classify_argv(args.db)):
+        classify.main()
+
+    with patched_argv(["canonicalize.py"]):
+        canonicalize.main()
+
+    with patched_argv(
+        [
+            "load_task1_canonical.py",
+            "--db",
+            args.db,
+            "--canonical-events",
+            "output/canonical_events.csv",
+            "--canonical-map",
+            "output/event_canonical_map.csv",
+            "--quiet",
+        ]
+    ):
+        load_task1_canonical.main()
 
     if not args.skip_validate:
-        run(["python3", "src/capabilities/quality/check.py"])
+        with patched_argv(["check.py"]):
+            check.main()
 
     if args.with_analysis:
-        run(
+        with patched_argv(
             [
-                "python3",
-                "src/capabilities/analysis/feature_return.py",
+                "feature_return.py",
                 "--db",
                 args.db,
                 "--analysis-mode",
@@ -85,7 +120,8 @@ def main() -> None:
                 "--event-windows",
                 args.event_windows,
             ]
-        )
+        ):
+            feature_return.main()
 
     print(f"Task 1 workflow completed for database: {args.db}")
 
