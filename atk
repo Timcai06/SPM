@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ $# -eq 0 ]; then
+  echo "Usage: ./atk <go|r|q|c|l|f|t|s|si|sl|n|help> [MAKE_VAR=VALUE ...]"
+  exit 0
+fi
+
+cmd="$1"
+shift
+
+case "$cmd" in
+  go|r|q|c|l|f|t|s|si|sl|n|help)
+    make "$cmd" "$@"
+    ;;
+  *)
+    echo "Unknown command: $cmd"
+    echo "Allowed: go r q c l f t s si sl n help"
+    exit 1
+    ;;
+esac

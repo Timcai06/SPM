@@ -26,6 +26,9 @@ endif
 	go r q c l f t s si sl n
 
 help:
+	@echo "推荐入口："
+	@echo "  ./atk go             # 与 make go 等价（建议以后优先用 atk）"
+	@echo ""
 	@echo "最常用："
 	@echo "  make go              # 跑一轮核心数据链（collect+link+feature+train+status）"
 	@echo "  make r               # 完整训练底座（go + stats-import + stats-load + negatives + status）"

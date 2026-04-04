@@ -47,6 +47,10 @@ DEFAULT_REPORT_CSV = ROOT / "output" / "collector_report.csv"
 DEFAULT_REPORT_JSON = ROOT / "output" / "collector_report.json"
 DEFAULT_DB = "stock_event_mining"
 NETWORK_ERROR_TOKENS = ("timeout", "timed out", "connection", "ssl", "urlopen", "network", "refused", "eof")
+DEFAULT_COLLECTOR_TIMEOUT_SEC = 25
+SOURCE_TIMEOUT_SEC = {
+    "miit": 20,
+}
 
 
 def write_collector_report_csv(path: Path, rows: list[dict[str, str]]) -> None:
@@ -79,15 +83,30 @@ async def run_collector(name: str, collect_func: Callable) -> tuple[str, list[di
     rows = []
     success = "false"
     max_attempts = 3
+    timeout_sec = SOURCE_TIMEOUT_SEC.get(name, DEFAULT_COLLECTOR_TIMEOUT_SEC)
+
+    async def execute_collect() -> list[dict]:
+        res = collect_func()
+        if asyncio.iscoroutine(res) or asyncio.isfuture(res):
+            return await res
+        return res
+
     for attempt in range(1, max_attempts + 1):
         try:
-            # Properly handle both sync functions and coroutines/awaitables
-            res = collect_func()
-            if asyncio.iscoroutine(res) or asyncio.isfuture(res):
-                rows = await res
-            else:
-                rows = res
+            rows = await asyncio.wait_for(execute_collect(), timeout=timeout_sec)
             success = "true"
+            break
+        except asyncio.TimeoutError:
+            error = f"timeout after {timeout_sec}s"
+            is_network = True
+            if attempt < max_attempts and is_network:
+                wait_sec = attempt
+                logger.warning(
+                    f"Collector {name} attempt {attempt}/{max_attempts} failed ({error}), retry in {wait_sec}s"
+                )
+                await asyncio.sleep(wait_sec)
+                continue
+            logger.error(f"Collector {name} failed: {error}")
             break
         except Exception as exc:
             msg = str(exc).strip()
