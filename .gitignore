@@ -1,5 +1,7 @@
 .secrets/
 *.env
+*.csv
+.DS_Store
 
 # Runtime outputs (DB is source of truth)
 output/*.csv

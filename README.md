@@ -4,7 +4,7 @@
 
 ## 当前实现范围
 
-- 演示输入：`data/demo_news.csv`
+- main/dev tree 默认不保存 CSV（只保留源码/SQL/文档）
 - 政府网采集结果：`output/sources/source_gov.csv`
 - 发改委采集结果：`output/sources/source_ndrc.csv`
 - 证监会采集结果：`output/sources/source_csrc.csv`
@@ -17,7 +17,7 @@
 - 36 氪股市快讯采集结果：`output/sources/source_36kr.csv`
 - 财新网采集结果：`output/sources/source_caixin.csv`
 - 工信部政策采集结果：`output/sources/source_miit.csv`
-- 手工补录模板：`data/manual_news.csv`
+- 手工补录模板（运行时生成）：`output/seeds/manual_news.csv`
 - 输出原始判定结果：`output/raw_event_candidates.csv`
 - 输出标准化事件表：`output/structured_events.csv`
 - 输出标准事件簇：`output/canonical_events.csv`
@@ -37,7 +37,7 @@
 - 任务 1 统一命令入口：`src/cli/task1.py`
 - 任务 2 表结构：`sql/create_task2_tables.sql`
 - 任务 1 规则说明（答辩版）：`docs/docs_task1_rulebook.md`
-- 附录 2 来源目录：`data/appendix2_sources.csv`
+- 附录 2 来源目录（运行时生成）：`output/meta/appendix2_sources.csv`
 - 公司导入脚本：`src/capabilities/storage/load_companies.py`
 - 事件-公司关联打分脚本：`src/capabilities/linking/link_events.py`
 - 任务 2 一键入口：`src/pipelines/task2.py`
@@ -106,7 +106,7 @@ python3 src/cli/task2.py run --db stock_event_mining --top-k 3 --min-score 0.35
 任务 3 准备闭环：
 
 ```bash
-python3 src/cli/task3.py run --db stock_event_mining --input data/company_relations_seed.csv --min-source-score 0.35 --min-propagation-score 0.20
+python3 src/cli/task3.py run --db stock_event_mining --input output/seeds/company_relations_seed.csv --min-source-score 0.35 --min-propagation-score 0.20
 ```
 
 这条命令会自动执行：
@@ -127,7 +127,6 @@ python3 src/cli/task1.py classify --skip-db-load
 ```bash
 python3 src/cli/task1.py collect --limit 8
 python3 src/capabilities/events/classify.py \
-  --input data/demo_news.csv \
   --input output/sources/source_gov.csv \
   --input output/sources/source_ndrc.csv \
   --input output/sources/source_csrc.csv \
@@ -140,7 +139,7 @@ python3 src/capabilities/events/classify.py \
   --input output/sources/source_36kr.csv \
   --input output/sources/source_caixin.csv \
   --input output/sources/source_miit.csv \
-  --input data/manual_news.csv
+  --input output/seeds/manual_news.csv
 python3 src/cli/task1.py check
 ```
 
@@ -207,9 +206,9 @@ psql -d stock_event_mining -f sql/create_readable_views.sql
 
 ## 数据说明
 
-首版现在支持两类输入：
+首版现在支持两类输入（均在 run tree 运行时生成或维护）：
 
-- 本地样例和手工补录 CSV
+- 手工补录模板 CSV（`output/seeds/manual_news.csv`）
 - 中国政府网实时抓取结果
 - 国家发展改革委通知实时抓取结果
 - 中国证监会要闻抓取结果
@@ -222,20 +221,14 @@ psql -d stock_event_mining -f sql/create_readable_views.sql
 - 财新网 mini 列表抓取结果
 - 工信部政策列表抓取结果
 
-样例数据用于验证流程能跑通，包含：
-
-- 正例：印巴空战、储能政策、重大合同、机器人技术突破
-- 负例：娱乐新闻、无重大事项的年报摘要
-- 重复样本：两条印巴空战近似报道
-
 ## 目录与 CSV 规范（DB-First）
 
 核心原则：`PostgreSQL 是唯一事实源（source of truth）`，CSV 只承担“输入种子 / 调试中间件 / 报告导出”的角色。
 
-`data/`（可追踪，偏静态）
-- 用途：长期保留的输入资产（样例、种子、词典、附录映射、手工补录模板）。
-- 适合放入 Git：是。
-- 约束：不放每轮运行都变化的大体量采集结果。
+`main/dev worktree`
+- 用途：只维护源码、SQL、文档，不存放 CSV。
+- 适合放入 Git：是（代码与文档）。
+- 约束：若出现 CSV，一律视为运行残留并清理。
 
 `output/`（默认不追踪，偏运行态）
 - 用途：流程运行产物（候选事件、结构化事件、归并映射、质量/分析导出）。
@@ -249,7 +242,7 @@ psql -d stock_event_mining -f sql/create_readable_views.sql
 
 工作流建议（与你当前双 worktree 一致）
 1. `run worktree`：执行采集/分类/入库；`output/*.csv` 只做本地缓存，不作为协作主介质。  
-2. `main/dev worktree`：只维护源码、SQL、文档与少量演示 seed。  
+2. `main/dev worktree`：只维护源码、SQL、文档（不保留 CSV）。  
 3. 需要分享数据时：从数据库按 SQL 导出“受控快照 CSV”，放到 `report/` 对应批次目录并注明 `run_id`。  
 
 什么时候必须看库而不是看 CSV
@@ -259,11 +252,10 @@ psql -d stock_event_mining -f sql/create_readable_views.sql
 
 ## 后续扩展方向
 
-- 把样例 CSV 替换成真实爬虫/API 数据
 - 增加更多官方/财经来源采集器
 - 增加更多来源与更细的行业词典
 - 用模型补强规则分类和摘要质量
 - 把输出接入任务 2 的事件-公司关联模块
-- 把 `companies_seed.csv` 扩成真实全市场公司主数据
-- 把 `company_relations_seed.csv` 扩成真实供应链/同概念/控股关系图
+- 把 run tree 的公司种子扩成真实全市场公司主数据
+- 把 run tree 的关系种子扩成真实供应链/同概念/控股关系图
 - 把一跳传播扩展到多跳传播与路径解释

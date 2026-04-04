@@ -83,8 +83,8 @@ from capabilities.events.rules import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-INPUT_PATH = ROOT / "data" / "demo_news.csv"
-RULE_FEEDBACK_PATH = ROOT / "data" / "rule_feedback_keywords.csv"
+INPUT_PATH = ROOT / "output" / "seeds" / "manual_news.csv"
+RULE_FEEDBACK_PATH = ROOT / "output" / "meta" / "rule_feedback_keywords.csv"
 OUTPUT_DIR = ROOT / "output"
 RAW_OUTPUT_PATH = OUTPUT_DIR / "raw_event_candidates.csv"
 STRUCTURED_OUTPUT_PATH = OUTPUT_DIR / "structured_events.csv"
@@ -481,7 +481,7 @@ def parse_args() -> argparse.Namespace:
         "--input",
         action="append",
         dest="inputs",
-        help="Input CSV file. Can be repeated. Defaults to data/demo_news.csv",
+        help="Input CSV file. Can be repeated. Defaults to output/seeds/manual_news.csv",
     )
     parser.add_argument(
         "--output-dir",

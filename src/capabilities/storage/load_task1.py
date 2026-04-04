@@ -24,20 +24,19 @@ from capabilities.storage.db_guard import dsn_for, write_guard
 
 ROOT = Path(__file__).resolve().parents[3]
 RAW_SOURCE_FILES = [
-    ROOT / "data" / "demo_news.csv",
-    ROOT / "data" / "source_gov.csv",
-    ROOT / "data" / "source_ndrc.csv",
-    ROOT / "data" / "source_csrc.csv",
-    ROOT / "data" / "source_sse.csv",
-    ROOT / "data" / "source_cninfo.csv",
-    ROOT / "data" / "source_szse.csv",
-    ROOT / "data" / "source_szse_suspension.csv",
-    ROOT / "data" / "source_yicai.csv",
-    ROOT / "data" / "source_eastmoney.csv",
-    ROOT / "data" / "source_36kr.csv",
-    ROOT / "data" / "source_caixin.csv",
-    ROOT / "data" / "source_miit.csv",
-    ROOT / "data" / "manual_news.csv",
+    ROOT / "output" / "sources" / "source_gov.csv",
+    ROOT / "output" / "sources" / "source_ndrc.csv",
+    ROOT / "output" / "sources" / "source_csrc.csv",
+    ROOT / "output" / "sources" / "source_sse.csv",
+    ROOT / "output" / "sources" / "source_cninfo.csv",
+    ROOT / "output" / "sources" / "source_szse.csv",
+    ROOT / "output" / "sources" / "source_szse_suspension.csv",
+    ROOT / "output" / "sources" / "source_yicai.csv",
+    ROOT / "output" / "sources" / "source_eastmoney.csv",
+    ROOT / "output" / "sources" / "source_36kr.csv",
+    ROOT / "output" / "sources" / "source_caixin.csv",
+    ROOT / "output" / "sources" / "source_miit.csv",
+    ROOT / "output" / "seeds" / "manual_news.csv",
 ]
 RAW_CANDIDATES_PATH = ROOT / "output" / "raw_event_candidates.csv"
 STRUCTURED_EVENTS_PATH = ROOT / "output" / "structured_events.csv"

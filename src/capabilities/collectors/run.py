@@ -34,8 +34,8 @@ from capabilities.collectors.catalog import write_source_catalog
 
 
 ROOT = Path(__file__).resolve().parents[3]
-MANUAL_TEMPLATE = ROOT / "data" / "manual_news.csv"
-SOURCE_CATALOG = ROOT / "data" / "appendix2_sources.csv"
+MANUAL_TEMPLATE = ROOT / "output" / "seeds" / "manual_news.csv"
+SOURCE_CATALOG = ROOT / "output" / "meta" / "appendix2_sources.csv"
 DEFAULT_REPORT_CSV = ROOT / "output" / "collector_report.csv"
 DEFAULT_REPORT_JSON = ROOT / "output" / "collector_report.json"
 DEFAULT_SOURCE_DIR = ROOT / "output" / "sources"
@@ -44,6 +44,7 @@ DEFAULT_SOURCE_DIR = ROOT / "output" / "sources"
 def ensure_manual_template() -> None:
     if MANUAL_TEMPLATE.exists():
         return
+    MANUAL_TEMPLATE.parent.mkdir(parents=True, exist_ok=True)
     with MANUAL_TEMPLATE.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(
             f,

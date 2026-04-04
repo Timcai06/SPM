@@ -11,14 +11,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_OUTPUT = ROOT / "data" / "companies_public.csv"
-DEFAULT_SEED = ROOT / "data" / "companies_seed.csv"
-DEFAULT_MANUAL = ROOT / "data" / "companies_manual.csv"
+DEFAULT_OUTPUT = ROOT / "output" / "seeds" / "companies_public.csv"
+DEFAULT_SEED = ROOT / "output" / "seeds" / "companies_seed.csv"
+DEFAULT_MANUAL = ROOT / "output" / "seeds" / "companies_manual.csv"
 SOURCE_FILES = [
-    ROOT / "data" / "source_sse.csv",
-    ROOT / "data" / "source_szse.csv",
-    ROOT / "data" / "source_cninfo.csv",
-    ROOT / "data" / "source_szse_suspension.csv",
+    ROOT / "output" / "sources" / "source_sse.csv",
+    ROOT / "output" / "sources" / "source_szse.csv",
+    ROOT / "output" / "sources" / "source_cninfo.csv",
+    ROOT / "output" / "sources" / "source_szse_suspension.csv",
 ]
 
 CODE_RE = re.compile(r"^[0-9]{6}$")

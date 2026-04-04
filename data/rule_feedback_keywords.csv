@@ -1,6 +1,0 @@
-dimension,label,keyword,enabled,comment
-subject,地缘类,霍尔木兹,true,示例: 漏判可补充关键词
-industry,军工,预警机,true,示例: 行业关键词补充
-predictability,突发型,升级,true,示例: 事件突发词补充
-duration,脉冲型,紧张局势,true,示例: 持续周期词补充
-

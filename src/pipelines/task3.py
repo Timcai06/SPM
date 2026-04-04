@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run task3 graph preparation workflow.")
     parser.add_argument("--db", default="stock_event_mining")
-    parser.add_argument("--input", default="data/company_relations_seed.csv")
+    parser.add_argument("--input", default="output/seeds/company_relations_seed.csv")
     parser.add_argument("--min-source-score", type=float, default=0.35)
     parser.add_argument("--min-propagation-score", type=float, default=0.20)
     parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")

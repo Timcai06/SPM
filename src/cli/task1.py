@@ -22,7 +22,6 @@ from pipelines import task1 as task1_pipeline
 
 ROOT = Path(__file__).resolve().parents[2]
 CLASSIFY_INPUT_FILES = [
-    "data/demo_news.csv",
     "output/sources/source_gov.csv",
     "output/sources/source_ndrc.csv",
     "output/sources/source_csrc.csv",
@@ -35,7 +34,7 @@ CLASSIFY_INPUT_FILES = [
     "output/sources/source_36kr.csv",
     "output/sources/source_caixin.csv",
     "output/sources/source_miit.csv",
-    "data/manual_news.csv",
+    "output/seeds/manual_news.csv",
 ]
 
 

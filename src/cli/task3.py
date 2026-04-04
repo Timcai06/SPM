@@ -33,14 +33,14 @@ def parse_args() -> argparse.Namespace:
 
     run_parser = sub.add_parser("run", help="load graph edges and build propagation links")
     run_parser.add_argument("--db", default="stock_event_mining")
-    run_parser.add_argument("--input", default="data/company_relations_seed.csv")
+    run_parser.add_argument("--input", default="output/seeds/company_relations_seed.csv")
     run_parser.add_argument("--min-source-score", type=float, default=0.35)
     run_parser.add_argument("--min-propagation-score", type=float, default=0.20)
     run_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
 
     load_parser = sub.add_parser("load-relations", help="load company graph edges")
     load_parser.add_argument("--db", default="stock_event_mining")
-    load_parser.add_argument("--input", default="data/company_relations_seed.csv")
+    load_parser.add_argument("--input", default="output/seeds/company_relations_seed.csv")
 
     propagate_parser = sub.add_parser("propagate", help="build one-hop propagated event links")
     propagate_parser.add_argument("--db", default="stock_event_mining")

@@ -20,7 +20,7 @@ from capabilities.storage.db_guard import dsn_for, write_guard
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = "stock_event_mining"
-DEFAULT_INPUT = ROOT / "data" / "company_relations_seed.csv"
+DEFAULT_INPUT = ROOT / "output" / "seeds" / "company_relations_seed.csv"
 
 
 def parse_args() -> argparse.Namespace:

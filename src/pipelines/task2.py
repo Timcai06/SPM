@@ -24,7 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--min-score", type=float, default=0.35)
-    parser.add_argument("--input", default="data/companies_seed.csv")
+    parser.add_argument("--input", default="output/seeds/companies_seed.csv")
     parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
     return parser.parse_args()
 

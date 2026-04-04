@@ -39,15 +39,15 @@ def parse_args() -> argparse.Namespace:
 
     load_parser = sub.add_parser("load-companies", help="load company seed")
     load_parser.add_argument("--db", default="stock_event_mining")
-    load_parser.add_argument("--input", default="data/companies_seed.csv")
+    load_parser.add_argument("--input", default="output/seeds/companies_seed.csv")
 
     import_parser = sub.add_parser("import-companies", help="import company basics from Tushare")
-    import_parser.add_argument("--output", default="data/companies_a_share.csv")
+    import_parser.add_argument("--output", default="output/seeds/companies_a_share.csv")
     import_parser.add_argument("--tushare-token", default="")
     import_parser.add_argument("--tushare-token-file", default="")
 
     import_public_parser = sub.add_parser("import-companies-public", help="build company seed from collected public sources")
-    import_public_parser.add_argument("--output", default="data/companies_public.csv")
+    import_public_parser.add_argument("--output", default="output/seeds/companies_public.csv")
 
     link_parser = sub.add_parser("link-events", help="generate event-company links")
     link_parser.add_argument("--db", default="stock_event_mining")
