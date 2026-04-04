@@ -1,9 +1,0 @@
-title,source,url,run_id,is_event_pred,event_score,event_threshold,evidence,filter_reason,manual_is_event,manual_subject_type,manual_comment
-克什米尔空战引发市场关注 军工产业链被重新定价,财新网,https://example.com/news/kashmir-defense,20260403_111121,true,5,2,命中事件关键词: 产业链|克什米尔|冲突|空战; score=5; threshold=2,event_signal_detected,,,
-印巴在克什米尔爆发大规模空战 巴基斯坦称使用中国制造战机击落印军战机,第一财经,https://example.com/news/air-combat,20260403_111121,true,7,2,命中事件关键词: 产业链|克什米尔|印巴|战机|空战; score=7; threshold=2,event_signal_detected,,,
-机器人公司发布新一代人形机器人样机,36氪,https://example.com/industry/humanoid,20260403_111121,true,2,2,命中事件关键词: 样机; score=2; threshold=2,event_signal_detected,,,
-国家发改委发布新型储能产业支持政策,中国政府网,https://example.com/policy/storage-policy,20260403_111121,true,6,2,命中事件关键词: 产业链|发改委|措施|支持|政策; score=6; threshold=2,event_signal_detected,,,
-某上市公司2024年年度报告摘要,上交所,https://example.com/report/annual,20260403_111121,false,1,2,常规披露且无显著事件关键词: 年度报告摘要|常规信息|董事会报告,routine_disclosure_without_signal,,,
-印巴在克什米尔爆发大规模空战 巴基斯坦称使用中国制造战机击落印军战机,第一财经,https://example.com/news/air-combat-dup,20260403_111121,true,7,2,命中事件关键词: 产业链|克什米尔|印巴|战机|空战; score=7; threshold=2,event_signal_detected,,,
-某明星官宣参加综艺节目,东方财富网,https://example.com/entertainment/show,20260403_111121,false,0,2,命中非金融关键词: 明星|综艺|娱乐,non_financial_noise,,,
-中航成飞关于签订重大军品合同的公告,巨潮资讯网,https://example.com/notice/contract,20260403_111121,true,3,2,命中事件关键词: 公告|合同; score=3; threshold=2,event_signal_detected,,,

@@ -5,18 +5,18 @@
 ## 当前实现范围
 
 - 演示输入：`data/demo_news.csv`
-- 政府网采集结果：`data/source_gov.csv`
-- 发改委采集结果：`data/source_ndrc.csv`
-- 证监会采集结果：`data/source_csrc.csv`
-- 上交所公告采集结果：`data/source_sse.csv`
-- 巨潮公告采集结果：`data/source_cninfo.csv`
-- 深交所公告采集结果：`data/source_szse.csv`
-- 深交所停复牌公告采集结果：`data/source_szse_suspension.csv`
-- 第一财经新闻采集结果：`data/source_yicai.csv`
-- 东方财富行业资讯采集结果：`data/source_eastmoney.csv`
-- 36 氪股市快讯采集结果：`data/source_36kr.csv`
-- 财新网采集结果：`data/source_caixin.csv`
-- 工信部政策采集结果：`data/source_miit.csv`
+- 政府网采集结果：`output/sources/source_gov.csv`
+- 发改委采集结果：`output/sources/source_ndrc.csv`
+- 证监会采集结果：`output/sources/source_csrc.csv`
+- 上交所公告采集结果：`output/sources/source_sse.csv`
+- 巨潮公告采集结果：`output/sources/source_cninfo.csv`
+- 深交所公告采集结果：`output/sources/source_szse.csv`
+- 深交所停复牌公告采集结果：`output/sources/source_szse_suspension.csv`
+- 第一财经新闻采集结果：`output/sources/source_yicai.csv`
+- 东方财富行业资讯采集结果：`output/sources/source_eastmoney.csv`
+- 36 氪股市快讯采集结果：`output/sources/source_36kr.csv`
+- 财新网采集结果：`output/sources/source_caixin.csv`
+- 工信部政策采集结果：`output/sources/source_miit.csv`
 - 手工补录模板：`data/manual_news.csv`
 - 输出原始判定结果：`output/raw_event_candidates.csv`
 - 输出标准化事件表：`output/structured_events.csv`
@@ -128,18 +128,18 @@ python3 src/cli/task1.py classify --skip-db-load
 python3 src/cli/task1.py collect --limit 8
 python3 src/capabilities/events/classify.py \
   --input data/demo_news.csv \
-  --input data/source_gov.csv \
-  --input data/source_ndrc.csv \
-  --input data/source_csrc.csv \
-  --input data/source_sse.csv \
-  --input data/source_cninfo.csv \
-  --input data/source_szse.csv \
-  --input data/source_szse_suspension.csv \
-  --input data/source_yicai.csv \
-  --input data/source_eastmoney.csv \
-  --input data/source_36kr.csv \
-  --input data/source_caixin.csv \
-  --input data/source_miit.csv \
+  --input output/sources/source_gov.csv \
+  --input output/sources/source_ndrc.csv \
+  --input output/sources/source_csrc.csv \
+  --input output/sources/source_sse.csv \
+  --input output/sources/source_cninfo.csv \
+  --input output/sources/source_szse.csv \
+  --input output/sources/source_szse_suspension.csv \
+  --input output/sources/source_yicai.csv \
+  --input output/sources/source_eastmoney.csv \
+  --input output/sources/source_36kr.csv \
+  --input output/sources/source_caixin.csv \
+  --input output/sources/source_miit.csv \
   --input data/manual_news.csv
 python3 src/cli/task1.py check
 ```
@@ -227,6 +227,35 @@ psql -d stock_event_mining -f sql/create_readable_views.sql
 - 正例：印巴空战、储能政策、重大合同、机器人技术突破
 - 负例：娱乐新闻、无重大事项的年报摘要
 - 重复样本：两条印巴空战近似报道
+
+## 目录与 CSV 规范（DB-First）
+
+核心原则：`PostgreSQL 是唯一事实源（source of truth）`，CSV 只承担“输入种子 / 调试中间件 / 报告导出”的角色。
+
+`data/`（可追踪，偏静态）
+- 用途：长期保留的输入资产（样例、种子、词典、附录映射、手工补录模板）。
+- 适合放入 Git：是。
+- 约束：不放每轮运行都变化的大体量采集结果。
+
+`output/`（默认不追踪，偏运行态）
+- 用途：流程运行产物（候选事件、结构化事件、归并映射、质量/分析导出）。
+- 适合放入 Git：否（除“答辩快照”外）。
+- 约束：优先写库；CSV 仅用于排查、抽样复核、对外演示导出。
+
+`report/`（可追踪，面向答辩）
+- 用途：里程碑报告、质量报告、事件研究结果摘要。
+- 适合放入 Git：是（建议按批次保留关键版本）。
+- 约束：报告引用的统计口径应可通过数据库复算，不以某个临时 CSV 为准。
+
+工作流建议（与你当前双 worktree 一致）
+1. `run worktree`：执行采集/分类/入库；`output/*.csv` 只做本地缓存，不作为协作主介质。  
+2. `main/dev worktree`：只维护源码、SQL、文档与少量演示 seed。  
+3. 需要分享数据时：从数据库按 SQL 导出“受控快照 CSV”，放到 `report/` 对应批次目录并注明 `run_id`。  
+
+什么时候必须看库而不是看 CSV
+- 判断“是否真正入库成功”：以表行数和主键/唯一键冲突处理结果为准。
+- 判断“全量/增量是否正确”：以数据库 `upsert` 后的统计为准，不以某个目录下 CSV 行数为准。
+- 任务 2/3 联动：一律以库中 `structured_events / canonical_events / event_company_links / event_propagation_links` 为输入。
 
 ## 后续扩展方向
 

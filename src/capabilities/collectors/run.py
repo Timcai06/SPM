@@ -38,6 +38,7 @@ MANUAL_TEMPLATE = ROOT / "data" / "manual_news.csv"
 SOURCE_CATALOG = ROOT / "data" / "appendix2_sources.csv"
 DEFAULT_REPORT_CSV = ROOT / "output" / "collector_report.csv"
 DEFAULT_REPORT_JSON = ROOT / "output" / "collector_report.json"
+DEFAULT_SOURCE_DIR = ROOT / "output" / "sources"
 
 
 def ensure_manual_template() -> None:
@@ -100,18 +101,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect live Task 1 source data.")
     parser.add_argument("--limit", type=int, default=10, help="Max rows to fetch per source.")
     parser.add_argument("--include-non-keyword", action="store_true", help="Disable gov title keyword prefilter.")
-    parser.add_argument("--gov-output", default=str(ROOT / "data" / "source_gov.csv"))
-    parser.add_argument("--ndrc-output", default=str(ROOT / "data" / "source_ndrc.csv"))
-    parser.add_argument("--csrc-output", default=str(ROOT / "data" / "source_csrc.csv"))
-    parser.add_argument("--sse-output", default=str(ROOT / "data" / "source_sse.csv"))
-    parser.add_argument("--cninfo-output", default=str(ROOT / "data" / "source_cninfo.csv"))
-    parser.add_argument("--szse-output", default=str(ROOT / "data" / "source_szse.csv"))
-    parser.add_argument("--szse-suspension-output", default=str(ROOT / "data" / "source_szse_suspension.csv"))
-    parser.add_argument("--yicai-output", default=str(ROOT / "data" / "source_yicai.csv"))
-    parser.add_argument("--eastmoney-output", default=str(ROOT / "data" / "source_eastmoney.csv"))
-    parser.add_argument("--kr36-output", default=str(ROOT / "data" / "source_36kr.csv"))
-    parser.add_argument("--caixin-output", default=str(ROOT / "data" / "source_caixin.csv"))
-    parser.add_argument("--miit-output", default=str(ROOT / "data" / "source_miit.csv"))
+    parser.add_argument("--gov-output", default=str(DEFAULT_SOURCE_DIR / "source_gov.csv"))
+    parser.add_argument("--ndrc-output", default=str(DEFAULT_SOURCE_DIR / "source_ndrc.csv"))
+    parser.add_argument("--csrc-output", default=str(DEFAULT_SOURCE_DIR / "source_csrc.csv"))
+    parser.add_argument("--sse-output", default=str(DEFAULT_SOURCE_DIR / "source_sse.csv"))
+    parser.add_argument("--cninfo-output", default=str(DEFAULT_SOURCE_DIR / "source_cninfo.csv"))
+    parser.add_argument("--szse-output", default=str(DEFAULT_SOURCE_DIR / "source_szse.csv"))
+    parser.add_argument("--szse-suspension-output", default=str(DEFAULT_SOURCE_DIR / "source_szse_suspension.csv"))
+    parser.add_argument("--yicai-output", default=str(DEFAULT_SOURCE_DIR / "source_yicai.csv"))
+    parser.add_argument("--eastmoney-output", default=str(DEFAULT_SOURCE_DIR / "source_eastmoney.csv"))
+    parser.add_argument("--kr36-output", default=str(DEFAULT_SOURCE_DIR / "source_36kr.csv"))
+    parser.add_argument("--caixin-output", default=str(DEFAULT_SOURCE_DIR / "source_caixin.csv"))
+    parser.add_argument("--miit-output", default=str(DEFAULT_SOURCE_DIR / "source_miit.csv"))
     parser.add_argument("--report-csv", default=str(DEFAULT_REPORT_CSV), help="Collector run report CSV path.")
     parser.add_argument("--report-json", default=str(DEFAULT_REPORT_JSON), help="Collector run report JSON path.")
     return parser.parse_args()

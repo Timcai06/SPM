@@ -1,2 +1,7 @@
 .secrets/
 *.env
+
+# Runtime outputs (DB is source of truth)
+output/*.csv
+output/*.json
+output/sources/
