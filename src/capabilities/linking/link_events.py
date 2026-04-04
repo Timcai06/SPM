@@ -185,7 +185,6 @@ def main() -> None:
     ):
         with psycopg.connect(dsn_for(args.db), row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
-                cur.execute("TRUNCATE TABLE event_company_links RESTART IDENTITY")
                 cur.execute(
                     """
                     SELECT se.id,
@@ -218,7 +217,9 @@ def main() -> None:
                 )
                 companies = cur.fetchall()
 
-                inserted = 0
+                upserted = 0
+                touched_structured_event_ids: set[int] = set()
+                current_keys: list[tuple[int, int, str]] = []
                 for event in cluster_events:
                     scored = []
                     for company in companies:
@@ -230,6 +231,7 @@ def main() -> None:
                     for final_score, company, details in scored[: limit_k]:
                         link_type = "direct_match" if details["direct_symbol_score"] >= 1 or details["direct_name_score"] >= 1 else ("industry_match" if details["industry_match_score"] >= 1 else "candidate")
                         for structured_event_id in event["member_ids"]:
+                            sid = int(structured_event_id)
                             evidence = {
                                 **details["evidence"],
                                 "canonical_event_id": event["canonical_event_id"],
@@ -244,9 +246,18 @@ def main() -> None:
                                     event_match_score, final_link_score, evidence
                                 )
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                                ON CONFLICT (structured_event_id, company_id, link_type) DO UPDATE
+                                SET relation_path = EXCLUDED.relation_path,
+                                    text_similarity_score = EXCLUDED.text_similarity_score,
+                                    industry_match_score = EXCLUDED.industry_match_score,
+                                    chain_position_score = EXCLUDED.chain_position_score,
+                                    event_match_score = EXCLUDED.event_match_score,
+                                    final_link_score = EXCLUDED.final_link_score,
+                                    evidence = EXCLUDED.evidence,
+                                    updated_at = NOW()
                                 """,
                                 (
-                                    structured_event_id,
+                                    sid,
                                     company["id"],
                                     link_type,
                                     f'{event["event_name"]} -> {company["industry_l2"]} -> {company["company_name"]}',
@@ -258,8 +269,51 @@ def main() -> None:
                                     json.dumps(evidence, ensure_ascii=False),
                                 ),
                             )
-                            inserted += 1
-    print(f"Inserted {inserted} event-company links into {args.db}")
+                            upserted += 1
+                            touched_structured_event_ids.add(sid)
+                            current_keys.append((sid, int(company["id"]), str(link_type)))
+
+                stale_deleted = 0
+                if touched_structured_event_ids:
+                    cur.execute(
+                        """
+                        CREATE TEMP TABLE current_event_company_link_keys (
+                            structured_event_id BIGINT NOT NULL,
+                            company_id BIGINT NOT NULL,
+                            link_type TEXT NOT NULL,
+                            PRIMARY KEY (structured_event_id, company_id, link_type)
+                        ) ON COMMIT DROP
+                        """
+                    )
+                    if current_keys:
+                        cur.executemany(
+                            """
+                            INSERT INTO current_event_company_link_keys (structured_event_id, company_id, link_type)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT DO NOTHING
+                            """,
+                            current_keys,
+                        )
+                    cur.execute(
+                        """
+                        DELETE FROM event_company_links l
+                        WHERE l.structured_event_id = ANY(%s)
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM current_event_company_link_keys k
+                              WHERE k.structured_event_id = l.structured_event_id
+                                AND k.company_id = l.company_id
+                                AND k.link_type = l.link_type
+                          )
+                        """,
+                        (list(touched_structured_event_ids),),
+                    )
+                    stale_deleted = cur.rowcount
+            conn.commit()
+    print(
+        f"Upserted {upserted} event-company links into {args.db}; "
+        f"deleted stale links: {stale_deleted}"
+    )
 
 
 if __name__ == "__main__":
