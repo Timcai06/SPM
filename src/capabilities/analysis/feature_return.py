@@ -278,10 +278,16 @@ def main() -> None:
         benchmark_source = f"tushare_failed:{exc.__class__.__name__}"
     if not benchmark_returns:
         symbol = INDEX_SINA_SYMBOL_MAP[benchmark_key]
-        benchmark_returns = close_series_to_returns(
-            fetch_sina_kline(symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
-        )
-        benchmark_source = "sina_index_fallback"
+        try:
+            benchmark_returns = close_series_to_returns(
+                fetch_sina_kline(symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
+            )
+            benchmark_source = "sina_index_fallback"
+        except Exception as exc:
+            benchmark_returns = {}
+            reason_counts[f"sina_index_error:{exc.__class__.__name__}"] += 1
+            benchmark_source = f"sina_failed:{exc.__class__.__name__}"
+            print(f"[feature] sina index fallback failed: {exc.__class__.__name__}")
 
     stock_cache: Dict[str, Dict[str, float]] = {}
     stock_source_map: Dict[str, str] = {}
@@ -329,14 +335,22 @@ def main() -> None:
             if not returns:
                 sina_symbol = ts_to_sina_symbol(ts_code)
                 if sina_symbol:
-                    returns = close_series_to_returns(
-                        fetch_sina_kline(sina_symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
-                    )
-                    source_name = "sina_stock_fallback"
+                    try:
+                        returns = close_series_to_returns(
+                            fetch_sina_kline(sina_symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
+                        )
+                        source_name = "sina_stock_fallback"
+                    except Exception as exc:
+                        returns = {}
+                        source_name = "none"
+                        reason_counts[f"sina_stock_error:{exc.__class__.__name__}"] += 1
             stock_cache[ts_code] = returns
             stock_source_map[ts_code] = source_name
 
         stock_returns = stock_cache[ts_code]
+        if not benchmark_returns:
+            reason_counts["benchmark_unavailable"] += 1
+            continue
         common_dates = sorted(set(stock_returns.keys()) & set(benchmark_returns.keys()))
         if not common_dates:
             reason_counts["no_common_trade_dates"] += 1
