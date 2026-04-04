@@ -57,6 +57,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--event-windows", default="1,3,5", help="Event windows for analysis.")
     parser.add_argument("--time-budget-sec", type=int, default=300, help="Time budget for analysis step.")
     parser.add_argument("--max-analysis-rows", type=int, default=300, help="Max rows for analysis step.")
+    parser.add_argument("--api-timeout-sec", type=float, default=20.0, help="Per request timeout for analysis fetch.")
+    parser.add_argument("--progress-every", type=int, default=10, help="Print analysis progress every N rows.")
     return parser.parse_args()
 
 
@@ -141,6 +143,8 @@ def main() -> None:
                 "--event-windows", args.event_windows,
                 "--time-budget-sec", str(args.time_budget_sec),
                 "--max-rows", str(args.max_analysis_rows),
+                "--api-timeout-sec", str(args.api_timeout_sec),
+                "--progress-every", str(args.progress_every),
             ]
         ):
             analysis_main()

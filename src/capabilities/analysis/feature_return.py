@@ -45,10 +45,10 @@ def ts_to_sina_symbol(ts_code: str) -> Optional[str]:
     return None
 
 
-def fetch_sina_kline(symbol: str, max_rows: int = 800) -> List[Dict[str, str]]:
+def fetch_sina_kline(symbol: str, max_rows: int = 800, timeout_seconds: float = 20.0) -> List[Dict[str, str]]:
     url = "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData"
     params = {"symbol": symbol, "scale": "240", "ma": "no", "datalen": str(max_rows)}
-    resp = requests.get(url, params=params, timeout=20)
+    resp = requests.get(url, params=params, timeout=timeout_seconds)
     resp.raise_for_status()
     text = resp.text.strip()
     if not text:
@@ -155,6 +155,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id", default="", help="Run identifier for traceability.")
     parser.add_argument("--time-budget-sec", type=int, default=300, help="Stop analysis when runtime budget is reached.")
     parser.add_argument("--max-rows", type=int, default=300, help="Max event-company rows to analyze per run.")
+    parser.add_argument("--api-timeout-sec", type=float, default=20.0, help="Per request timeout for Tushare/Sina fetch.")
+    parser.add_argument("--progress-every", type=int, default=10, help="Print progress every N processed rows.")
     return parser.parse_args()
 
 
@@ -253,7 +255,14 @@ def main() -> None:
     benchmark_source = "none"
     try:
         if use_tushare:
-            ret_obj = fetch_index_returns(ts_module, token, INDEX_CODE_MAP[benchmark_key], "20200101", datetime.now().strftime("%Y%m%d"))
+            ret_obj = fetch_index_returns(
+                ts_module,
+                token,
+                INDEX_CODE_MAP[benchmark_key],
+                "20200101",
+                datetime.now().strftime("%Y%m%d"),
+                timeout_seconds=args.api_timeout_sec,
+            )
             benchmark_returns = ret_obj.returns
             benchmark_source = ret_obj.source
     except Exception as exc:
@@ -262,7 +271,9 @@ def main() -> None:
         benchmark_source = f"tushare_failed:{exc.__class__.__name__}"
     if not benchmark_returns:
         symbol = INDEX_SINA_SYMBOL_MAP[benchmark_key]
-        benchmark_returns = close_series_to_returns(fetch_sina_kline(symbol))
+        benchmark_returns = close_series_to_returns(
+            fetch_sina_kline(symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
+        )
         benchmark_source = "sina_index_fallback"
 
     stock_cache: Dict[str, Dict[str, float]] = {}
@@ -270,10 +281,22 @@ def main() -> None:
     dataset_rows: List[Dict[str, str]] = []
     started_at = time.time()
 
-    for row in rows:
+    total_rows = len(rows)
+    print(
+        f"[feature] start rows={total_rows}, use_tushare={use_tushare}, "
+        f"benchmark_source={benchmark_source}, token_source={token_source}"
+    )
+    for idx_row, row in enumerate(rows, start=1):
         if args.time_budget_sec > 0 and (time.time() - started_at) >= args.time_budget_sec:
             reason_counts["time_budget_exceeded"] += 1
+            print(f"[feature] stop by time budget at row={idx_row}/{total_rows}")
             break
+        if args.progress_every > 0 and (idx_row == 1 or idx_row % args.progress_every == 0):
+            elapsed = int(time.time() - started_at)
+            print(
+                f"[feature] progress {idx_row}/{total_rows}, generated={len(dataset_rows)}, "
+                f"stocks_cached={len(stock_cache)}, elapsed={elapsed}s"
+            )
         ts_code = (row.get("ts_code") or "").strip()
         if not ts_code:
             reason_counts["missing_ts_code"] += 1
@@ -283,7 +306,14 @@ def main() -> None:
             source_name = "none"
             if use_tushare:
                 try:
-                    ret_obj = fetch_stock_returns(ts_module, token, ts_code, "20200101", datetime.now().strftime("%Y%m%d"))
+                    ret_obj = fetch_stock_returns(
+                        ts_module,
+                        token,
+                        ts_code,
+                        "20200101",
+                        datetime.now().strftime("%Y%m%d"),
+                        timeout_seconds=args.api_timeout_sec,
+                    )
                     returns = ret_obj.returns
                     source_name = ret_obj.source
                 except Exception as exc:
@@ -292,7 +322,9 @@ def main() -> None:
             if not returns:
                 sina_symbol = ts_to_sina_symbol(ts_code)
                 if sina_symbol:
-                    returns = close_series_to_returns(fetch_sina_kline(sina_symbol))
+                    returns = close_series_to_returns(
+                        fetch_sina_kline(sina_symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
+                    )
                     source_name = "sina_stock_fallback"
             stock_cache[ts_code] = returns
             stock_source_map[ts_code] = source_name
@@ -370,6 +402,7 @@ def main() -> None:
             writer = csv.DictWriter(f, fieldnames=list(dataset_rows[0].keys()))
             writer.writeheader()
             writer.writerows(dataset_rows)
+            print(f"[feature] generated dataset rows={len(dataset_rows)}")
         else:
             writer = csv.DictWriter(
                 f,
@@ -387,6 +420,7 @@ def main() -> None:
                     "link_source": link_source,
                 }
             )
+            print(f"[feature] no dataset rows. reason_counts={dict(reason_counts)}")
 
     def summarize_metric(metric: str) -> str:
         vals = [float(r[metric]) for r in dataset_rows if r.get(metric)]

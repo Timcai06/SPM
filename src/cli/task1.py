@@ -62,6 +62,8 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--event-windows", default="1,3,5")
     run_parser.add_argument("--time-budget-sec", type=int, default=300)
     run_parser.add_argument("--max-analysis-rows", type=int, default=300)
+    run_parser.add_argument("--api-timeout-sec", type=float, default=20.0)
+    run_parser.add_argument("--progress-every", type=int, default=10)
 
     collect_parser = sub.add_parser("collect", help="collect source data")
     collect_parser.add_argument("--limit", type=int, default=10)
@@ -94,6 +96,8 @@ def parse_args() -> argparse.Namespace:
     feature_parser.add_argument("--run-id", default="")
     feature_parser.add_argument("--time-budget-sec", type=int, default=300)
     feature_parser.add_argument("--max-rows", type=int, default=300)
+    feature_parser.add_argument("--api-timeout-sec", type=float, default=20.0)
+    feature_parser.add_argument("--progress-every", type=int, default=10)
     feature_parser.add_argument("--dataset-path", default="output/task1_event_return_dataset.csv")
     feature_parser.add_argument("--report-path", default="output/task1_feature_return_report.md")
 
@@ -128,6 +132,10 @@ def main() -> None:
                 str(args.time_budget_sec),
                 "--max-analysis-rows",
                 str(args.max_analysis_rows),
+                "--api-timeout-sec",
+                str(args.api_timeout_sec),
+                "--progress-every",
+                str(args.progress_every),
             ]
         )
         with patched_argv(argv):
@@ -202,6 +210,10 @@ def main() -> None:
             str(args.time_budget_sec),
             "--max-rows",
             str(args.max_rows),
+            "--api-timeout-sec",
+            str(args.api_timeout_sec),
+            "--progress-every",
+            str(args.progress_every),
             "--dataset-path",
             args.dataset_path,
             "--report-path",
