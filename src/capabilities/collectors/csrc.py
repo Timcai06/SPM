@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional
 
-from .common import fetch_text, strip_tags
+from .common import fetch_text, fetch_text_async, strip_tags
 
 
 CSRC_LIST_URL = "https://www.csrc.gov.cn/csrc/c100028/common_list.shtml"
@@ -18,8 +18,8 @@ def extract_meta_content(html: str, name: str) -> str:
     return strip_tags(match.group(1)) if match else ""
 
 
-def parse_list(limit: int) -> List[Dict[str, str]]:
-    html = fetch_text(CSRC_LIST_URL)
+async def parse_list(limit: int, session: object | None = None) -> List[Dict[str, str]]:
+    html = await fetch_text_async(CSRC_LIST_URL, session=session)
     pattern = re.compile(
         r'<li>\s*<a href="(?P<href>/csrc/c100028/[^"]+/content\.shtml)"[^>]*>(?P<title>.*?)</a>\s*<span class="date">(?P<date>[0-9\-]+)</span>',
         re.S,
@@ -38,8 +38,8 @@ def parse_list(limit: int) -> List[Dict[str, str]]:
     return rows
 
 
-def parse_article(url: str) -> Optional[Dict[str, str]]:
-    html = fetch_text(url)
+async def parse_article(url: str, session: object | None = None) -> Optional[Dict[str, str]]:
+    html = await fetch_text_async(url, session=session)
     title = extract_meta_content(html, "ArticleTitle")
     publish_time = extract_meta_content(html, "PubDate")
     source_name = extract_meta_content(html, "ContentSource") or "中国证监会"
@@ -69,11 +69,12 @@ def parse_article(url: str) -> Optional[Dict[str, str]]:
     }
 
 
-def collect(limit: int = 10) -> List[Dict[str, str]]:
-    rows: List[Dict[str, str]] = []
-    for item in parse_list(limit):
-        parsed = parse_article(item["url"])
-        if parsed:
-            rows.append(parsed)
-    return rows
+async def collect(limit: int = 10) -> List[Dict[str, str]]:
+    import aiohttp
+    import asyncio
+    async with aiohttp.ClientSession() as session:
+        items = await parse_list(limit, session=session)
+        tasks = [parse_article(item["url"], session=session) for item in items]
+        results = await asyncio.gather(*tasks)
+        return [r for r in results if r]
 

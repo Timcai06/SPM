@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from .common import fetch_text, strip_tags
+from .common import fetch_text, fetch_text_async, strip_tags
 
 
 EASTMONEY_INDUSTRY_URL = "https://finance.eastmoney.com/a/cywjh.html"
@@ -17,8 +17,8 @@ def parse_datetime(text: str) -> str:
     return f"{match.group(1)} {(match.group(2) or '00:00')}:00"
 
 
-def parse_article(url: str) -> Optional[Dict[str, str]]:
-    html = fetch_text(url)
+async def parse_article(url: str, session: object | None = None) -> Optional[Dict[str, str]]:
+    html = await fetch_text_async(url, session=session)
     title_match = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.S)
     if not title_match:
         title_match = re.search(r"<title>(.*?)_.*?</title>", html, re.S)
@@ -43,19 +43,26 @@ def parse_article(url: str) -> Optional[Dict[str, str]]:
     }
 
 
-def collect(limit: int = 20) -> List[Dict[str, str]]:
-    html = fetch_text(EASTMONEY_INDUSTRY_URL)
-    links = re.findall(r'https://finance\.eastmoney\.com/a/[0-9]+\.html', html)
-    rows: List[Dict[str, str]] = []
-    seen: set[str] = set()
-    for link in links:
-        if link in seen:
-            continue
-        seen.add(link)
-        parsed = parse_article(link)
-        if parsed:
-            rows.append(parsed)
-        if len(rows) >= limit:
-            break
-    return rows
+async def collect(limit: int = 20) -> List[Dict[str, str]]:
+    import aiohttp
+    import asyncio
+    
+    async with aiohttp.ClientSession() as session:
+        html = await fetch_text_async(EASTMONEY_INDUSTRY_URL, session=session)
+        links = re.findall(r'https://finance\.eastmoney\.com/a/[0-9]+\.html', html)
+        rows: List[Dict[str, str]] = []
+        seen: set[str] = set()
+        
+        candidates = []
+        for link in links:
+            if link in seen:
+                continue
+            seen.add(link)
+            candidates.append(link)
+            if len(candidates) >= limit:
+                break
+        
+        tasks = [parse_article(link, session=session) for link in candidates]
+        results = await asyncio.gather(*tasks)
+        return [r for r in results if r]
 

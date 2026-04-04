@@ -590,52 +590,187 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
     }
 
 
-def classify_rows(rows: List[Dict[str, str]]) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
-    duplicate_counts = Counter(dedup_key(row) for row in rows)
-    candidate_rows: List[Dict[str, object]] = []
-    structured_rows: List[Dict[str, object]] = []
-    seen_structured_dedup_keys = set()
+import asyncio
+import aiohttp
+import os
 
+SECRETS_DIR = ROOT / ".secrets"
+LLM_KEY_FILE = SECRETS_DIR / "llm_api_key.txt"
+
+class AsyncLLMClient:
+    def __init__(self, api_key: str = None, base_url: str = "https://opencode.ai/zen/v1"):
+        self.api_key = api_key or self._load_key()
+        self.base_url = base_url
+        self.model = "gpt-5.4-mini" # Optimized for OpenCode Zen speed/cost
+
+    def _load_key(self) -> str:
+        try:
+            return LLM_KEY_FILE.read_text(encoding="utf-8").strip()
+        except:
+            return ""
+
+    async def extract_event_data(self, title: str, content: str) -> dict:
+        """Call LLM to extract structured event information."""
+        if not self.api_key:
+            return {}
+
+        prompt = f"""
+你是一个专业的金融事件分析专家。请分析以下新闻，并判断它是否属于重要的股市基本面事件。
+重要事件包括：产业政策变动、技术突破、重大公司行为（分红/并购/增发/高管变动）、宏观经济数据发布、行业重大突发事件。
+不重要的事件包括：普通市场行情波动、非财经类社会新闻、重复新闻、纯技术指标讨论。
+
+请严格返回以下JSON格式（不要包含markdown格式标记）：
+{{
+  "is_event": true/false,
+  "event_name": "简洁的事件名称",
+  "subject_type": "Macro/Policy/Industry/Entity/Shock",
+  "industry": "涉及行业",
+  "sentiment": "Positive/Negative/Neutral",
+  "summary": "50字以内的核心内容综述"
+}}
+
+新闻标题：{title}
+新闻正文：{content[:1000]}
+"""
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"}
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f"{self.base_url}/chat/completions", json=payload, headers=headers, timeout=30) as resp:
+                    if resp.status == 200:
+                        text = await resp.text()
+                        data = json.loads(text)
+                        return json.loads(data["choices"][0]["message"]["content"])
+                    else:
+                        print(f"[WARN] LLM API Error: Status {resp.status}")
+                        return {}
+        except Exception as e:
+            print(f"[WARN] LLM API Exception: {e}")
+            return {}
+
+@dataclass
+class LLMResultEnrichment:
+    is_event_llm: bool = False
+    event_name_llm: str = ""
+    subject_type_llm: str = ""
+    industry_llm: str = ""
+    sentiment_llm: str = ""
+    summary_llm: str = ""
+
+async def classify_rows_async(rows: List[Dict[str, str]], use_llm: bool = True) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+    """Classify rows with optional LLM second pass."""
+    client = AsyncLLMClient()
+    semaphore = asyncio.Semaphore(5) # Concurrency limit to avoid rate limits
+    
+    # First Pass: Deterministic Rules (Fast & Free)
+    duplicate_counts = Counter(dedup_key(row) for row in rows)
+    candidate_results = []
     for row in rows:
-        result = detect_event(row, duplicate_counts[dedup_key(row)])
-        candidate_rows.append(build_candidate_row(row, result))
-        if not result.is_event:
-            continue
-        if result.dedup_key in seen_structured_dedup_keys:
-            continue
-        seen_structured_dedup_keys.add(result.dedup_key)
-        structured_rows.append(build_structured_row(row, result))
+        candidate_results.append(detect_event(row, duplicate_counts[dedup_key(row)]))
+    
+    async def process_one(row, res):
+        # We only call LLM if rules say it MIGHT be an event OR for enrichment
+        if res.is_event and use_llm and client.api_key:
+            async with semaphore:
+                llm_data = await client.extract_event_data(row["title"], row["content"])
+                if llm_data:
+                    # Enrich original result
+                    structured_row = build_structured_row(row, res)
+                    structured_row.update({
+                        "event_name": llm_data.get("event_name", structured_row["event_name"]),
+                        "event_subject_type": llm_data.get("subject_type", structured_row["event_subject_type"]),
+                        "industry_type": llm_data.get("industry", structured_row["industry_type"]),
+                        "sentiment": llm_data.get("sentiment", structured_row["sentiment"]),
+                        "event_summary": llm_data.get("summary", structured_row["event_summary"]),
+                    })
+                    return build_candidate_row(row, res), structured_row
+        
+        # Fallback to rules-only
+        return build_candidate_row(row, res), (build_structured_row(row, res) if res.is_event else None)
+
+    tasks = [process_one(row, res) for row, res in zip(rows, candidate_results)]
+    results = await asyncio.gather(*tasks)
+    
+    candidate_rows = []
+    structured_rows = []
+    seen_structured_dedup_keys = set()
+    
+    for cand, struct in results:
+        candidate_rows.append(cand)
+        if struct:
+            # Simple dedup for structured events
+            d_key = dedup_key(rows[candidate_rows.index(cand)])
+            if d_key not in seen_structured_dedup_keys:
+                seen_structured_dedup_keys.add(d_key)
+                structured_rows.append(struct)
+                
+    return candidate_rows, structured_rows
+
+
+def load_rows_from_db(db: str) -> List[Dict[str, str]]:
+    """Load latest raw_documents from database for classification."""
+    import psycopg
+    from capabilities.storage.db_guard import dsn_for
+    
+    sql = """
+        SELECT source, title, content, publish_time::text, url, symbol_or_subject 
+        FROM raw_documents
+        ORDER BY publish_time DESC
+        LIMIT 1000;
+    """
+    with psycopg.connect(dsn_for(db)) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            columns = [desc[0] for desc in cur.description]
+            return [dict(zip(columns, row)) for row in cur.fetchall()]
+
+
+async def run_classification_pipeline(db: str, input_rows: List[Dict[str, str]] = None) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+    """Orchestrate classification and write results to Stage tables (Async)."""
+    from capabilities.storage.load_task1 import load_stage_tables
+    
+    rows = input_rows if input_rows is not None else load_rows_from_db(db)
+    if not rows:
+        print("No documents found for classification.")
+        return [], []
+        
+    candidate_rows, structured_rows = await classify_rows_async(rows)
+    
+    load_stage_tables(db, [], candidate_rows, structured_rows)
     return candidate_rows, structured_rows
 
 
 def main() -> None:
     args = parse_args()
-    input_paths = [Path(p).resolve() for p in args.inputs] if args.inputs else [INPUT_PATH]
-    output_dir = Path(args.output_dir).resolve()
-    raw_output_path = output_dir / "raw_event_candidates.csv"
-    structured_output_path = output_dir / "structured_events.csv"
+    
+    async def _run():
+        if args.inputs:
+            input_paths = [Path(p).resolve() for p in args.inputs]
+            rows = load_rows_from_inputs(input_paths)
+            print(f"Loaded {len(rows)} rows from {len(input_paths)} input file(s)")
+            candidate_rows, structured_rows = await classify_rows_async(rows)
+        else:
+            print(f"No input files provided. Reading from database: {args.db}")
+            candidate_rows, structured_rows = await run_classification_pipeline(args.db)
 
-    rows = load_rows_from_inputs(input_paths)
-    candidate_rows, structured_rows = classify_rows(rows)
+        output_dir = Path(args.output_dir).resolve()
+        raw_output_path = output_dir / "raw_event_candidates.csv"
+        structured_output_path = output_dir / "structured_events.csv"
+        ensure_output_dir(output_dir)
+        
+        write_csv(raw_output_path, candidate_rows, RAW_CANDIDATE_FIELDS)
+        write_csv(structured_output_path, structured_rows, STRUCTURED_EVENT_FIELDS)
 
-    ensure_output_dir(output_dir)
-    write_csv(
-        raw_output_path,
-        candidate_rows,
-        RAW_CANDIDATE_FIELDS,
-    )
-    write_csv(
-        structured_output_path,
-        structured_rows,
-        STRUCTURED_EVENT_FIELDS,
-    )
+        print(f"Wrote {len(candidate_rows)} raw candidates to {raw_output_path}")
+        print(f"Wrote {len(structured_rows)} structured events to {structured_output_path}")
 
-    print(f"Loaded {len(rows)} rows from {len(input_paths)} input file(s)")
-    print(f"Wrote {len(candidate_rows)} raw candidates to {raw_output_path}")
-    print(f"Wrote {len(structured_rows)} structured events to {structured_output_path}")
-    if not args.skip_db_load:
-        load_outputs_to_postgres(args.db)
-        print(f"Loaded outputs into PostgreSQL database: {args.db}")
+    asyncio.run(_run())
 
 
 if __name__ == "__main__":

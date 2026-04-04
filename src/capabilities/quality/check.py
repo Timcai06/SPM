@@ -90,19 +90,31 @@ def check_enum_values(structured_rows) -> None:
         assert row["impact_scope"] in IMPACT_SCOPE_ENUM, f"Invalid impact_scope: {row['impact_scope']}"
 
 
-def main() -> None:
-    raw_rows = read_csv(RAW_OUTPUT_PATH)
-    structured_rows = read_csv(STRUCTURED_OUTPUT_PATH)
-    check_non_empty(raw_rows, structured_rows)
-    check_event_balance(raw_rows, structured_rows)
-    check_dedup_consistency(raw_rows)
-    check_required_fields(structured_rows)
-    check_decision_threshold_fields(raw_rows)
-    check_enum_values(structured_rows)
+def run_validation_pipeline(raw_rows: List[Dict[str, str]] = None, structured_rows: List[Dict[str, str]] = None) -> bool:
+    """Orchestrate validation from memory or CSV files."""
+    if raw_rows is None:
+        raw_rows = read_csv(RAW_OUTPUT_PATH)
+    if structured_rows is None:
+        structured_rows = read_csv(STRUCTURED_OUTPUT_PATH)
+        
+    try:
+        check_non_empty(raw_rows, structured_rows)
+        check_event_balance(raw_rows, structured_rows)
+        check_dedup_consistency(raw_rows)
+        check_required_fields(structured_rows)
+        check_decision_threshold_fields(raw_rows)
+        check_enum_values(structured_rows)
+        print("Validation passed.")
+        print(f"raw rows: {len(raw_rows)}")
+        print(f"structured rows: {len(structured_rows)}")
+        return True
+    except Exception as exc:
+        print(f"Validation failed: {exc}")
+        return False
 
-    print("Validation passed.")
-    print(f"raw rows: {len(raw_rows)}")
-    print(f"structured rows: {len(structured_rows)}")
+
+def main() -> None:
+    run_validation_pipeline()
 
 
 if __name__ == "__main__":

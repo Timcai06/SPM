@@ -4,7 +4,7 @@ import json
 import re
 from typing import Dict, List, Optional
 
-from .common import fetch_text, strip_tags
+from .common import fetch_text, fetch_text_async, strip_tags
 
 
 GOV_LIST_URL = "https://www.gov.cn/yaowen/liebiao/YAOWENLIEBIAO.json"
@@ -29,8 +29,8 @@ def is_high_value_title(title: str) -> bool:
     return any(keyword in title for keyword in HIGH_VALUE_KEYWORDS)
 
 
-def parse_gov_article(url: str) -> Optional[Dict[str, str]]:
-    html = fetch_text(url)
+async def parse_gov_article(url: str, session: object | None = None) -> Optional[Dict[str, str]]:
+    html = await fetch_text_async(url, session=session)
     title_match = re.search(r'<h1 id="ti">\s*(.*?)\s*</h1>', html, re.S)
     date_match = re.search(r'<div class="pages-date">\s*([0-9\-:\s]+)', html, re.S)
     source_match = re.search(r'来源：\s*([^<\s]+)', html)
@@ -55,22 +55,25 @@ def parse_gov_article(url: str) -> Optional[Dict[str, str]]:
     }
 
 
-def collect(limit: int = 10, include_non_keyword: bool = False) -> List[Dict[str, str]]:
-    payload = json.loads(fetch_text(GOV_LIST_URL))
-    selected = []
-    for item in payload:
-        title = item.get("TITLE", "").strip()
-        if not title:
-            continue
-        if include_non_keyword or is_high_value_title(title):
-            selected.append(item)
-        if len(selected) >= limit:
-            break
+async def collect(limit: int = 10, include_non_keyword: bool = False) -> List[Dict[str, str]]:
+    import aiohttp
+    import json
+    import asyncio
+    
+    async with aiohttp.ClientSession() as session:
+        list_text = await fetch_text_async(GOV_LIST_URL, session=session)
+        payload = json.loads(list_text)
+        selected = []
+        for item in payload:
+            title = item.get("TITLE", "").strip()
+            if not title:
+                continue
+            if include_non_keyword or is_high_value_title(title):
+                selected.append(item)
+            if len(selected) >= limit:
+                break
 
-    rows: List[Dict[str, str]] = []
-    for item in selected:
-        article = parse_gov_article(item["URL"])
-        if article:
-            rows.append(article)
-    return rows
+        tasks = [parse_gov_article(item["URL"], session=session) for item in selected]
+        results = await asyncio.gather(*tasks)
+        return [r for r in results if r]
 

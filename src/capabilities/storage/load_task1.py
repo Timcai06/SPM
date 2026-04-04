@@ -154,8 +154,33 @@ def copy_csv_to_table(db: str, rows: list[dict[str, str]], fieldnames: list[str]
 
 
 def upsert_raw_documents(db: str, rows: list[dict[str, str]]) -> None:
+    """Upsert collected rows into raw_documents table.
+    
+    Rows should have keys: source, title, content, publish_time, url, symbol_or_subject.
+    """
     if not rows:
         return
+    
+    data_to_insert = []
+    for row in rows:
+        title = (row.get("title") or "").strip()
+        content = (row.get("content") or "").strip()
+        if not content:
+            content = title or "(empty)"
+            
+        content_hash = hashlib.md5(f"{title}::{content}".encode("utf-8")).hexdigest()
+        
+        data_to_insert.append({
+            "source": row.get("source", "unknown"),
+            "source_type": "text_source",
+            "title": title,
+            "content": content,
+            "publish_time": safe_normalize_datetime(row.get("publish_time", "")),
+            "url": row.get("url", ""),
+            "symbol_or_subject": row.get("symbol_or_subject", ""),
+            "content_hash": content_hash,
+        })
+
     sql = """
         INSERT INTO raw_documents (source, source_type, title, content, publish_time, url, symbol_or_subject, content_hash)
         VALUES (%(source)s, %(source_type)s, %(title)s, %(content)s, %(publish_time)s, %(url)s, %(symbol_or_subject)s, %(content_hash)s)
@@ -170,7 +195,7 @@ def upsert_raw_documents(db: str, rows: list[dict[str, str]]) -> None:
     """
     with psycopg.connect(dsn_for(db)) as conn:
         with conn.cursor() as cur:
-            cur.executemany(sql, rows)
+            cur.executemany(sql, data_to_insert)
         conn.commit()
 
 

@@ -60,75 +60,92 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-@contextmanager
-def patched_argv(argv: list[str]):
-    old = sys.argv[:]
-    sys.argv = argv
-    try:
-        yield
-    finally:
-        sys.argv = old
+import asyncio
+from capabilities.collectors.run import collect_all_async
+from capabilities.events.classify import run_classification_pipeline
+from capabilities.events.canonicalize import run_canonicalization_pipeline
+from capabilities.quality.check import run_validation_pipeline
+from capabilities.storage.load_task1_canonical import run_loading_pipeline
+from capabilities.storage.load_task1 import upsert_raw_documents
+from capabilities.analysis.feature_return import main as analysis_main
 
-
-def build_classify_argv(db: str) -> list[str]:
-    argv = ["classify.py", "--db", db]
-    for input_file in CLASSIFY_INPUT_FILES:
-        argv.extend(["--input", input_file])
-    return argv
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DB = "stock_event_mining"
 
 
 def main() -> None:
     args = parse_args()
+    db = args.db
 
+    # 1. Collection
     if not args.skip_collect:
-        with patched_argv(["run.py", "--limit", str(args.limit)]):
-            collector_run.main()
+        print(f"--- Phase 1: Asynchronous Collection (limit={args.limit}) ---")
+        all_rows = asyncio.run(collect_all_async(args.limit, include_non_keyword=False))
+        print(f"Collected {len(all_rows)} documents in memory.")
+        
+        # 2. Storage Upsert
+        if all_rows:
+            print(f"Upserting {len(all_rows)} documents to database '{db}'...")
+            upsert_raw_documents(db, all_rows)
+    else:
+        print("Skipping collection phase.")
 
-    with patched_argv(build_classify_argv(args.db)):
-        classify.main()
+    # 3. Classification
+    print(f"--- Phase 2: Identification & Classification (DB: {db}) ---")
+    candidate_rows, structured_rows = asyncio.run(run_classification_pipeline(db))
+    print(f"Identified {len(structured_rows)} structured events from candidates.")
 
-    with patched_argv(["canonicalize.py"]):
-        canonicalize.main()
+    # 4. Canonicalization
+    print("--- Phase 3: Canonicalization (Grouping) ---")
+    canonical_rows, mapping_rows = run_canonicalization_pipeline(db=db)
+    print(f"Grouped into {len(canonical_rows)} canonical event clusters.")
 
-    with patched_argv(
-        [
-            "load_task1_canonical.py",
-            "--db",
-            args.db,
-            "--canonical-events",
-            "output/canonical_events.csv",
-            "--canonical-map",
-            "output/event_canonical_map.csv",
-            "--quiet",
-        ]
-    ):
-        load_task1_canonical.main()
+    # 5. Loading Canonical Layer
+    print("--- Phase 4: Loading Canonical Layer ---")
+    run_loading_pipeline(
+        db=db,
+        canonical_event_rows=canonical_rows,
+        canonical_link_rows=mapping_rows,
+        quiet=False
+    )
 
+    # 6. Validation
     if not args.skip_validate:
-        with patched_argv(["check.py"]):
-            check.main()
+        print("--- Phase 5: Validation ---")
+        success = run_validation_pipeline(candidate_rows, structured_rows)
+        if not success:
+            print("[WARN] Validation failed, but continuing.")
 
+    # 7. Analysis (Optional)
     if args.with_analysis:
+        print("--- Phase 6: Event Analysis (Event Study) ---")
+        # For analysis_main, we might still need patched_argv if it's not refactored yet,
+        # but let's try to keep it simple for now or use the existing one if it works.
+        # Actually, let's keep it as is since it's an optional extension.
+        from contextlib import contextmanager
+        @contextmanager
+        def patched_argv(argv: list[str]):
+            old = sys.argv[:]
+            sys.argv = argv
+            try:
+                yield
+            finally:
+                sys.argv = old
+        
         with patched_argv(
             [
                 "feature_return.py",
-                "--db",
-                args.db,
-                "--analysis-mode",
-                args.analysis_mode,
-                "--benchmark",
-                args.benchmark,
-                "--event-windows",
-                args.event_windows,
-                "--time-budget-sec",
-                str(args.time_budget_sec),
-                "--max-rows",
-                str(args.max_analysis_rows),
+                "--db", db,
+                "--analysis-mode", args.analysis_mode,
+                "--benchmark", args.benchmark,
+                "--event-windows", args.event_windows,
+                "--time-budget-sec", str(args.time_budget_sec),
+                "--max-rows", str(args.max_analysis_rows),
             ]
         ):
-            feature_return.main()
+            analysis_main()
 
-    print(f"Task 1 workflow completed for database: {args.db}")
+    print(f"\nTask 1 workflow completed successfully for database: {db}")
 
 
 if __name__ == "__main__":

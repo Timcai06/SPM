@@ -3,14 +3,14 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional
 
-from .common import fetch_text, strip_tags
+from .common import fetch_text, fetch_text_async, strip_tags
 
 
 NDRC_LIST_URL = "https://www.ndrc.gov.cn/xxgk/zcfb/tz/"
 
 
-def parse_list(limit: int) -> List[Dict[str, str]]:
-    html = fetch_text(NDRC_LIST_URL)
+async def parse_list(limit: int, session: object | None = None) -> List[Dict[str, str]]:
+    html = await fetch_text_async(NDRC_LIST_URL, session=session)
     pattern = re.compile(
         r'<li>\s*<a href="(?P<href>[^"]+)"[^>]*title="(?P<title>[^"]+)">.*?</a>[\s\S]*?<span>(?P<date>[0-9/]+)</span>\s*</li>',
         re.S,
@@ -32,8 +32,8 @@ def parse_list(limit: int) -> List[Dict[str, str]]:
     return rows
 
 
-def parse_article(url: str) -> Optional[Dict[str, str]]:
-    html = fetch_text(url)
+async def parse_article(url: str, session: object | None = None) -> Optional[Dict[str, str]]:
+    html = await fetch_text_async(url, session=session)
     title_match = re.search(r'<meta name="ArticleTitle" content="([^"]+)">', html)
     if not title_match:
         title_match = re.search(r"<h2[^>]*>\s*(.*?)\s*</h2>", html, re.S)
@@ -65,11 +65,12 @@ def parse_article(url: str) -> Optional[Dict[str, str]]:
     }
 
 
-def collect(limit: int = 10) -> List[Dict[str, str]]:
-    rows: List[Dict[str, str]] = []
-    for item in parse_list(limit):
-        parsed = parse_article(item["url"])
-        if parsed:
-            rows.append(parsed)
-    return rows
+async def collect(limit: int = 10) -> List[Dict[str, str]]:
+    import aiohttp
+    import asyncio
+    async with aiohttp.ClientSession() as session:
+        items = await parse_list(limit, session=session)
+        tasks = [parse_article(item["url"], session=session) for item in items]
+        results = await asyncio.gather(*tasks)
+        return [r for r in results if r]
 

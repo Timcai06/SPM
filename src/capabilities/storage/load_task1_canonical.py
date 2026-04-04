@@ -197,28 +197,37 @@ def load_event_links(cur: psycopg.Cursor, rows: list[dict[str, str]]) -> int:
     return len(payload)
 
 
-def main() -> None:
-    args = parse_args()
-    canonical_events_path = Path(args.canonical_events).resolve()
-    canonical_map_path = Path(args.canonical_map).resolve()
-    canonical_event_rows = read_csv(canonical_events_path)
-    canonical_link_rows = read_csv(canonical_map_path)
-
-    ensure_tables(args.db)
+def run_loading_pipeline(db: str, canonical_event_rows: list[dict[str, str]] = None, canonical_link_rows: list[dict[str, str]] = None, lock_timeout_sec: int = 120, quiet: bool = False) -> None:
+    """Orchestrate loading of canonical events."""
+    if canonical_event_rows is None:
+        canonical_event_rows = read_csv(DEFAULT_CANONICAL_EVENTS)
+    if canonical_link_rows is None:
+        canonical_link_rows = read_csv(DEFAULT_CANONICAL_MAP)
+        
+    ensure_tables(db)
 
     with write_guard(
-        db_name=args.db,
+        db_name=db,
         required_tables=["structured_events", "canonical_events", "event_canonical_links"],
-        lock_timeout_sec=args.lock_timeout_sec,
+        lock_timeout_sec=lock_timeout_sec,
     ) as conn:
         with conn.cursor() as cur:
             upserted = load_canonical_events(cur, canonical_event_rows)
             linked = load_event_links(cur, canonical_link_rows)
         conn.commit()
 
-    if not args.quiet:
-        print(f"Upserted {upserted} canonical events into {args.db}")
-        print(f"Loaded {linked} event-canonical links into {args.db}")
+    if not quiet:
+        print(f"Upserted {upserted} canonical events into {db}")
+        print(f"Loaded {linked} event-canonical links into {db}")
+
+
+def main() -> None:
+    args = parse_args()
+    run_loading_pipeline(
+        db=args.db,
+        lock_timeout_sec=args.lock_timeout_sec,
+        quiet=args.quiet
+    )
 
 
 if __name__ == "__main__":

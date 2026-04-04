@@ -58,6 +58,40 @@ def fetch_json_post(url: str, form_data: Dict[str, str]) -> Dict[str, object]:
         return json.loads(resp.read().decode("utf-8", "ignore"))
 
 
+async def fetch_text_async(url: str, session: object | None = None) -> str:
+    import aiohttp
+    headers = {"User-Agent": USER_AGENT}
+    if session is not None:
+        async with session.get(url, headers=headers, timeout=20) as resp:
+            return await resp.text(encoding="utf-8", errors="ignore")
+    else:
+        async with aiohttp.ClientSession() as new_session:
+            async with new_session.get(url, headers=headers, timeout=20) as resp:
+                return await resp.text(encoding="utf-8", errors="ignore")
+
+
+async def fetch_json_post_async(url: str, form_data: Dict[str, str], session: object | None = None) -> Dict[str, object]:
+    import aiohttp
+    import json
+    from urllib.parse import urlencode
+    
+    payload = urlencode(form_data).encode("utf-8")
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    
+    if session is not None:
+        async with session.post(url, data=payload, headers=headers, timeout=20) as resp:
+            return await resp.json(content_type=None)
+    else:
+        async with aiohttp.ClientSession() as new_session:
+            async with new_session.post(url, data=payload, headers=headers, timeout=20) as resp:
+                return await resp.json(content_type=None)
+
+
 def strip_tags(html: str) -> str:
     text = re.sub(r"<script[\s\S]*?</script>", " ", html, flags=re.I)
     text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)

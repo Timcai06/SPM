@@ -277,19 +277,46 @@ def write_report(path: Path, canonical_rows: List[Dict[str, object]], mapping_ro
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build canonical event clusters from structured events.")
-    parser.add_argument("--input", default=str(INPUT_PATH), help="Structured events CSV path.")
-    parser.add_argument("--canonical-output", default=str(CANONICAL_EVENTS_PATH), help="Canonical events CSV output path.")
-    parser.add_argument("--mapping-output", default=str(CANONICAL_MAP_PATH), help="Event to canonical mapping CSV output path.")
-    parser.add_argument("--report-path", default=str(REPORT_PATH), help="Markdown report output path.")
-    return parser.parse_args()
+def run_canonicalization_pipeline(db: str = None, input_rows: List[Dict[str, str]] = None) -> tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+    """Orchestrate canonicalization from memory or database."""
+    if input_rows is not None:
+        rows = input_rows
+    elif db:
+        import psycopg
+        from capabilities.storage.db_guard import dsn_for
+        with psycopg.connect(dsn_for(db)) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM structured_events_stage")
+                columns = [desc[0] for desc in cur.description]
+                rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+    else:
+        rows = read_csv(INPUT_PATH)
+        
+    if not rows:
+        print("No structured events found for canonicalization.")
+        return [], []
+        
+    canonical_rows, mapping_rows = build_canonical_events(rows)
+    return canonical_rows, mapping_rows
 
 
 def main() -> None:
-    args = parse_args()
-    rows = read_csv(Path(args.input))
-    canonical_rows, mapping_rows = build_canonical_events(rows)
+    parser = argparse.ArgumentParser(description="Build canonical event clusters from structured events.")
+    parser.add_argument("--db", help="Database name to read structured_events_stage from.")
+    parser.add_argument("--input", default=str(INPUT_PATH), help="Structured events CSV path (if not using --db).")
+    parser.add_argument("--canonical_output", default=str(CANONICAL_EVENTS_PATH), help="Canonical events CSV output path.")
+    parser.add_argument("--mapping_output", default=str(CANONICAL_MAP_PATH), help="Event to canonical mapping CSV output path.")
+    parser.add_argument("--report-path", default=str(REPORT_PATH), help="Markdown report output path.")
+    args = parser.parse_args()
+
+    if args.db:
+        print(f"Reading structured events from database: {args.db}")
+        canonical_rows, mapping_rows = run_canonicalization_pipeline(db=args.db)
+    else:
+        print(f"Reading structured events from file: {args.input}")
+        rows = read_csv(Path(args.input))
+        canonical_rows, mapping_rows = build_canonical_events(rows)
+
     write_csv(
         Path(args.canonical_output),
         canonical_rows,

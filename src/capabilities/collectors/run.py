@@ -16,6 +16,8 @@ SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+import asyncio
+import logging
 from capabilities.collectors import (
     caixin,
     cninfo,
@@ -29,49 +31,21 @@ from capabilities.collectors import (
     szse,
     szse_suspension,
     yicai,
+    akshare_api,
 )
 from capabilities.collectors.catalog import write_source_catalog
+from capabilities.storage.load_task1 import upsert_raw_documents
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[3]
 MANUAL_TEMPLATE = ROOT / "output" / "seeds" / "manual_news.csv"
 SOURCE_CATALOG = ROOT / "output" / "meta" / "appendix2_sources.csv"
 DEFAULT_REPORT_CSV = ROOT / "output" / "collector_report.csv"
 DEFAULT_REPORT_JSON = ROOT / "output" / "collector_report.json"
-DEFAULT_SOURCE_DIR = ROOT / "output" / "sources"
-
-
-def ensure_manual_template() -> None:
-    if MANUAL_TEMPLATE.exists():
-        return
-    MANUAL_TEMPLATE.parent.mkdir(parents=True, exist_ok=True)
-    with MANUAL_TEMPLATE.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["source", "title", "content", "publish_time", "url", "symbol_or_subject"],
-        )
-        writer.writeheader()
-        writer.writerow(
-            {
-                "source": "手工录入",
-                "title": "请删除本行后再录入正式事件",
-                "content": "把正文粘贴到这里。这个占位行会被程序自动忽略。",
-                "publish_time": "2026-04-02 00:00:00",
-                "url": "local://manual-seed",
-                "symbol_or_subject": "自定义主题",
-            }
-        )
-
-
-def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["source", "title", "content", "publish_time", "url", "symbol_or_subject"],
-        )
-        writer.writeheader()
-        writer.writerows(rows)
+DEFAULT_DB = "stock_event_mining"
 
 
 def write_collector_report_csv(path: Path, rows: list[dict[str, str]]) -> None:
@@ -79,7 +53,7 @@ def write_collector_report_csv(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["collector", "success", "failure_category", "row_count", "duration_ms", "output_path", "error", "run_at"],
+            fieldnames=["collector", "success", "failure_category", "row_count", "duration_ms", "error", "run_at"],
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -98,85 +72,93 @@ def classify_failure(error: str, row_count: int, success: str) -> str:
     return "unknown"
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Collect live Task 1 source data.")
-    parser.add_argument("--limit", type=int, default=10, help="Max rows to fetch per source.")
-    parser.add_argument("--include-non-keyword", action="store_true", help="Disable gov title keyword prefilter.")
-    parser.add_argument("--gov-output", default=str(DEFAULT_SOURCE_DIR / "source_gov.csv"))
-    parser.add_argument("--ndrc-output", default=str(DEFAULT_SOURCE_DIR / "source_ndrc.csv"))
-    parser.add_argument("--csrc-output", default=str(DEFAULT_SOURCE_DIR / "source_csrc.csv"))
-    parser.add_argument("--sse-output", default=str(DEFAULT_SOURCE_DIR / "source_sse.csv"))
-    parser.add_argument("--cninfo-output", default=str(DEFAULT_SOURCE_DIR / "source_cninfo.csv"))
-    parser.add_argument("--szse-output", default=str(DEFAULT_SOURCE_DIR / "source_szse.csv"))
-    parser.add_argument("--szse-suspension-output", default=str(DEFAULT_SOURCE_DIR / "source_szse_suspension.csv"))
-    parser.add_argument("--yicai-output", default=str(DEFAULT_SOURCE_DIR / "source_yicai.csv"))
-    parser.add_argument("--eastmoney-output", default=str(DEFAULT_SOURCE_DIR / "source_eastmoney.csv"))
-    parser.add_argument("--kr36-output", default=str(DEFAULT_SOURCE_DIR / "source_36kr.csv"))
-    parser.add_argument("--caixin-output", default=str(DEFAULT_SOURCE_DIR / "source_caixin.csv"))
-    parser.add_argument("--miit-output", default=str(DEFAULT_SOURCE_DIR / "source_miit.csv"))
-    parser.add_argument("--report-csv", default=str(DEFAULT_REPORT_CSV), help="Collector run report CSV path.")
-    parser.add_argument("--report-json", default=str(DEFAULT_REPORT_JSON), help="Collector run report JSON path.")
-    return parser.parse_args()
+async def run_collector(name: str, collect_func: Callable) -> tuple[str, list[dict], dict]:
+    started = time.perf_counter()
+    error = ""
+    rows = []
+    success = "false"
+    try:
+        # Properly handle both sync functions and coroutines/awaitables
+        res = collect_func()
+        if asyncio.iscoroutine(res) or asyncio.isfuture(res):
+            rows = await res
+        else:
+            rows = res
+        success = "true"
+    except Exception as exc:
+        error = str(exc)
+        logger.error(f"Collector {name} failed: {exc}")
+    
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    report = {
+        "collector": name,
+        "success": success,
+        "failure_category": classify_failure(error, len(rows), success),
+        "row_count": str(len(rows)),
+        "duration_ms": str(duration_ms),
+        "error": error,
+        "run_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    return name, rows, report
+
+
+async def collect_all_async(limit: int, include_non_keyword: bool) -> list[dict]:
+    """Orchestrate all collectors in parallel and return combined rows."""
+    # We call the collect functions directly now, or keep them as lambdas
+    jobs = [
+        ("gov", lambda: gov.collect(limit=limit, include_non_keyword=include_non_keyword)),
+        ("ndrc", lambda: ndrc.collect(limit=limit)),
+        ("csrc", lambda: csrc.collect(limit=limit)),
+        ("sse", lambda: sse.collect(limit=limit)),
+        ("cninfo", lambda: cninfo.collect(limit=limit)),
+        ("szse", lambda: szse.collect(limit=limit)),
+        ("szse_suspension", lambda: szse_suspension.collect(limit=limit)),
+        ("yicai", lambda: yicai.collect(limit=limit)),
+        ("eastmoney", lambda: eastmoney.collect(limit=limit)),
+        ("36kr", lambda: kr36.collect(limit=limit)),
+        ("caixin", lambda: caixin.collect(limit=limit)),
+        ("miit", lambda: miit.collect(limit=limit)),
+        ("akshare", lambda: akshare_api.collect(limit=limit)),
+    ]
+    
+    tasks = [run_collector(name, func) for name, func in jobs]
+    results = await asyncio.gather(*tasks)
+    
+    all_combined_rows = []
+    report_rows = []
+    for name, rows, report in results:
+        if rows:
+            all_combined_rows.extend(rows)
+        report_rows.append(report)
+        logger.info(f"Collector {name} finished, fetched {len(rows)} rows in {report['duration_ms']}ms")
+    
+    # Write reports
+    write_collector_report_csv(DEFAULT_REPORT_CSV, report_rows)
+    DEFAULT_REPORT_JSON.write_text(json.dumps(report_rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    
+    return all_combined_rows
 
 
 def main() -> None:
-    args = parse_args()
-    ensure_manual_template()
+    parser = argparse.ArgumentParser(description="Collect live Task 1 source data (Async).")
+    parser.add_argument("--limit", type=int, default=10, help="Max rows to fetch per source.")
+    parser.add_argument("--include-non-keyword", action="store_true", help="Disable gov title keyword prefilter.")
+    parser.add_argument("--db", default=DEFAULT_DB, help="Target PostgreSQL database name.")
+    args = parser.parse_args()
+    
     write_source_catalog(SOURCE_CATALOG)
-
-    jobs: list[tuple[str, Path, Callable[[], list[dict[str, str]]]]] = [
-        ("government", Path(args.gov_output).resolve(), lambda: gov.collect(limit=args.limit, include_non_keyword=args.include_non_keyword)),
-        ("ndrc", Path(args.ndrc_output).resolve(), lambda: ndrc.collect(limit=args.limit)),
-        ("csrc", Path(args.csrc_output).resolve(), lambda: csrc.collect(limit=args.limit)),
-        ("sse", Path(args.sse_output).resolve(), lambda: sse.collect(limit=args.limit)),
-        ("cninfo", Path(args.cninfo_output).resolve(), lambda: cninfo.collect(limit=args.limit)),
-        ("szse", Path(args.szse_output).resolve(), lambda: szse.collect(limit=args.limit)),
-        ("szse_suspension", Path(args.szse_suspension_output).resolve(), lambda: szse_suspension.collect(limit=args.limit)),
-        ("yicai", Path(args.yicai_output).resolve(), lambda: yicai.collect(limit=args.limit)),
-        ("eastmoney", Path(args.eastmoney_output).resolve(), lambda: eastmoney.collect(limit=args.limit)),
-        ("36kr", Path(args.kr36_output).resolve(), lambda: kr36.collect(limit=args.limit)),
-        ("caixin", Path(args.caixin_output).resolve(), lambda: caixin.collect(limit=args.limit)),
-        ("miit", Path(args.miit_output).resolve(), lambda: miit.collect(limit=args.limit)),
-    ]
-
-    report_rows: list[dict[str, str]] = []
-    for name, out_path, run in jobs:
-        started = time.perf_counter()
-        error = ""
-        try:
-            rows = run()
-            success = "true"
-        except Exception as exc:
-            rows = []
-            success = "false"
-            error = str(exc)
-            print(f"[WARN] collector failed: {name}: {exc}")
-        duration_ms = int((time.perf_counter() - started) * 1000)
-        write_csv(out_path, rows)
-        print(f"Wrote {len(rows)} live {name} rows to {out_path}")
-        report_rows.append(
-            {
-                "collector": name,
-                "success": success,
-                "failure_category": classify_failure(error, len(rows), success),
-                "row_count": str(len(rows)),
-                "duration_ms": str(duration_ms),
-                "output_path": str(out_path),
-                "error": error,
-                "run_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }
-        )
-
-    report_csv_path = Path(args.report_csv).resolve()
-    report_json_path = Path(args.report_json).resolve()
-    write_collector_report_csv(report_csv_path, report_rows)
-    report_json_path.parent.mkdir(parents=True, exist_ok=True)
-    report_json_path.write_text(json.dumps(report_rows, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    print(f"Wrote appendix 2 source catalog to {SOURCE_CATALOG}")
-    print(f"Wrote collector report CSV to {report_csv_path}")
-    print(f"Wrote collector report JSON to {report_json_path}")
-    print(f"Manual import template available at {MANUAL_TEMPLATE}")
+    
+    logger.info("Starting asynchronous data collection...")
+    all_rows = asyncio.run(collect_all_async(args.limit, args.include_non_keyword))
+    logger.info(f"Total rows collected: {len(all_rows)}")
+    
+    # Direct memory-to-database processing
+    if all_rows:
+        logger.info(f"Upserting {len(all_rows)} rows into database '{args.db}'...")
+        upsert_raw_documents(args.db, all_rows)
+        logger.info("Database upsert complete.")
+    else:
+        logger.warning("No rows collected, skipping database upsert.")
 
 
 if __name__ == "__main__":
