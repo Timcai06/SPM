@@ -4,14 +4,20 @@ LIMIT ?= 20
 TOP_K ?= 3
 MIN_SCORE ?= 0.35
 TIME_BUDGET ?= 180
-MAX_ROWS ?= 80
+MAX_ROWS ?= 200
 API_TIMEOUT ?= 10
 PROGRESS_EVERY ?= 5
 TOKEN_FILE ?= .secrets/tushare_token.txt
 USE_TUSHARE ?= 0
 STATS_SOURCE ?= auto
-DAYS ?= 30
+DAYS ?= 120
+STATS_MAX_SYMBOLS ?= 800
 NEG_MAX_PER_DAY ?= 100
+BACKFILL_ROUNDS ?= 3
+BACKFILL_LIMIT ?= 60
+BACKFILL_MAX_ROWS ?= 300
+BACKFILL_DAYS ?= 365
+BACKFILL_STATS_MAX_SYMBOLS ?= 1200
 
 FEATURE_TOKEN_ARG :=
 ifeq ($(USE_TUSHARE),1)
@@ -22,12 +28,13 @@ endif
 
 .PHONY: help \
 	collect link feature train status qa stats-import stats-load negatives \
-	full full-with-stats \
-	go r q c l f t s qa si sl n
+	full full-with-stats backfill \
+	go r q c l f t s qa si sl n bf
 
 help:
 	@echo "推荐入口："
 	@echo "  ./atk go             # 与 make go 等价（建议以后优先用 atk）"
+	@echo "  ./atk bf             # 历史补报模式（多轮采集 + 扩公司统计特征）"
 	@echo ""
 	@echo "最常用："
 	@echo "  make go              # 跑一轮核心数据链（collect+link+feature+train+status）"
@@ -35,10 +42,10 @@ help:
 	@echo "  make q               # 快速采集（collect + status）"
 	@echo ""
 	@echo "完整命令："
-	@echo "  make collect | link | feature | train | status | qa"
-	@echo "  make stats-import | stats-load | negatives"
+	@echo "  make collect | link | feature | train | status | qa | backfill"
+	@echo "  make stats-import | stats-load | negatives | full | full-with-stats"
 	@echo ""
-	@echo "短别名：c l f t s qa si sl n"
+	@echo "短别名：c l f t s qa si sl n bf"
 
 collect:
 	$(PY) src/cli/task1.py run --limit $(LIMIT) --skip-validate --db $(DB)
@@ -62,7 +69,7 @@ qa:
 	$(PY) src/cli/task1.py qa --db $(DB)
 
 stats-import:
-	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(DAYS) --tushare-token-file $(TOKEN_FILE)
+	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(DAYS) --max-symbols $(STATS_MAX_SYMBOLS) --tushare-token-file $(TOKEN_FILE)
 
 stats-load:
 	$(PY) src/cli/task2.py load-company-stats --db $(DB)
@@ -73,6 +80,21 @@ negatives:
 full: collect link feature train status
 
 full-with-stats: full stats-import stats-load negatives status
+
+backfill:
+	@echo "[backfill] rounds=$(BACKFILL_ROUNDS), limit=$(BACKFILL_LIMIT), max_rows=$(BACKFILL_MAX_ROWS)"
+	@i=1; while [ $$i -le $(BACKFILL_ROUNDS) ]; do \
+		echo "[backfill] round $$i/$(BACKFILL_ROUNDS)"; \
+		$(PY) src/cli/task1.py run --limit $(BACKFILL_LIMIT) --skip-validate --db $(DB); \
+		i=$$((i+1)); \
+	done
+	$(PY) src/cli/task2.py run --db $(DB) --top-k $(TOP_K) --min-score $(MIN_SCORE)
+	$(PY) src/cli/task1.py feature --db $(DB) --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --time-budget-sec $(TIME_BUDGET) --max-rows $(BACKFILL_MAX_ROWS) --api-timeout-sec $(API_TIMEOUT) --progress-every $(PROGRESS_EVERY) $(FEATURE_TOKEN_ARG)
+	$(PY) src/cli/task1.py train-samples --db $(DB) --min-link-score $(MIN_SCORE) --label-dataset output/task1_event_return_dataset.csv
+	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(BACKFILL_DAYS) --max-symbols $(BACKFILL_STATS_MAX_SYMBOLS) --tushare-token-file $(TOKEN_FILE)
+	$(PY) src/cli/task2.py load-company-stats --db $(DB)
+	$(PY) src/cli/task2.py build-negative-samples --db $(DB) --max-per-day $(NEG_MAX_PER_DAY)
+	$(PY) src/cli/task1.py qa --db $(DB)
 
 # Short aliases
 go: full
@@ -86,3 +108,4 @@ s: status
 si: stats-import
 sl: stats-load
 n: negatives
+bf: backfill

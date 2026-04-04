@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ $# -eq 0 ]; then
-  echo "Usage: ./atk <go|r|q|c|l|f|t|s|qa|si|sl|n|help> [MAKE_VAR=VALUE ...]"
+  echo "Usage: ./atk <go|r|q|c|l|f|t|s|qa|si|sl|n|bf|help> [MAKE_VAR=VALUE ...]"
   exit 0
 fi
 
@@ -10,12 +10,12 @@ cmd="$1"
 shift
 
 case "$cmd" in
-  go|r|q|c|l|f|t|s|qa|si|sl|n|help)
+  go|r|q|c|l|f|t|s|qa|si|sl|n|bf|help)
     make "$cmd" "$@"
     ;;
   *)
     echo "Unknown command: $cmd"
-    echo "Allowed: go r q c l f t s qa si sl n help"
+    echo "Allowed: go r q c l f t s qa si sl n bf help"
     exit 1
     ;;
 esac
