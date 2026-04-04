@@ -30,6 +30,8 @@ if str(SRC_ROOT) not in sys.path:
 
 from capabilities.events.rules import (
     ANNOUNCEMENT_TEMPLATE_KEYWORDS,
+    CSRC_HARD_EVENT_KEYWORDS,
+    CSRC_ROUTINE_TITLE_KEYWORDS,
     DURATION_DEFAULT,
     DURATION_ENUM,
     DURATION_RULES,
@@ -68,6 +70,8 @@ from capabilities.events.rules import (
     PREDICTABILITY_RULES,
     RULE_VERSION,
     ROUTINE_ANNOUNCEMENT_KEYWORDS,
+    LISTING_FINANCING_STRONG_KEYWORDS,
+    LISTING_FINANCING_EXCLUSION_KEYWORDS,
     SENTIMENT_ENUM,
     SOURCE_WEIGHT_DEFAULT,
     SOURCE_WEIGHT_TOKENS,
@@ -251,6 +255,11 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
     title_narrative_hits = keyword_hits(row["title"], GOV_NARRATIVE_KEYWORDS)
     title_policy_action_hits = keyword_hits(row["title"], POLICY_ACTION_KEYWORDS)
     title_macro_data_hits = keyword_hits(row["title"], MACRO_DATA_KEYWORDS)
+    listing_financing_hits = keyword_hits(row["title"], LISTING_FINANCING_STRONG_KEYWORDS)
+    listing_financing_exclusion_hits = keyword_hits(row["title"], LISTING_FINANCING_EXCLUSION_KEYWORDS)
+    listing_financing_strong = bool(listing_financing_hits) and not listing_financing_exclusion_hits
+    csrc_routine_hits = keyword_hits(row["title"], CSRC_ROUTINE_TITLE_KEYWORDS)
+    csrc_hard_event_hits = keyword_hits(full_text, CSRC_HARD_EVENT_KEYWORDS)
     event_hits = keyword_hits(full_text, ACTIVE_EVENT_KEYWORDS)
     strong_event_hits = [kw for kw in event_hits if kw not in GENERIC_EVENT_HITS]
 
@@ -282,7 +291,7 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             event_threshold=EVENT_SCORE_THRESHOLD,
         )
 
-    if routine_hits and not strong_event_hits:
+    if routine_hits and not strong_event_hits and not listing_financing_strong:
         return CandidateResult(
             row=row,
             normalized_publish_time=publish_time,
@@ -296,7 +305,7 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             event_threshold=EVENT_SCORE_THRESHOLD,
         )
 
-    if template_hits and not strong_event_hits:
+    if template_hits and not strong_event_hits and not listing_financing_strong:
         return CandidateResult(
             row=row,
             normalized_publish_time=publish_time,
@@ -310,7 +319,7 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             event_threshold=EVENT_SCORE_THRESHOLD,
         )
 
-    if row.get("source", "").startswith(("上交所", "深交所", "巨潮资讯网")) and not strong_event_hits:
+    if row.get("source", "").startswith(("上交所", "深交所", "巨潮资讯网")) and not strong_event_hits and not listing_financing_strong:
         return CandidateResult(
             row=row,
             normalized_publish_time=publish_time,
@@ -337,6 +346,24 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,
         )
+
+    if row.get("source", "").startswith("中国证监会"):
+        only_csrc_token_signal = bool(event_hits) and set(event_hits) <= {"证监会"}
+        if (csrc_routine_hits or only_csrc_token_signal) and not csrc_hard_event_hits and not title_policy_action_hits:
+            return CandidateResult(
+                row=row,
+                normalized_publish_time=publish_time,
+                dedup_key=dedup_key(row),
+                duplicate_group_size=duplicate_group_size,
+                is_event=False,
+                filter_reason="csrc_routine_without_policy_action",
+                evidence="证监会常规新闻且缺少制度动作词: "
+                + ("|".join(csrc_routine_hits) if csrc_routine_hits else "证监会弱信号")
+                + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
+                score_hint=1,
+                event_score=1,
+                event_threshold=EVENT_SCORE_THRESHOLD,
+            )
 
     score_hint = len(event_hits) + min(duplicate_group_size, EVENT_DUPLICATE_BONUS_CAP)
     is_event = score_hint >= EVENT_SCORE_THRESHOLD
