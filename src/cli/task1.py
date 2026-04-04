@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
 import psycopg
@@ -23,6 +25,9 @@ from capabilities.storage.db_guard import dsn_for
 from pipelines import task1 as task1_pipeline
 
 ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_QA_SNAPSHOT = ROOT / "output" / "meta" / "qa_snapshot.json"
+DEFAULT_COLLECTOR_REPORT = ROOT / "output" / "collector_report.json"
+DEFAULT_FEATURE_REPORT = ROOT / "output" / "task1_feature_return_report.md"
 CLASSIFY_INPUT_FILES = [
     "output/sources/source_gov.csv",
     "output/sources/source_ndrc.csv",
@@ -114,6 +119,12 @@ def parse_args() -> argparse.Namespace:
     db_status_parser = sub.add_parser("db-status", help="show core table row counts")
     db_status_parser.add_argument("--db", default="stock_event_mining")
 
+    qa_parser = sub.add_parser("qa", help="show batch quality summary with deltas")
+    qa_parser.add_argument("--db", default="stock_event_mining")
+    qa_parser.add_argument("--snapshot-path", default=str(DEFAULT_QA_SNAPSHOT))
+    qa_parser.add_argument("--collector-report", default=str(DEFAULT_COLLECTOR_REPORT))
+    qa_parser.add_argument("--feature-report", default=str(DEFAULT_FEATURE_REPORT))
+
     return parser.parse_args()
 
 
@@ -140,6 +151,134 @@ def print_db_status(db_name: str) -> None:
                 cur.execute(f"SELECT count(*) FROM {table}")
                 count = cur.fetchone()[0]
                 print(f"- {table}: {count}")
+
+
+def parse_feature_top_reasons(path: Path, top_n: int = 3) -> list[tuple[str, int]]:
+    if not path.exists():
+        return []
+    reasons: list[tuple[str, int]] = []
+    in_section = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        text = line.strip()
+        if text.startswith("## 三、不可计算样本原因"):
+            in_section = True
+            continue
+        if in_section and text.startswith("## "):
+            break
+        if in_section and text.startswith("- ") and ":" in text:
+            key, value = text[2:].split(":", 1)
+            try:
+                reasons.append((key.strip(), int(value.strip())))
+            except Exception:
+                continue
+    reasons.sort(key=lambda x: x[1], reverse=True)
+    return reasons[:top_n]
+
+
+def parse_collector_failures(path: Path, top_n: int = 3) -> list[tuple[str, int]]:
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if not isinstance(payload, list):
+        return []
+    counter: dict[str, int] = {}
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("success", "")).lower() == "true":
+            continue
+        category = str(item.get("failure_category") or "unknown").strip() or "unknown"
+        counter[category] = counter.get(category, 0) + 1
+    pairs = sorted(counter.items(), key=lambda x: x[1], reverse=True)
+    return pairs[:top_n]
+
+
+def print_qa_summary(db_name: str, snapshot_path: Path, collector_report: Path, feature_report: Path) -> None:
+    keys = [
+        "raw_documents",
+        "structured_events",
+        "event_company_links",
+        "event_propagation_links",
+        "model_event_samples",
+        "model_non_event_samples",
+        "company_stats",
+    ]
+    counts: dict[str, int] = {}
+    labeled = 0
+    with psycopg.connect(dsn_for(db_name)) as conn:
+        with conn.cursor() as cur:
+            for table in keys:
+                cur.execute("SELECT to_regclass(%s)", (f"public.{table}",))
+                exists = cur.fetchone()[0]
+                if exists is None:
+                    counts[table] = -1
+                    continue
+                cur.execute(f"SELECT count(*) FROM {table}")
+                counts[table] = int(cur.fetchone()[0])
+            cur.execute(
+                """
+                SELECT count(*)
+                FROM model_event_samples
+                WHERE label_car_w1 IS NOT NULL OR label_car_w3 IS NOT NULL OR label_car_w5 IS NOT NULL
+                """
+            )
+            labeled = int(cur.fetchone()[0])
+
+    prev_counts: dict[str, int] = {}
+    if snapshot_path.exists():
+        try:
+            payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            prev_counts = {str(k): int(v) for k, v in payload.get("counts", {}).items()}
+        except Exception:
+            prev_counts = {}
+
+    total_samples = counts.get("model_event_samples", 0)
+    label_ratio = (labeled / total_samples) if total_samples > 0 else 0.0
+    print(f"QA summary for: {db_name}")
+    for key in keys:
+        current = counts.get(key, -1)
+        prev = prev_counts.get(key)
+        if current < 0:
+            print(f"- {key}: missing")
+            continue
+        if prev is None:
+            print(f"- {key}: {current} (delta: n/a)")
+        else:
+            print(f"- {key}: {current} (delta: {current - prev:+d})")
+    print(f"- labeled_samples: {labeled}")
+    print(f"- label_ratio: {label_ratio:.2%}")
+
+    collector_top = parse_collector_failures(collector_report, top_n=3)
+    feature_top = parse_feature_top_reasons(feature_report, top_n=3)
+    if collector_top:
+        text = ", ".join(f"{k}:{v}" for k, v in collector_top)
+        print(f"- collector_fail_top3: {text}")
+    else:
+        print("- collector_fail_top3: none")
+    if feature_top:
+        text = ", ".join(f"{k}:{v}" for k, v in feature_top)
+        print(f"- feature_reason_top3: {text}")
+    else:
+        print("- feature_reason_top3: none")
+
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "db": db_name,
+                "counts": counts,
+                "labeled_samples": labeled,
+                "label_ratio": label_ratio,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
@@ -281,6 +420,15 @@ def main() -> None:
 
     if args.command == "db-status":
         print_db_status(args.db)
+        return
+
+    if args.command == "qa":
+        print_qa_summary(
+            db_name=args.db,
+            snapshot_path=Path(args.snapshot_path).resolve(),
+            collector_report=Path(args.collector_report).resolve(),
+            feature_report=Path(args.feature_report).resolve(),
+        )
         return
 
 if __name__ == "__main__":

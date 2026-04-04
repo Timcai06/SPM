@@ -79,7 +79,6 @@ def main() -> None:
     ):
         with psycopg.connect(dsn_for(args.db), row_factory=psycopg.rows.dict_row) as conn:
             with conn.cursor() as cur:
-                cur.execute("TRUNCATE TABLE event_propagation_links RESTART IDENTITY")
                 cur.execute(
                     """
                     SELECT l.structured_event_id,
@@ -99,7 +98,9 @@ def main() -> None:
                 if not canonical_map:
                     canonical_map = load_canonical_map_from_db(cur)
                 source_links = build_cluster_links(source_rows, canonical_map)
-                inserted = 0
+                upserted = 0
+                touched_structured_event_ids: set[int] = set()
+                current_keys: list[tuple[int, int, int, str]] = []
                 for link in source_links:
                     cur.execute(
                         """
@@ -138,6 +139,7 @@ def main() -> None:
                         if propagation_score < args.min_propagation_score:
                             continue
                         for structured_event_id in link["member_structured_event_ids"]:
+                            sid = int(structured_event_id)
                             cur.execute(
                                 """
                                 INSERT INTO event_propagation_links (
@@ -157,7 +159,7 @@ def main() -> None:
                                     updated_at = NOW()
                                 """,
                                 (
-                                    structured_event_id,
+                                    sid,
                                     link["source_company_id"],
                                     relation["target_company_id"],
                                     relation["id"],
@@ -178,9 +180,61 @@ def main() -> None:
                                     ),
                                 ),
                             )
-                            inserted += 1
+                            upserted += 1
+                            touched_structured_event_ids.add(sid)
+                            current_keys.append(
+                                (
+                                    sid,
+                                    int(link["source_company_id"]),
+                                    int(relation["target_company_id"]),
+                                    "one_hop",
+                                )
+                            )
+                stale_deleted = 0
+                if touched_structured_event_ids:
+                    cur.execute(
+                        """
+                        CREATE TEMP TABLE current_event_propagation_keys (
+                            structured_event_id BIGINT NOT NULL,
+                            source_company_id BIGINT NOT NULL,
+                            target_company_id BIGINT NOT NULL,
+                            propagation_type TEXT NOT NULL,
+                            PRIMARY KEY (structured_event_id, source_company_id, target_company_id, propagation_type)
+                        ) ON COMMIT DROP
+                        """
+                    )
+                    if current_keys:
+                        cur.executemany(
+                            """
+                            INSERT INTO current_event_propagation_keys (
+                                structured_event_id, source_company_id, target_company_id, propagation_type
+                            )
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT DO NOTHING
+                            """,
+                            current_keys,
+                        )
+                    cur.execute(
+                        """
+                        DELETE FROM event_propagation_links p
+                        WHERE p.structured_event_id = ANY(%s)
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM current_event_propagation_keys k
+                              WHERE k.structured_event_id = p.structured_event_id
+                                AND k.source_company_id = p.source_company_id
+                                AND k.target_company_id = p.target_company_id
+                                AND k.propagation_type = p.propagation_type
+                          )
+                        """,
+                        (list(touched_structured_event_ids),),
+                    )
+                    stale_deleted = cur.rowcount
             conn.commit()
-    print(f"Inserted {inserted} event propagation links into {args.db}")
+    print(
+        f"Upserted {upserted} event propagation links into {args.db}; "
+        f"deleted stale links: {stale_deleted}"
+    )
 
 
 if __name__ == "__main__":

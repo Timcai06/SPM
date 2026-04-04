@@ -21,9 +21,9 @@ FEATURE_TOKEN_ARG := --disable-tushare
 endif
 
 .PHONY: help \
-	collect link feature train status stats-import stats-load negatives \
+	collect link feature train status qa stats-import stats-load negatives \
 	full full-with-stats \
-	go r q c l f t s si sl n
+	go r q c l f t s qa si sl n
 
 help:
 	@echo "推荐入口："
@@ -35,10 +35,10 @@ help:
 	@echo "  make q               # 快速采集（collect + status）"
 	@echo ""
 	@echo "完整命令："
-	@echo "  make collect | link | feature | train | status"
+	@echo "  make collect | link | feature | train | status | qa"
 	@echo "  make stats-import | stats-load | negatives"
 	@echo ""
-	@echo "短别名：c l f t s si sl n"
+	@echo "短别名：c l f t s qa si sl n"
 
 collect:
 	$(PY) src/cli/task1.py run --limit $(LIMIT) --skip-validate --db $(DB)
@@ -57,6 +57,9 @@ train:
 
 status:
 	$(PY) src/cli/task1.py db-status --db $(DB)
+
+qa:
+	$(PY) src/cli/task1.py qa --db $(DB)
 
 stats-import:
 	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(DAYS) --tushare-token-file $(TOKEN_FILE)
