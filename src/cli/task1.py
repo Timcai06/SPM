@@ -53,6 +53,12 @@ def parse_args() -> argparse.Namespace:
     classify_parser.add_argument("--db", default="stock_event_mining")
     classify_parser.add_argument("--skip-db-load", action="store_true")
 
+    sub.add_parser("canonicalize", help="build canonical event clusters")
+    canonical_load_parser = sub.add_parser("canonical-load", help="load canonical events into PostgreSQL")
+    canonical_load_parser.add_argument("--db", default="stock_event_mining")
+    canonical_load_parser.add_argument("--canonical-events", default="output/canonical_events.csv")
+    canonical_load_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
+
     sub.add_parser("check", help="validate output datasets")
 
     quality_parser = sub.add_parser("quality", help="build quality sample/report")
@@ -105,6 +111,25 @@ def main() -> None:
 
     if args.command == "check":
         run(["python3", "src/capabilities/quality/check.py"])
+        return
+
+    if args.command == "canonicalize":
+        run(["python3", "src/capabilities/events/canonicalize.py"])
+        return
+
+    if args.command == "canonical-load":
+        run(
+            [
+                "python3",
+                "src/capabilities/storage/load_task1_canonical.py",
+                "--db",
+                args.db,
+                "--canonical-events",
+                args.canonical_events,
+                "--canonical-map",
+                args.canonical_map,
+            ]
+        )
         return
 
     if args.command == "quality":

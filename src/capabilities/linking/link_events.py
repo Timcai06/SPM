@@ -16,9 +16,12 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.storage.db_guard import dsn_for, write_guard
+from capabilities.events.canonical_utils import load_canonical_map_from_csv, load_canonical_map_from_db
 
 
 DEFAULT_DB = "stock_event_mining"
+ROOT = Path(__file__).resolve().parents[3]
+CANONICAL_MAP_PATH = ROOT / "output" / "event_canonical_map.csv"
 
 EVENT_INDUSTRY_TO_COMPANY = {
     "军工": "军工",
@@ -54,6 +57,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--top-k", type=int, default=3, help="Max companies per event.")
     parser.add_argument("--min-score", type=float, default=0.35)
     parser.add_argument("--lock-timeout-sec", type=int, default=120, help="Max seconds to wait for DB write lock.")
+    parser.add_argument("--canonical-map", default=str(CANONICAL_MAP_PATH), help="Optional event canonical map CSV.")
     return parser.parse_args()
 
 
@@ -133,8 +137,47 @@ def score_link(event: dict, company: dict) -> tuple[float, dict]:
     }
 
 
+def build_cluster_events(events: list[dict], event_to_cluster: dict[str, dict]) -> list[dict]:
+    if not event_to_cluster:
+        return [{**event, "canonical_event_id": event["event_id"], "member_ids": [event["id"]], "cluster_size": 1} for event in events]
+
+    event_by_event_id = {event["event_id"]: event for event in events}
+    built = []
+    seen_clusters = set()
+    for event in events:
+        cluster = event_to_cluster.get(event["event_id"])
+        if not cluster:
+            built.append({**event, "canonical_event_id": event["event_id"], "member_ids": [event["id"]], "cluster_size": 1})
+            continue
+        canonical_event_id = cluster["canonical_event_id"]
+        if canonical_event_id in seen_clusters:
+            continue
+        seen_clusters.add(canonical_event_id)
+
+        members = [event_by_event_id[event_id] for event_id in cluster["member_event_ids"] if event_id in event_by_event_id]
+        representative = event_by_event_id.get(cluster["representative_event_id"], members[0] if members else event)
+        raw_title = " | ".join(dict.fromkeys(member["raw_title"] for member in members if member.get("raw_title")))
+        raw_content = " | ".join(dict.fromkeys(member["raw_content"] for member in members if member.get("raw_content")))
+        raw_symbol = " | ".join(dict.fromkeys((member.get("raw_symbol") or "").strip() for member in members if (member.get("raw_symbol") or "").strip()))
+        event_summary = " | ".join(dict.fromkeys(member["event_summary"] for member in members if member.get("event_summary")))
+        built.append(
+            {
+                **representative,
+                "canonical_event_id": canonical_event_id,
+                "member_ids": [member["id"] for member in members] or [event["id"]],
+                "cluster_size": len(members) or 1,
+                "raw_title": raw_title or representative.get("raw_title") or "",
+                "raw_content": raw_content or representative.get("raw_content") or "",
+                "raw_symbol": raw_symbol or representative.get("raw_symbol") or "",
+                "event_summary": event_summary or representative.get("event_summary") or "",
+            }
+        )
+    return built
+
+
 def main() -> None:
     args = parse_args()
+    canonical_map = load_canonical_map_from_csv(Path(args.canonical_map).resolve())
     with write_guard(
         db_name=args.db,
         required_tables=["companies", "structured_events", "event_company_links"],
@@ -146,6 +189,7 @@ def main() -> None:
                 cur.execute(
                     """
                     SELECT se.id,
+                           se.event_id,
                            se.event_name,
                            se.event_subject_type,
                            se.industry_type,
@@ -161,6 +205,9 @@ def main() -> None:
                     """
                 )
                 events = cur.fetchall()
+                if not canonical_map:
+                    canonical_map = load_canonical_map_from_db(cur)
+                cluster_events = build_cluster_events(events, canonical_map)
                 cur.execute(
                     """
                     SELECT id, ts_code, company_name, industry_l1, industry_l2, business_scope, core_products, concept_tags
@@ -172,7 +219,7 @@ def main() -> None:
                 companies = cur.fetchall()
 
                 inserted = 0
-                for event in events:
+                for event in cluster_events:
                     scored = []
                     for company in companies:
                         final_score, details = score_link(event, company)
@@ -182,29 +229,36 @@ def main() -> None:
                     limit_k = 1 if is_generic_event(event) and all(item[2]["direct_symbol_score"] < 1 and item[2]["direct_name_score"] < 1 for item in scored[:1]) else args.top_k
                     for final_score, company, details in scored[: limit_k]:
                         link_type = "direct_match" if details["direct_symbol_score"] >= 1 or details["direct_name_score"] >= 1 else ("industry_match" if details["industry_match_score"] >= 1 else "candidate")
-                        cur.execute(
-                            """
-                            INSERT INTO event_company_links (
-                                structured_event_id, company_id, link_type, relation_path,
-                                text_similarity_score, industry_match_score, chain_position_score,
-                                event_match_score, final_link_score, evidence
+                        for structured_event_id in event["member_ids"]:
+                            evidence = {
+                                **details["evidence"],
+                                "canonical_event_id": event["canonical_event_id"],
+                                "canonical_cluster_size": event["cluster_size"],
+                                "canonical_link_mode": "cluster_aggregated",
+                            }
+                            cur.execute(
+                                """
+                                INSERT INTO event_company_links (
+                                    structured_event_id, company_id, link_type, relation_path,
+                                    text_similarity_score, industry_match_score, chain_position_score,
+                                    event_match_score, final_link_score, evidence
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                                """,
+                                (
+                                    structured_event_id,
+                                    company["id"],
+                                    link_type,
+                                    f'{event["event_name"]} -> {company["industry_l2"]} -> {company["company_name"]}',
+                                    Decimal(str(details["text_similarity_score"])),
+                                    Decimal(str(details["industry_match_score"])),
+                                    Decimal(str(details["chain_position_score"])),
+                                    Decimal(str(details["event_match_score"])),
+                                    Decimal(str(final_score)),
+                                    json.dumps(evidence, ensure_ascii=False),
+                                ),
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
-                            """,
-                            (
-                                event["id"],
-                                company["id"],
-                                link_type,
-                                f'{event["event_name"]} -> {company["industry_l2"]} -> {company["company_name"]}',
-                                Decimal(str(details["text_similarity_score"])),
-                                Decimal(str(details["industry_match_score"])),
-                                Decimal(str(details["chain_position_score"])),
-                                Decimal(str(details["event_match_score"])),
-                                Decimal(str(final_score)),
-                                json.dumps(details["evidence"], ensure_ascii=False),
-                            ),
-                        )
-                        inserted += 1
+                            inserted += 1
     print(f"Inserted {inserted} event-company links into {args.db}")
 
 

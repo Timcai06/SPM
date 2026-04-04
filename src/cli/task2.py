@@ -23,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--db", default="stock_event_mining")
     run_parser.add_argument("--top-k", type=int, default=3)
     run_parser.add_argument("--min-score", type=float, default=0.35)
+    run_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
 
     load_parser = sub.add_parser("load-companies", help="load company seed")
     load_parser.add_argument("--db", default="stock_event_mining")
@@ -40,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     link_parser.add_argument("--db", default="stock_event_mining")
     link_parser.add_argument("--top-k", type=int, default=3)
     link_parser.add_argument("--min-score", type=float, default=0.35)
+    link_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
     return parser.parse_args()
 
 
@@ -56,6 +58,8 @@ def main() -> None:
                 str(args.top_k),
                 "--min-score",
                 str(args.min_score),
+                "--canonical-map",
+                args.canonical_map,
             ]
         )
         return
@@ -109,6 +113,8 @@ def main() -> None:
                 str(args.top_k),
                 "--min-score",
                 str(args.min_score),
+                "--canonical-map",
+                args.canonical_map,
             ]
         )
         return

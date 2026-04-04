@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--input", default="data/company_relations_seed.csv")
     run_parser.add_argument("--min-source-score", type=float, default=0.35)
     run_parser.add_argument("--min-propagation-score", type=float, default=0.20)
+    run_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
 
     load_parser = sub.add_parser("load-relations", help="load company graph edges")
     load_parser.add_argument("--db", default="stock_event_mining")
@@ -33,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     propagate_parser.add_argument("--db", default="stock_event_mining")
     propagate_parser.add_argument("--min-source-score", type=float, default=0.35)
     propagate_parser.add_argument("--min-propagation-score", type=float, default=0.20)
+    propagate_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
     return parser.parse_args()
 
 
@@ -51,6 +53,8 @@ def main() -> None:
                 str(args.min_source_score),
                 "--min-propagation-score",
                 str(args.min_propagation_score),
+                "--canonical-map",
+                args.canonical_map,
             ]
         )
         return
@@ -79,6 +83,8 @@ def main() -> None:
                 str(args.min_source_score),
                 "--min-propagation-score",
                 str(args.min_propagation_score),
+                "--canonical-map",
+                args.canonical_map,
             ]
         )
 

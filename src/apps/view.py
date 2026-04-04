@@ -23,6 +23,13 @@ def load_dataframe(conn, query: str, params=None) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def table_exists(conn, table_name: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute("SELECT to_regclass(%s)", (f"public.{table_name}",))
+        row = cur.fetchone()
+    return bool(row and row[0])
+
+
 def main() -> None:
     st.set_page_config(page_title="Task 1/2/3 Data Viewer", layout="wide")
     st.title("Task 1/2/3 Data Viewer")
@@ -39,24 +46,20 @@ def main() -> None:
         return
 
     with conn:
-        summary = load_dataframe(
-            conn,
-            """
-            SELECT 'raw_documents' AS table_name, count(*) AS row_count FROM raw_documents
-            UNION ALL
-            SELECT 'event_candidates', count(*) FROM event_candidates
-            UNION ALL
-            SELECT 'structured_events', count(*) FROM structured_events
-            UNION ALL
-            SELECT 'companies', count(*) FROM companies
-            UNION ALL
-            SELECT 'event_company_links', count(*) FROM event_company_links
-            UNION ALL
-            SELECT 'company_relations', count(*) FROM company_relations
-            UNION ALL
-            SELECT 'event_propagation_links', count(*) FROM event_propagation_links
-            """
-        )
+        summary_queries = [
+            "SELECT 'raw_documents' AS table_name, count(*) AS row_count FROM raw_documents",
+            "SELECT 'event_candidates', count(*) FROM event_candidates",
+            "SELECT 'structured_events', count(*) FROM structured_events",
+            "SELECT 'companies', count(*) FROM companies",
+            "SELECT 'event_company_links', count(*) FROM event_company_links",
+            "SELECT 'company_relations', count(*) FROM company_relations",
+            "SELECT 'event_propagation_links', count(*) FROM event_propagation_links",
+        ]
+        if table_exists(conn, "canonical_events"):
+            summary_queries.append("SELECT 'canonical_events', count(*) FROM canonical_events")
+        if table_exists(conn, "event_canonical_links"):
+            summary_queries.append("SELECT 'event_canonical_links', count(*) FROM event_canonical_links")
+        summary = load_dataframe(conn, " UNION ALL ".join(summary_queries))
         st.subheader("Summary")
         st.dataframe(summary, width="stretch", hide_index=True)
 
@@ -111,6 +114,42 @@ def main() -> None:
             tuple(params),
         )
         st.dataframe(events, width="stretch", hide_index=True)
+
+        if table_exists(conn, "canonical_events"):
+            st.subheader("Canonical Events")
+            canonical_events = load_dataframe(
+                conn,
+                """
+                SELECT id, canonical_event_id, canonical_event_name, cluster_size,
+                       date_start, date_end, event_subject_type, industry_type,
+                       max_heat_score, max_intensity_score
+                FROM canonical_events
+                ORDER BY date_start DESC, id DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            st.dataframe(canonical_events, width="stretch", hide_index=True)
+
+        if table_exists(conn, "event_canonical_links"):
+            st.subheader("Event Canonical Links")
+            canonical_links = load_dataframe(
+                conn,
+                """
+                SELECT l.id,
+                       se.event_id,
+                       se.event_name,
+                       l.canonical_event_id,
+                       l.cluster_size,
+                       l.is_representative
+                FROM event_canonical_links l
+                JOIN structured_events se ON se.id = l.structured_event_id
+                ORDER BY l.id DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            st.dataframe(canonical_links, width="stretch", hide_index=True)
 
         st.subheader("Companies")
         companies = load_dataframe(

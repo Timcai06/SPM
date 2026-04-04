@@ -20,11 +20,15 @@
 - 手工补录模板：`data/manual_news.csv`
 - 输出原始判定结果：`output/raw_event_candidates.csv`
 - 输出标准化事件表：`output/structured_events.csv`
+- 输出标准事件簇：`output/canonical_events.csv`
+- 输出事件归并映射：`output/event_canonical_map.csv`
 - 任务 1 采集入口：`src/capabilities/collectors/run.py`
 - 任务 1 采集器目录：`src/capabilities/collectors/`
 - 任务 1 分类与特征提取：`src/capabilities/events/classify.py`
+- 任务 1 事件归并：`src/capabilities/events/canonicalize.py`
 - 任务 1 冻结规则配置：`src/capabilities/events/rules.py`
 - 任务 1 入库脚本：`src/capabilities/storage/load_task1.py`
+- 任务 1 标准事件层入库脚本：`src/capabilities/storage/load_task1_canonical.py`
 - 任务 1 校验脚本：`src/capabilities/quality/check.py`
 - 任务 1 质量评估脚本：`src/capabilities/quality/quality_report.py`
 - 任务 1 特征-收益初步分析：`src/capabilities/analysis/feature_return.py`
@@ -68,6 +72,8 @@
 
 ```bash
 python3 src/cli/task1.py classify
+python3 src/cli/task1.py canonicalize
+python3 src/cli/task1.py canonical-load
 python3 src/cli/task1.py check
 ```
 
@@ -80,6 +86,8 @@ python3 src/cli/task1.py run --limit 8 --with-analysis --analysis-mode event-stu
 这条命令会自动执行：
 - 实时采集
 - 清洗与事件判定
+- 事件归并
+- 标准事件层入库（`canonical_events` / `event_canonical_links`）
 - CSV 输出
 - PostgreSQL 入库
 - 基本校验
@@ -92,7 +100,7 @@ python3 src/cli/task2.py run --db stock_event_mining --top-k 3 --min-score 0.35
 
 这条命令会自动执行：
 - 首批公司样本导入 `companies`
-- 对 `structured_events` 做最小关联打分
+- 优先基于 `event_canonical_map.csv` 的标准事件簇做关联打分
 - 把结果写入 `event_company_links`
 
 任务 3 准备闭环：
@@ -103,7 +111,7 @@ python3 src/cli/task3.py run --db stock_event_mining --input data/company_relati
 
 这条命令会自动执行：
 - 把公司关系边导入 `company_relations`
-- 基于 `event_company_links` 构造一跳传播结果
+- 优先基于标准事件簇聚合后的 `event_company_links` 构造一跳传播结果
 - 把传播结果写入 `event_propagation_links`
 
 默认情况下，`task1 classify` 在写出 CSV 后会继续把结果直接写入 PostgreSQL 的 `stock_event_mining` 数据库。
@@ -182,6 +190,20 @@ python3 src/cli/task1.py view
 任务 3 当前新增两张基础表：
 - `company_relations`
 - `event_propagation_links`
+
+增加“易读表名层”（推荐）：
+
+```bash
+psql -d stock_event_mining -f sql/create_readable_views.sql
+```
+
+执行后会新增两类只读视图：
+- 简洁英文视图：`events_structured`、`event_stock_links`、`stock_relations` 等
+- 中文视图别名：`"结构化事件"`、`"事件公司关联"`、`"公司关系边"` 等
+
+说明：
+- 这一步不会改动原始表名，不会影响现有脚本
+- 适合在 pgAdmin 中按中文名称直观看数
 
 ## 数据说明
 
