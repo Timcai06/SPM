@@ -16,6 +16,8 @@ NEG_MAX_PER_DAY ?= 100
 FEATURE_TOKEN_ARG :=
 ifeq ($(USE_TUSHARE),1)
 FEATURE_TOKEN_ARG := --tushare-token-file $(TOKEN_FILE)
+else
+FEATURE_TOKEN_ARG := --disable-tushare
 endif
 
 .PHONY: help \

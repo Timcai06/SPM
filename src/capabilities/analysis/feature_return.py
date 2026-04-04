@@ -150,6 +150,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--event-windows", default="1,3,5", help="Event windows in days, comma-separated.")
     parser.add_argument("--tushare-token", default="", help="Explicit Tushare token. Prefer env/file in shared environments.")
     parser.add_argument("--tushare-token-file", default="", help="Path to local file containing Tushare token.")
+    parser.add_argument("--disable-tushare", action="store_true", help="Disable Tushare and use fallback sources directly.")
     parser.add_argument("--report-path", default=str(DEFAULT_REPORT), help="Markdown report output path.")
     parser.add_argument("--dataset-path", default=str(DEFAULT_DATASET), help="CSV dataset output path.")
     parser.add_argument("--run-id", default="", help="Run identifier for traceability.")
@@ -161,6 +162,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def resolve_tushare_token(args: argparse.Namespace) -> tuple[str, str]:
+    if args.disable_tushare:
+        return "", "disabled"
     if args.tushare_token.strip():
         return args.tushare_token.strip(), "cli_arg"
     if args.tushare_token_file.strip():
