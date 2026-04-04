@@ -55,6 +55,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--analysis-mode", default="event-study", help="Analysis mode for feature step.")
     parser.add_argument("--benchmark", default="hs300", help="Benchmark id for analysis.")
     parser.add_argument("--event-windows", default="1,3,5", help="Event windows for analysis.")
+    parser.add_argument("--time-budget-sec", type=int, default=300, help="Time budget for analysis step.")
+    parser.add_argument("--max-analysis-rows", type=int, default=300, help="Max rows for analysis step.")
     return parser.parse_args()
 
 
@@ -118,6 +120,10 @@ def main() -> None:
                 args.benchmark,
                 "--event-windows",
                 args.event_windows,
+                "--time-budget-sec",
+                str(args.time_budget_sec),
+                "--max-rows",
+                str(args.max_analysis_rows),
             ]
         ):
             feature_return.main()

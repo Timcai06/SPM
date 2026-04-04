@@ -17,7 +17,7 @@ if str(SRC_ROOT) not in sys.path:
 
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_OUTPUT = ROOT / "data" / "companies_a_share.csv"
+DEFAULT_OUTPUT = ROOT / "output" / "seeds" / "companies_a_share.csv"
 
 
 INDUSTRY_L1_KEYWORDS = {

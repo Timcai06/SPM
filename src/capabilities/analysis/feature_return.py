@@ -11,6 +11,7 @@ import os
 import statistics
 import subprocess
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -152,6 +153,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--report-path", default=str(DEFAULT_REPORT), help="Markdown report output path.")
     parser.add_argument("--dataset-path", default=str(DEFAULT_DATASET), help="CSV dataset output path.")
     parser.add_argument("--run-id", default="", help="Run identifier for traceability.")
+    parser.add_argument("--time-budget-sec", type=int, default=300, help="Stop analysis when runtime budget is reached.")
+    parser.add_argument("--max-rows", type=int, default=300, help="Max event-company rows to analyze per run.")
     return parser.parse_args()
 
 
@@ -238,6 +241,8 @@ def main() -> None:
         """
         rows = run_psql_csv(args.db, sql_fallback)
         link_source = "raw_documents_symbol_or_subject"
+    if args.max_rows > 0:
+        rows = rows[: args.max_rows]
 
     token, token_source = resolve_tushare_token(args)
     ts_module = load_tushare() if token else None
@@ -263,8 +268,12 @@ def main() -> None:
     stock_cache: Dict[str, Dict[str, float]] = {}
     stock_source_map: Dict[str, str] = {}
     dataset_rows: List[Dict[str, str]] = []
+    started_at = time.time()
 
     for row in rows:
+        if args.time_budget_sec > 0 and (time.time() - started_at) >= args.time_budget_sec:
+            reason_counts["time_budget_exceeded"] += 1
+            break
         ts_code = (row.get("ts_code") or "").strip()
         if not ts_code:
             reason_counts["missing_ts_code"] += 1
@@ -391,10 +400,13 @@ def main() -> None:
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"- 分析模式：{args.analysis_mode}",
         f"- 事件-公司有效样本：{len(dataset_rows)}",
+        f"- 分析输入行数：{len(rows)}",
         f"- 链接来源：{link_source}",
         f"- 基准：{benchmark_key}（{benchmark_source}）",
         f"- token来源：{token_source}",
         f"- 事件窗：{','.join(str(x) for x in event_windows)}",
+        f"- 时间预算(秒)：{args.time_budget_sec}",
+        f"- 最大输入行数：{args.max_rows}",
         "",
         "## 一、总体CAR统计",
     ]

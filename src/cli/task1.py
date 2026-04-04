@@ -13,7 +13,7 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.analysis import feature_return
+from capabilities.analysis import build_model_samples, feature_return
 from capabilities.collectors import run as collector_run
 from capabilities.events import canonicalize, classify
 from capabilities.quality import check, quality_report
@@ -61,6 +61,8 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--analysis-mode", default="event-study")
     run_parser.add_argument("--benchmark", default="hs300")
     run_parser.add_argument("--event-windows", default="1,3,5")
+    run_parser.add_argument("--time-budget-sec", type=int, default=300)
+    run_parser.add_argument("--max-analysis-rows", type=int, default=300)
 
     collect_parser = sub.add_parser("collect", help="collect source data")
     collect_parser.add_argument("--limit", type=int, default=10)
@@ -91,6 +93,16 @@ def parse_args() -> argparse.Namespace:
     feature_parser.add_argument("--tushare-token", default="")
     feature_parser.add_argument("--tushare-token-file", default="")
     feature_parser.add_argument("--run-id", default="")
+    feature_parser.add_argument("--time-budget-sec", type=int, default=300)
+    feature_parser.add_argument("--max-rows", type=int, default=300)
+    feature_parser.add_argument("--dataset-path", default="output/task1_event_return_dataset.csv")
+    feature_parser.add_argument("--report-path", default="output/task1_feature_return_report.md")
+
+    train_sample_parser = sub.add_parser("train-samples", help="build model-ready training samples into DB")
+    train_sample_parser.add_argument("--db", default="stock_event_mining")
+    train_sample_parser.add_argument("--min-link-score", type=float, default=0.35)
+    train_sample_parser.add_argument("--label-dataset", default="output/task1_event_return_dataset.csv")
+    train_sample_parser.add_argument("--run-id", default="")
 
     sub.add_parser("view", help="open streamlit data viewer")
     return parser.parse_args()
@@ -106,7 +118,20 @@ def main() -> None:
             argv.append("--skip-validate")
         if args.with_analysis:
             argv.append("--with-analysis")
-        argv.extend(["--analysis-mode", args.analysis_mode, "--benchmark", args.benchmark, "--event-windows", args.event_windows])
+        argv.extend(
+            [
+                "--analysis-mode",
+                args.analysis_mode,
+                "--benchmark",
+                args.benchmark,
+                "--event-windows",
+                args.event_windows,
+                "--time-budget-sec",
+                str(args.time_budget_sec),
+                "--max-analysis-rows",
+                str(args.max_analysis_rows),
+            ]
+        )
         with patched_argv(argv):
             task1_pipeline.main()
         return
@@ -175,6 +200,14 @@ def main() -> None:
             args.benchmark,
             "--event-windows",
             args.event_windows,
+            "--time-budget-sec",
+            str(args.time_budget_sec),
+            "--max-rows",
+            str(args.max_rows),
+            "--dataset-path",
+            args.dataset_path,
+            "--report-path",
+            args.report_path,
         ]
         if args.tushare_token:
             argv.extend(["--tushare-token", args.tushare_token])
@@ -184,6 +217,22 @@ def main() -> None:
             argv.extend(["--run-id", args.run_id])
         with patched_argv(argv):
             feature_return.main()
+        return
+
+    if args.command == "train-samples":
+        argv = [
+            "build_model_samples.py",
+            "--db",
+            args.db,
+            "--min-link-score",
+            str(args.min_link_score),
+            "--label-dataset",
+            args.label_dataset,
+        ]
+        if args.run_id:
+            argv.extend(["--run-id", args.run_id])
+        with patched_argv(argv):
+            build_model_samples.main()
         return
 
     if args.command == "view":

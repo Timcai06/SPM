@@ -32,6 +32,7 @@
 - 任务 1 校验脚本：`src/capabilities/quality/check.py`
 - 任务 1 质量评估脚本：`src/capabilities/quality/quality_report.py`
 - 任务 1 特征-收益初步分析：`src/capabilities/analysis/feature_return.py`
+- 训练样本构建脚本：`src/capabilities/analysis/build_model_samples.py`
 - 任务 1 可视化页面：`src/apps/view.py`
 - 任务 1 一键总入口：`src/pipelines/task1.py`
 - 任务 1 统一命令入口：`src/cli/task1.py`
@@ -153,6 +154,24 @@ python3 src/cli/task1.py quality --sample-size 50
 
 ```bash
 python3 src/cli/task1.py feature --db stock_event_mining --min-link-score 0.35 --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5
+```
+
+如果你要限制分析耗时，推荐加：
+
+```bash
+python3 src/cli/task1.py feature --db stock_event_mining --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --time-budget-sec 240 --max-rows 200
+```
+
+构建模型训练样本表（`model_event_samples`）：
+
+```bash
+python3 src/cli/task1.py train-samples --db stock_event_mining --min-link-score 0.35
+```
+
+如需把事件研究的 `CAR` 标签并入训练样本（若你已生成 `output/task1_event_return_dataset.csv`）：
+
+```bash
+python3 src/cli/task1.py train-samples --db stock_event_mining --min-link-score 0.35 --label-dataset output/task1_event_return_dataset.csv
 ```
 
 事件研究增强默认优先使用 `TUSHARE_TOKEN`（若存在），不可用时回退到新浪行情接口并在报告中标记数据源。

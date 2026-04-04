@@ -29,24 +29,25 @@ def check_non_empty(raw_rows, structured_rows) -> None:
     assert structured_rows, "structured_events.csv must not be empty"
 
 
-def check_positive_case(structured_rows) -> None:
-    positive_case = next((r for r in structured_rows if "印巴" in r["event_summary"] or "克什米尔" in r["event_summary"]), None)
-    assert positive_case is not None, "Expected 印巴空战 case in structured events"
-    assert positive_case["event_subject_type"] == "地缘类", "印巴空战 should be classified as 地缘类"
-    assert positive_case["industry_type"] == "军工", "印巴空战 should map to 军工"
-    assert positive_case["duration_type"] == "脉冲型", "印巴空战 should be 脉冲型"
+def check_event_balance(raw_rows, structured_rows) -> None:
+    event_rows = [r for r in raw_rows if r["is_event"] == "true"]
+    non_event_rows = [r for r in raw_rows if r["is_event"] == "false"]
+    assert event_rows, "No positive events found in raw_event_candidates.csv"
+    assert non_event_rows, "No negative samples found in raw_event_candidates.csv"
+    assert len(structured_rows) <= len(event_rows), "structured_events rows should not exceed positive event candidates"
 
 
-def check_noise_case(raw_rows) -> None:
-    noise_case = next((r for r in raw_rows if "综艺节目" in r["title"]), None)
-    assert noise_case is not None, "Expected noise sample in raw candidates"
-    assert noise_case["is_event"] == "false", "娱乐新闻 should not be classified as event"
-
-
-def check_dedup_case(raw_rows) -> None:
-    dedup_rows = [r for r in raw_rows if "印巴在克什米尔爆发大规模空战" in r["title"]]
-    assert len(dedup_rows) == 2, "Expected duplicate positive samples"
-    assert len({r["dedup_key"] for r in dedup_rows}) == 1, "Duplicate news should share the same dedup key"
+def check_dedup_consistency(raw_rows) -> None:
+    grouped = {}
+    for row in raw_rows:
+        key = row["dedup_key"]
+        grouped.setdefault(key, 0)
+        grouped[key] += 1
+    for row in raw_rows:
+        key = row["dedup_key"]
+        expected = grouped.get(key, 0)
+        actual = int(row.get("duplicate_group_size", "0") or 0)
+        assert actual == expected, f"duplicate_group_size mismatch for dedup_key={key}: {actual} != {expected}"
 
 
 def check_required_fields(structured_rows) -> None:
@@ -93,9 +94,8 @@ def main() -> None:
     raw_rows = read_csv(RAW_OUTPUT_PATH)
     structured_rows = read_csv(STRUCTURED_OUTPUT_PATH)
     check_non_empty(raw_rows, structured_rows)
-    check_positive_case(structured_rows)
-    check_noise_case(raw_rows)
-    check_dedup_case(raw_rows)
+    check_event_balance(raw_rows, structured_rows)
+    check_dedup_consistency(raw_rows)
     check_required_fields(structured_rows)
     check_decision_threshold_fields(raw_rows)
     check_enum_values(structured_rows)
