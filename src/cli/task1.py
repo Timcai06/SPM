@@ -8,6 +8,8 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
+import psycopg
+
 SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
@@ -17,6 +19,7 @@ from capabilities.collectors import run as collector_run
 from capabilities.events import canonicalize, classify
 from capabilities.quality import check, quality_report
 from capabilities.storage import load_task1_canonical
+from capabilities.storage.db_guard import dsn_for
 from pipelines import task1 as task1_pipeline
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -107,7 +110,35 @@ def parse_args() -> argparse.Namespace:
     train_sample_parser.add_argument("--label-dataset", default="output/task1_event_return_dataset.csv")
     train_sample_parser.add_argument("--run-id", default="")
 
+    db_status_parser = sub.add_parser("db-status", help="show core table row counts")
+    db_status_parser.add_argument("--db", default="stock_event_mining")
+
     return parser.parse_args()
+
+
+def print_db_status(db_name: str) -> None:
+    table_names = [
+        "raw_documents",
+        "event_candidates",
+        "structured_events",
+        "canonical_events",
+        "event_canonical_links",
+        "company_stats",
+        "model_event_samples",
+        "model_non_event_samples",
+    ]
+    print(f"Database status for: {db_name}")
+    with psycopg.connect(dsn_for(db_name)) as conn:
+        with conn.cursor() as cur:
+            for table in table_names:
+                cur.execute("SELECT to_regclass(%s)", (f"public.{table}",))
+                exists = cur.fetchone()[0]
+                if exists is None:
+                    print(f"- {table}: missing")
+                    continue
+                cur.execute(f"SELECT count(*) FROM {table}")
+                count = cur.fetchone()[0]
+                print(f"- {table}: {count}")
 
 
 def main() -> None:
@@ -243,6 +274,10 @@ def main() -> None:
             argv.extend(["--run-id", args.run_id])
         with patched_argv(argv):
             build_model_samples.main()
+        return
+
+    if args.command == "db-status":
+        print_db_status(args.db)
         return
 
 if __name__ == "__main__":
