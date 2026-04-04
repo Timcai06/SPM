@@ -29,6 +29,7 @@ from capabilities.analysis.tushare_adapter import fetch_index_returns, fetch_sto
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REPORT = ROOT / "output" / "task1_feature_return_report.md"
 DEFAULT_DATASET = ROOT / "output" / "task1_event_return_dataset.csv"
+DEFAULT_CACHE = ROOT / "output" / "meta" / "feature_market_cache.json"
 INDEX_CODE_MAP = {"hs300": "000300.SH"}
 INDEX_SINA_SYMBOL_MAP = {"hs300": "sh000300"}
 
@@ -158,6 +159,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-rows", type=int, default=300, help="Max event-company rows to analyze per run.")
     parser.add_argument("--api-timeout-sec", type=float, default=20.0, help="Per request timeout for Tushare/Sina fetch.")
     parser.add_argument("--progress-every", type=int, default=10, help="Print progress every N processed rows.")
+    parser.add_argument("--cache-path", default=str(DEFAULT_CACHE), help="Local JSON cache path for market returns.")
+    parser.add_argument("--disable-cache", action="store_true", help="Disable persistent market returns cache.")
     return parser.parse_args()
 
 
@@ -185,6 +188,53 @@ def resolve_tushare_token(args: argparse.Namespace) -> tuple[str, str]:
     if env_token:
         return env_token, "env:TUSHARE_TOKEN"
     return "", "missing"
+
+
+def load_market_cache(path: Path) -> dict:
+    if not path.exists():
+        return {"series": {}}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"series": {}}
+    if not isinstance(payload, dict):
+        return {"series": {}}
+    series = payload.get("series")
+    if not isinstance(series, dict):
+        payload["series"] = {}
+    return payload
+
+
+def save_market_cache(path: Path, cache_payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cache_payload["saved_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    path.write_text(json.dumps(cache_payload, ensure_ascii=False), encoding="utf-8")
+
+
+def get_cached_series(cache_payload: dict, key: str) -> tuple[Dict[str, float], str]:
+    series = cache_payload.get("series", {}).get(key)
+    if not isinstance(series, dict):
+        return {}, "none"
+    returns = series.get("returns")
+    if not isinstance(returns, dict):
+        return {}, "none"
+    normalized: Dict[str, float] = {}
+    for date_key, value in returns.items():
+        try:
+            normalized[str(date_key)] = float(value)
+        except Exception:
+            continue
+    source = str(series.get("source") or "cache")
+    return normalized, source
+
+
+def put_cached_series(cache_payload: dict, key: str, returns: Dict[str, float], source: str) -> None:
+    cache_payload.setdefault("series", {})
+    cache_payload["series"][key] = {
+        "source": source,
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "returns": returns,
+    }
 
 
 def main() -> None:
@@ -258,10 +308,17 @@ def main() -> None:
     )
 
     reason_counts: defaultdict[str, int] = defaultdict(int)
+    cache_path = Path(args.cache_path).resolve()
+    cache_payload = {"series": {}} if args.disable_cache else load_market_cache(cache_path)
     benchmark_returns: Dict[str, float] = {}
     benchmark_source = "none"
+    benchmark_cache_key = f"index:{benchmark_key}"
+    if not args.disable_cache:
+        benchmark_returns, benchmark_source = get_cached_series(cache_payload, benchmark_cache_key)
+        if benchmark_returns:
+            benchmark_source = f"cache:{benchmark_source}"
     try:
-        if use_tushare:
+        if use_tushare and not benchmark_returns:
             ret_obj = fetch_index_returns(
                 ts_module,
                 token,
@@ -272,6 +329,8 @@ def main() -> None:
             )
             benchmark_returns = ret_obj.returns
             benchmark_source = ret_obj.source
+            if benchmark_returns and not args.disable_cache:
+                put_cached_series(cache_payload, benchmark_cache_key, benchmark_returns, benchmark_source)
     except Exception as exc:
         benchmark_returns = {}
         reason_counts["tushare_index_error"] += 1
@@ -286,6 +345,8 @@ def main() -> None:
                 fetch_sina_kline(symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
             )
             benchmark_source = "sina_index_fallback"
+            if benchmark_returns and not args.disable_cache:
+                put_cached_series(cache_payload, benchmark_cache_key, benchmark_returns, benchmark_source)
         except Exception as exc:
             benchmark_returns = {}
             reason_counts[f"sina_index_error:{exc.__class__.__name__}"] += 1
@@ -318,23 +379,31 @@ def main() -> None:
             reason_counts["missing_ts_code"] += 1
             continue
         if ts_code not in stock_cache:
+            stock_cache_key = f"stock:{ts_code}"
             returns: Dict[str, float] = {}
             source_name = "none"
+            if not args.disable_cache:
+                returns, source_name = get_cached_series(cache_payload, stock_cache_key)
+                if returns:
+                    source_name = f"cache:{source_name}"
             if use_tushare:
-                try:
-                    ret_obj = fetch_stock_returns(
-                        ts_module,
-                        token,
-                        ts_code,
-                        "20200101",
-                        datetime.now().strftime("%Y%m%d"),
-                        timeout_seconds=args.api_timeout_sec,
-                    )
-                    returns = ret_obj.returns
-                    source_name = ret_obj.source
-                except Exception as exc:
-                    returns = {}
-                    reason_counts[f"tushare_stock_error:{exc.__class__.__name__}"] += 1
+                if not returns:
+                    try:
+                        ret_obj = fetch_stock_returns(
+                            ts_module,
+                            token,
+                            ts_code,
+                            "20200101",
+                            datetime.now().strftime("%Y%m%d"),
+                            timeout_seconds=args.api_timeout_sec,
+                        )
+                        returns = ret_obj.returns
+                        source_name = ret_obj.source
+                        if returns and not args.disable_cache:
+                            put_cached_series(cache_payload, stock_cache_key, returns, source_name)
+                    except Exception as exc:
+                        returns = {}
+                        reason_counts[f"tushare_stock_error:{exc.__class__.__name__}"] += 1
             if not returns:
                 sina_symbol = ts_to_sina_symbol(ts_code)
                 if sina_symbol:
@@ -343,6 +412,8 @@ def main() -> None:
                             fetch_sina_kline(sina_symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
                         )
                         source_name = "sina_stock_fallback"
+                        if returns and not args.disable_cache:
+                            put_cached_series(cache_payload, stock_cache_key, returns, source_name)
                     except Exception as exc:
                         returns = {}
                         source_name = "none"
@@ -512,6 +583,8 @@ def main() -> None:
     report_path = Path(args.report_path).resolve()
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(report_lines), encoding="utf-8")
+    if not args.disable_cache:
+        save_market_cache(cache_path, cache_payload)
     print(f"Wrote event-study dataset to {dataset_path}")
     print(f"Wrote event-study report to {report_path}")
 
