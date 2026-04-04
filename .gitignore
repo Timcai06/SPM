@@ -2,6 +2,8 @@
 *.env
 *.csv
 .DS_Store
+__pycache__/
+*.pyc
 
 # Runtime outputs (DB is source of truth)
 output/*.csv

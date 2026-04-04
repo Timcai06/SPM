@@ -62,6 +62,16 @@ STRUCTURED_STAGE_FIELDS = [
 ]
 
 
+def sanitize_text(value: str) -> str:
+    """Remove characters that PostgreSQL text fields cannot store safely."""
+    if not value:
+        return ""
+    # PostgreSQL rejects NUL bytes in text/varchar columns.
+    value = value.replace("\x00", "")
+    # Keep common whitespace while dropping other control characters.
+    return "".join(ch for ch in value if (ord(ch) >= 32 or ch in "\t\n\r"))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load Task 1 outputs into PostgreSQL.")
     parser.add_argument("--db", default="stock_event_mining", help="Target PostgreSQL database name.")
@@ -107,7 +117,7 @@ def load_raw_documents() -> list[dict[str, str]]:
 
 
 def normalize_datetime(value: str) -> str:
-    value = value.strip()
+    value = sanitize_text(value).strip()
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
             return datetime.strptime(value, fmt).strftime("%Y-%m-%d %H:%M:%S")
@@ -163,21 +173,21 @@ def upsert_raw_documents(db: str, rows: list[dict[str, str]]) -> None:
     
     data_to_insert = []
     for row in rows:
-        title = (row.get("title") or "").strip()
-        content = (row.get("content") or "").strip()
+        title = sanitize_text((row.get("title") or "")).strip()
+        content = sanitize_text((row.get("content") or "")).strip()
         if not content:
             content = title or "(empty)"
             
         content_hash = hashlib.md5(f"{title}::{content}".encode("utf-8")).hexdigest()
         
         data_to_insert.append({
-            "source": row.get("source", "unknown"),
+            "source": sanitize_text(row.get("source", "unknown")),
             "source_type": "text_source",
             "title": title,
             "content": content,
             "publish_time": safe_normalize_datetime(row.get("publish_time", "")),
-            "url": row.get("url", ""),
-            "symbol_or_subject": row.get("symbol_or_subject", ""),
+            "url": sanitize_text(row.get("url", "")),
+            "symbol_or_subject": sanitize_text(row.get("symbol_or_subject", "")),
             "content_hash": content_hash,
         })
 
