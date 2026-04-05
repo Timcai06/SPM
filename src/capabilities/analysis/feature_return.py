@@ -205,6 +205,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--time-budget-sec", type=int, default=300, help="Stop analysis when runtime budget is reached.")
     parser.add_argument("--max-rows", type=int, default=300, help="Max event-company rows to analyze per run.")
     parser.add_argument("--api-timeout-sec", type=float, default=20.0, help="Per request timeout for Tushare/Sina fetch.")
+    parser.add_argument("--market-max-rows", type=int, default=1200, help="Max rows to fetch from fallback market APIs.")
     parser.add_argument("--progress-every", type=int, default=10, help="Print progress every N processed rows.")
     parser.add_argument("--cache-path", default=str(DEFAULT_CACHE), help="Local JSON cache path for market returns.")
     parser.add_argument("--disable-cache", action="store_true", help="Disable persistent market returns cache.")
@@ -389,7 +390,7 @@ def main() -> None:
         secid = INDEX_EASTMONEY_SECID_MAP[benchmark_key]
         try:
             benchmark_returns = close_series_to_returns(
-                fetch_eastmoney_kline(secid, max_rows=800, timeout_seconds=args.api_timeout_sec)
+                fetch_eastmoney_kline(secid, max_rows=args.market_max_rows, timeout_seconds=args.api_timeout_sec)
             )
             benchmark_source = "eastmoney_index_fallback"
             if benchmark_returns and not args.disable_cache:
@@ -403,7 +404,7 @@ def main() -> None:
         symbol = INDEX_SINA_SYMBOL_MAP[benchmark_key]
         try:
             benchmark_returns = close_series_to_returns(
-                fetch_sina_kline(symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
+                fetch_sina_kline(symbol, max_rows=args.market_max_rows, timeout_seconds=args.api_timeout_sec)
             )
             benchmark_source = "sina_index_fallback"
             if benchmark_returns and not args.disable_cache:
@@ -470,7 +471,9 @@ def main() -> None:
                 if eastmoney_secid:
                     try:
                         returns = close_series_to_returns(
-                            fetch_eastmoney_kline(eastmoney_secid, max_rows=800, timeout_seconds=args.api_timeout_sec)
+                            fetch_eastmoney_kline(
+                                eastmoney_secid, max_rows=args.market_max_rows, timeout_seconds=args.api_timeout_sec
+                            )
                         )
                         source_name = "eastmoney_stock_fallback"
                         if returns and not args.disable_cache:
@@ -484,7 +487,9 @@ def main() -> None:
                     if sina_symbol:
                         try:
                             returns = close_series_to_returns(
-                                fetch_sina_kline(sina_symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
+                                fetch_sina_kline(
+                                    sina_symbol, max_rows=args.market_max_rows, timeout_seconds=args.api_timeout_sec
+                                )
                             )
                             source_name = "sina_stock_fallback"
                             if returns and not args.disable_cache:

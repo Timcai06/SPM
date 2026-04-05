@@ -18,6 +18,7 @@ from capabilities.storage import (
     import_companies_public,
     import_companies_tushare,
     import_company_stats_akshare,
+    import_company_stats_local,
     import_company_stats_tushare,
     load_companies,
     load_company_stats,
@@ -68,6 +69,10 @@ def parse_args() -> argparse.Namespace:
     import_stats_parser.add_argument("--sleep-sec", type=float, default=0.05)
     import_stats_parser.add_argument("--progress-every", type=int, default=20)
     import_stats_parser.add_argument("--timeout-sec", type=float, default=12.0)
+
+    import_local_parser = sub.add_parser("import-company-stats-local", help="import company stats from local price CSV")
+    import_local_parser.add_argument("--input", required=True)
+    import_local_parser.add_argument("--output", default="output/seeds/company_stats.csv")
 
     load_stats_parser = sub.add_parser("load-company-stats", help="load company stats csv")
     load_stats_parser.add_argument("--db", default="stock_event_mining")
@@ -162,6 +167,11 @@ def main() -> None:
         ]
         with patched_argv(argv):
             import_company_stats_akshare.main()
+        return
+
+    if args.command == "import-company-stats-local":
+        with patched_argv(["import_company_stats_local.py", "--input", args.input, "--output", args.output]):
+            import_company_stats_local.main()
         return
 
     if args.command == "load-company-stats":

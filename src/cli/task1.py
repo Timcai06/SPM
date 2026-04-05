@@ -110,6 +110,7 @@ def parse_args() -> argparse.Namespace:
     feature_parser.add_argument("--progress-every", type=int, default=10)
     feature_parser.add_argument("--dataset-path", default="output/task1_event_return_dataset.csv")
     feature_parser.add_argument("--report-path", default="output/task1_feature_return_report.md")
+    feature_parser.add_argument("--market-max-rows", type=int, default=1200)
 
     train_sample_parser = sub.add_parser("train-samples", help="build model-ready training samples into DB")
     train_sample_parser.add_argument("--db", default="stock_event_mining")
@@ -386,6 +387,8 @@ def main() -> None:
             str(args.api_timeout_sec),
             "--progress-every",
             str(args.progress_every),
+            "--market-max-rows",
+            str(args.market_max_rows),
             "--dataset-path",
             args.dataset_path,
             "--report-path",
