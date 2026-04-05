@@ -32,6 +32,8 @@ DEFAULT_DATASET = ROOT / "output" / "task1_event_return_dataset.csv"
 DEFAULT_CACHE = ROOT / "output" / "meta" / "feature_market_cache.json"
 INDEX_CODE_MAP = {"hs300": "000300.SH"}
 INDEX_SINA_SYMBOL_MAP = {"hs300": "sh000300"}
+INDEX_EASTMONEY_SECID_MAP = {"hs300": "1.000300"}
+ENABLE_EASTMONEY_FALLBACK = os.getenv("USE_EASTMONEY", "0") == "1"
 
 
 def ts_to_sina_symbol(ts_code: str) -> Optional[str]:
@@ -43,6 +45,20 @@ def ts_to_sina_symbol(ts_code: str) -> Optional[str]:
         return f"sz{code}"
     if exch == "SH":
         return f"sh{code}"
+    return None
+
+
+def ts_to_eastmoney_secid(ts_code: str) -> Optional[str]:
+    ts_code = ts_code.strip().upper()
+    if not ts_code or "." not in ts_code:
+        return None
+    code, exch = ts_code.split(".", 1)
+    if exch == "SZ":
+        return f"0.{code}"
+    if exch == "SH":
+        return f"1.{code}"
+    if exch == "BJ":
+        return f"0.{code}"
     return None
 
 
@@ -59,6 +75,37 @@ def fetch_sina_kline(symbol: str, max_rows: int = 800, timeout_seconds: float = 
     except json.JSONDecodeError:
         return []
     return [row for row in data if row.get("day") and row.get("close")]
+
+
+def fetch_eastmoney_kline(
+    secid: str, max_rows: int = 800, timeout_seconds: float = 20.0
+) -> List[Dict[str, str]]:
+    url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+    params = {
+        "secid": secid,
+        "fields1": "f1,f2,f3,f4,f5",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57",
+        "klt": "101",
+        "fqt": "1",
+        "beg": "0",
+        "end": "0",
+        "lmt": str(max_rows),
+    }
+    resp = requests.get(url, params=params, timeout=timeout_seconds)
+    resp.raise_for_status()
+    payload = resp.json()
+    data = payload.get("data") or {}
+    klines = data.get("klines") or []
+    rows: List[Dict[str, str]] = []
+    for line in klines:
+        parts = str(line).split(",")
+        if len(parts) < 3:
+            continue
+        day = parts[0].strip()
+        close = parts[2].strip()
+        if day and close:
+            rows.append({"day": day, "close": close})
+    return rows
 
 
 def close_series_to_returns(kline: List[Dict[str, str]]) -> Dict[str, float]:
@@ -338,7 +385,21 @@ def main() -> None:
             use_tushare = False
             print("[feature] tushare token invalid, fallback to sina and disable tushare stock fetch.")
         benchmark_source = f"tushare_failed:{exc.__class__.__name__}"
-    if not benchmark_returns:
+    if not benchmark_returns and ENABLE_EASTMONEY_FALLBACK and benchmark_key in INDEX_EASTMONEY_SECID_MAP:
+        secid = INDEX_EASTMONEY_SECID_MAP[benchmark_key]
+        try:
+            benchmark_returns = close_series_to_returns(
+                fetch_eastmoney_kline(secid, max_rows=800, timeout_seconds=args.api_timeout_sec)
+            )
+            benchmark_source = "eastmoney_index_fallback"
+            if benchmark_returns and not args.disable_cache:
+                put_cached_series(cache_payload, benchmark_cache_key, benchmark_returns, benchmark_source)
+        except Exception as exc:
+            benchmark_returns = {}
+            reason_counts[f"eastmoney_index_error:{exc.__class__.__name__}"] += 1
+            benchmark_source = f"eastmoney_failed:{exc.__class__.__name__}"
+            print(f"[feature] eastmoney index fallback failed: {exc.__class__.__name__}")
+    if not benchmark_returns and benchmark_key in INDEX_SINA_SYMBOL_MAP:
         symbol = INDEX_SINA_SYMBOL_MAP[benchmark_key]
         try:
             benchmark_returns = close_series_to_returns(
@@ -404,20 +465,34 @@ def main() -> None:
                     except Exception as exc:
                         returns = {}
                         reason_counts[f"tushare_stock_error:{exc.__class__.__name__}"] += 1
-            if not returns:
-                sina_symbol = ts_to_sina_symbol(ts_code)
-                if sina_symbol:
+            if not returns and ENABLE_EASTMONEY_FALLBACK:
+                eastmoney_secid = ts_to_eastmoney_secid(ts_code)
+                if eastmoney_secid:
                     try:
                         returns = close_series_to_returns(
-                            fetch_sina_kline(sina_symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
+                            fetch_eastmoney_kline(eastmoney_secid, max_rows=800, timeout_seconds=args.api_timeout_sec)
                         )
-                        source_name = "sina_stock_fallback"
+                        source_name = "eastmoney_stock_fallback"
                         if returns and not args.disable_cache:
                             put_cached_series(cache_payload, stock_cache_key, returns, source_name)
                     except Exception as exc:
                         returns = {}
                         source_name = "none"
-                        reason_counts[f"sina_stock_error:{exc.__class__.__name__}"] += 1
+                        reason_counts[f"eastmoney_stock_error:{exc.__class__.__name__}"] += 1
+                if not returns:
+                    sina_symbol = ts_to_sina_symbol(ts_code)
+                    if sina_symbol:
+                        try:
+                            returns = close_series_to_returns(
+                                fetch_sina_kline(sina_symbol, max_rows=800, timeout_seconds=args.api_timeout_sec)
+                            )
+                            source_name = "sina_stock_fallback"
+                            if returns and not args.disable_cache:
+                                put_cached_series(cache_payload, stock_cache_key, returns, source_name)
+                        except Exception as exc:
+                            returns = {}
+                            source_name = "none"
+                            reason_counts[f"sina_stock_error:{exc.__class__.__name__}"] += 1
             stock_cache[ts_code] = returns
             stock_source_map[ts_code] = source_name
 
@@ -575,7 +650,7 @@ def main() -> None:
             "",
             "## 四、说明",
             "- 估计窗固定为[-120,-20]，事件窗为[t0,t0+w]。",
-            "- 若Tushare不可用，自动回退Sina行情接口并在报告中标记。",
+            "- 若Tushare不可用，默认回退Sina行情接口（可用环境变量 USE_EASTMONEY=1 启用东方财富回退），并在报告中标记。",
             f"- 数据明细见：`{dataset_path}`",
         ]
     )

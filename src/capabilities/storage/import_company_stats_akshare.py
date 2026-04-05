@@ -8,6 +8,7 @@ import csv
 import statistics
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -33,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-symbols", type=int, default=300, help="Max stock symbols to fetch.")
     parser.add_argument("--sleep-sec", type=float, default=0.05, help="Sleep between symbol requests.")
     parser.add_argument("--progress-every", type=int, default=20, help="Print progress every N symbols.")
+    parser.add_argument("--timeout-sec", type=float, default=12.0, help="Timeout for each symbol request.")
     parser.add_argument("--db", default="stock_event_mining", help="Database used to load symbols from companies table.")
     return parser.parse_args()
 
@@ -113,17 +115,33 @@ def get_symbols_from_spot(max_symbols: int) -> list[str]:
     return symbols[:max_symbols]
 
 
-def fetch_hist(symbol: str, start_date: str, end_date: str):
-    return ak.stock_zh_a_hist(
-        symbol=symbol,
-        period="daily",
-        start_date=start_date,
-        end_date=end_date,
-        adjust="",
+def _call_with_timeout(callable_obj, timeout_seconds: float):
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(callable_obj)
+        return future.result(timeout=timeout_seconds)
+
+
+def fetch_hist(symbol: str, start_date: str, end_date: str, timeout_sec: float):
+    return _call_with_timeout(
+        lambda: ak.stock_zh_a_hist(
+            symbol=symbol,
+            period="daily",
+            start_date=start_date,
+            end_date=end_date,
+            adjust="",
+        ),
+        timeout_seconds=timeout_sec,
     )
 
 
-def build_rows(days: int, max_symbols: int, sleep_sec: float, progress_every: int, db_name: str) -> list[dict[str, str]]:
+def build_rows(
+    days: int,
+    max_symbols: int,
+    sleep_sec: float,
+    progress_every: int,
+    db_name: str,
+    timeout_sec: float,
+) -> list[dict[str, str]]:
     target_start = (datetime.now().date() - timedelta(days=days * 3)).strftime("%Y%m%d")
     target_end = datetime.now().date().strftime("%Y%m%d")
     symbols = get_symbols_from_db(db_name=db_name, max_symbols=max_symbols)
@@ -142,7 +160,11 @@ def build_rows(days: int, max_symbols: int, sleep_sec: float, progress_every: in
         if not ts_code:
             continue
         try:
-            hist = fetch_hist(symbol=symbol, start_date=target_start, end_date=target_end)
+            hist = fetch_hist(symbol=symbol, start_date=target_start, end_date=target_end, timeout_sec=timeout_sec)
+        except TimeoutError:
+            fail_count += 1
+            time.sleep(sleep_sec)
+            continue
         except Exception:
             fail_count += 1
             time.sleep(sleep_sec)
@@ -267,6 +289,7 @@ def main() -> None:
         sleep_sec=args.sleep_sec,
         progress_every=args.progress_every,
         db_name=args.db,
+        timeout_sec=args.timeout_sec,
     )
     output_path = Path(args.output).resolve()
     write_csv(output_path, rows)

@@ -67,6 +67,7 @@ def parse_args() -> argparse.Namespace:
     import_stats_parser.add_argument("--max-symbols", type=int, default=300)
     import_stats_parser.add_argument("--sleep-sec", type=float, default=0.05)
     import_stats_parser.add_argument("--progress-every", type=int, default=20)
+    import_stats_parser.add_argument("--timeout-sec", type=float, default=12.0)
 
     load_stats_parser = sub.add_parser("load-company-stats", help="load company stats csv")
     load_stats_parser.add_argument("--db", default="stock_event_mining")
@@ -156,6 +157,8 @@ def main() -> None:
             str(args.sleep_sec),
             "--progress-every",
             str(args.progress_every),
+            "--timeout-sec",
+            str(args.timeout_sec),
         ]
         with patched_argv(argv):
             import_company_stats_akshare.main()

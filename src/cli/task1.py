@@ -102,6 +102,7 @@ def parse_args() -> argparse.Namespace:
     feature_parser.add_argument("--tushare-token", default="")
     feature_parser.add_argument("--tushare-token-file", default="")
     feature_parser.add_argument("--disable-tushare", action="store_true")
+    feature_parser.add_argument("--disable-cache", action="store_true")
     feature_parser.add_argument("--run-id", default="")
     feature_parser.add_argument("--time-budget-sec", type=int, default=300)
     feature_parser.add_argument("--max-rows", type=int, default=300)
@@ -396,6 +397,8 @@ def main() -> None:
             argv.extend(["--tushare-token-file", args.tushare_token_file])
         if args.disable_tushare:
             argv.append("--disable-tushare")
+        if args.disable_cache:
+            argv.append("--disable-cache")
         if args.run_id:
             argv.extend(["--run-id", args.run_id])
         with patched_argv(argv):
