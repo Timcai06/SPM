@@ -72,6 +72,8 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument("--max-analysis-rows", type=int, default=300)
     run_parser.add_argument("--api-timeout-sec", type=float, default=20.0)
     run_parser.add_argument("--progress-every", type=int, default=10)
+    run_parser.add_argument("--use-llm", action="store_true")
+    run_parser.add_argument("--llm-max-rows", type=int, default=20)
 
     collect_parser = sub.add_parser("collect", help="collect source data")
     collect_parser.add_argument("--limit", type=int, default=10)
@@ -80,6 +82,8 @@ def parse_args() -> argparse.Namespace:
     classify_parser = sub.add_parser("classify", help="classify and structure events")
     classify_parser.add_argument("--db", default="stock_event_mining")
     classify_parser.add_argument("--skip-db-load", action="store_true")
+    classify_parser.add_argument("--use-llm", action="store_true")
+    classify_parser.add_argument("--llm-max-rows", type=int, default=20)
 
     sub.add_parser("canonicalize", help="build canonical event clusters")
     canonical_load_parser = sub.add_parser("canonical-load", help="load canonical events into PostgreSQL")
@@ -311,6 +315,8 @@ def main() -> None:
                 str(args.progress_every),
             ]
         )
+        if args.use_llm:
+            argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
         with patched_argv(argv):
             task1_pipeline.main()
         return
@@ -329,6 +335,8 @@ def main() -> None:
             argv.extend(["--input", input_file])
         if args.skip_db_load:
             argv.append("--skip-db-load")
+        if args.use_llm:
+            argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
         with patched_argv(argv):
             classify.main()
         return

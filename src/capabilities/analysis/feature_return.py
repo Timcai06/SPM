@@ -189,6 +189,38 @@ def bucket3(value: float) -> str:
     return "high"
 
 
+def date_distance_days(a: str, b: str) -> Optional[int]:
+    try:
+        da = datetime.strptime(a, "%Y-%m-%d").date()
+        db = datetime.strptime(b, "%Y-%m-%d").date()
+    except Exception:
+        return None
+    return abs((da - db).days)
+
+
+def resolve_event_trade_index(common_dates: List[str], event_date: str, max_gap_days: int = 7) -> tuple[Optional[int], str]:
+    if not common_dates:
+        return None, "no_common_trade_dates"
+    for idx, trade_date in enumerate(common_dates):
+        if trade_date >= event_date:
+            gap = date_distance_days(trade_date, event_date)
+            if gap is None or gap <= max_gap_days:
+                return idx, "aligned_next_trade_date" if trade_date != event_date else "aligned_exact_trade_date"
+            break
+
+    prev_idx = None
+    for idx in range(len(common_dates) - 1, -1, -1):
+        if common_dates[idx] <= event_date:
+            prev_idx = idx
+            break
+    if prev_idx is None:
+        return None, "event_outside_trade_dates"
+    gap = date_distance_days(common_dates[prev_idx], event_date)
+    if gap is None or gap > max_gap_days:
+        return None, "event_outside_trade_dates"
+    return prev_idx, "aligned_prev_trade_date"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Task1 event-study analysis.")
     parser.add_argument("--db", default="stock_event_mining", help="PostgreSQL database name.")
@@ -209,6 +241,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--progress-every", type=int, default=10, help="Print progress every N processed rows.")
     parser.add_argument("--cache-path", default=str(DEFAULT_CACHE), help="Local JSON cache path for market returns.")
     parser.add_argument("--disable-cache", action="store_true", help="Disable persistent market returns cache.")
+    parser.add_argument("--event-align-max-gap-days", type=int, default=7, help="Max calendar-day gap when snapping event date to nearest trade date.")
     return parser.parse_args()
 
 
@@ -511,10 +544,12 @@ def main() -> None:
             continue
 
         event_date = row["event_date"]
-        event_idx = next((i for i, d in enumerate(common_dates) if d >= event_date), None)
+        event_idx, align_reason = resolve_event_trade_index(common_dates, event_date, max_gap_days=args.event_align_max_gap_days)
         if event_idx is None:
-            reason_counts["event_outside_trade_dates"] += 1
+            reason_counts[align_reason] += 1
             continue
+        if align_reason != "aligned_exact_trade_date":
+            reason_counts[align_reason] += 1
         if event_idx - 120 < 0:
             reason_counts["insufficient_estimation_window"] += 1
             continue
@@ -559,6 +594,8 @@ def main() -> None:
                 "benchmark_source": benchmark_source,
                 "token_source": token_source,
                 "stock_source": stock_source_map.get(ts_code, "none"),
+                "event_trade_date": common_dates[event_idx],
+                "event_date_alignment": align_reason,
                 "estimation_window": "[-120,-20]",
                 "event_windows": ",".join(str(x) for x in event_windows),
                 "estimation_points": str(len(est_points)),

@@ -107,7 +107,8 @@ def main() -> None:
     output_rows: list[dict[str, str]] = []
     for ts_code, items in grouped.items():
         prev_close: Optional[float] = None
-        for idx, row in enumerate(items):
+        computed_returns: list[Optional[float]] = []
+        for row in items:
             daily_return = row["daily_return"]
             if daily_return is None and row["pct_chg"] is not None:
                 daily_return = row["pct_chg"] / 100.0
@@ -115,15 +116,18 @@ def main() -> None:
                 daily_return = (row["close"] - prev_close) / prev_close
             if row["close"] is not None:
                 prev_close = row["close"]
+            computed_returns.append(daily_return)
 
-            hist_returns = [items[i].get("daily_return") for i in range(max(0, idx - 19), idx + 1)]
-            hist_returns = [r if r is not None else daily_return for r in hist_returns]
+        for idx, row in enumerate(items):
+            daily_return = computed_returns[idx]
+
+            hist_returns = computed_returns[max(0, idx - 19) : idx + 1]
             trailing_ret = trailing_return(hist_returns)
             vol_20 = volatility(hist_returns)
 
-            forward_1 = trailing_return([items[i].get("daily_return") for i in range(idx + 1, idx + 2)])
-            forward_3 = trailing_return([items[i].get("daily_return") for i in range(idx + 1, idx + 4)])
-            forward_5 = trailing_return([items[i].get("daily_return") for i in range(idx + 1, idx + 6)])
+            forward_1 = trailing_return(computed_returns[idx + 1 : idx + 2])
+            forward_3 = trailing_return(computed_returns[idx + 1 : idx + 4])
+            forward_5 = trailing_return(computed_returns[idx + 1 : idx + 6])
 
             volume_ratio = row["volume_ratio"]
             if volume_ratio is None and row["volume"] is not None:

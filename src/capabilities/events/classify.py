@@ -22,7 +22,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
@@ -126,6 +126,20 @@ STRUCTURED_EVENT_FIELDS = [
 
 ENTITY_PATTERN = re.compile(r"[0-9]{6}\.(?:SZ|SH)|印巴|克什米尔|歼\-?10CE|中航成飞|储能|机器人")
 GENERIC_EVENT_HITS = {"公告"}
+LLM_SUBJECT_MAP = {
+    "macro": "宏观类",
+    "policy": "政策类",
+    "industry": "行业类",
+    "entity": "公司类",
+    "company": "公司类",
+    "shock": "地缘类",
+    "geopolitical": "地缘类",
+}
+LLM_SENTIMENT_MAP = {
+    "positive": "利好",
+    "negative": "利空",
+    "neutral": "中性",
+}
 
 
 def _copy_rules(source: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -498,6 +512,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only write CSV outputs and skip PostgreSQL loading.",
     )
+    parser.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Enable a small LLM enrichment pass for rule-positive candidates.",
+    )
+    parser.add_argument(
+        "--llm-max-rows",
+        type=int,
+        default=20,
+        help="Max number of rule-positive rows to enrich with LLM per run.",
+    )
     return parser.parse_args()
 
 
@@ -596,17 +621,43 @@ import os
 
 SECRETS_DIR = ROOT / ".secrets"
 LLM_KEY_FILE = SECRETS_DIR / "llm_api_key.txt"
+LLM_BASE_URL_FILE = SECRETS_DIR / "llm_base_url.txt"
+LLM_MODEL_FILE = SECRETS_DIR / "llm_model.txt"
 
 class AsyncLLMClient:
-    def __init__(self, api_key: str = None, base_url: str = "https://opencode.ai/zen/v1"):
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = None):
         self.api_key = api_key or self._load_key()
-        self.base_url = base_url
-        self.model = "gpt-5.4-mini" # Optimized for OpenCode Zen speed/cost
+        self.base_url = base_url or self._load_base_url()
+        self.model = model or self._load_model()
 
     def _load_key(self) -> str:
+        env_key = os.getenv("LLM_API_KEY", "").strip()
+        if env_key:
+            return env_key
+        return self._read_secret_file(LLM_KEY_FILE)
+
+    def _load_base_url(self) -> str:
+        env_url = os.getenv("LLM_BASE_URL", "").strip()
+        if env_url:
+            return env_url.rstrip("/")
+        file_url = self._read_secret_file(LLM_BASE_URL_FILE)
+        if file_url:
+            return file_url.rstrip("/")
+        return "https://opencode.ai/zen/v1"
+
+    def _load_model(self) -> str:
+        env_model = os.getenv("LLM_MODEL", "").strip()
+        if env_model:
+            return env_model
+        file_model = self._read_secret_file(LLM_MODEL_FILE)
+        if file_model:
+            return file_model
+        return "gpt-5.4-mini"
+
+    def _read_secret_file(self, path: Path) -> str:
         try:
-            return LLM_KEY_FILE.read_text(encoding="utf-8").strip()
-        except:
+            return path.read_text(encoding="utf-8").strip()
+        except Exception:
             return ""
 
     async def extract_event_data(self, title: str, content: str) -> dict:
@@ -648,10 +699,59 @@ class AsyncLLMClient:
                         data = json.loads(text)
                         return json.loads(data["choices"][0]["message"]["content"])
                     else:
-                        print(f"[WARN] LLM API Error: Status {resp.status}")
+                        body = await resp.text()
+                        print(f"[WARN] LLM API Error: Status {resp.status}; body={body[:300]}")
                         return {}
         except Exception as e:
             print(f"[WARN] LLM API Exception: {e}")
+            return {}
+
+
+class AsyncOllamaClient:
+    def __init__(self, base_url: str = None, model: str = None):
+        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")).rstrip("/")
+        self.model = model or os.getenv("OLLAMA_MODEL", "qwen3:8b")
+
+    async def extract_event_data(self, title: str, content: str) -> dict:
+        prompt = f"""
+你是一个专业的金融事件分析专家。请分析以下新闻，并判断它是否属于重要的股市基本面事件。
+重要事件包括：产业政策变动、技术突破、重大公司行为、宏观经济数据发布、行业重大突发事件。
+不重要的事件包括：普通市场行情波动、非财经类社会新闻、重复新闻、纯技术指标讨论。
+
+请严格返回 JSON，不要返回 markdown，不要补充解释：
+{{
+  "is_event": true,
+  "event_name": "简洁的事件名称",
+  "subject_type": "Policy/Entity/Industry/Macro/Shock",
+  "industry": "军工/新能源/消费/科技/其他 之一",
+  "sentiment": "Positive/Negative/Neutral",
+  "summary": "50字以内摘要"
+}}
+
+新闻标题：{title}
+新闻正文：{content[:1000]}
+"""
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "format": "json",
+            "options": {"temperature": 0.1},
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f"{self.base_url}/api/generate", json=payload, timeout=60) as resp:
+                    text = await resp.text()
+                    if resp.status != 200:
+                        print(f"[WARN] Ollama API Error: Status {resp.status}; body={text[:300]}")
+                        return {}
+                    data = json.loads(text)
+                    response_text = (data.get("response") or "").strip()
+                    if not response_text:
+                        return {}
+                    return json.loads(response_text)
+        except Exception as e:
+            print(f"[WARN] Ollama API Exception: {e}")
             return {}
 
 @dataclass
@@ -663,9 +763,27 @@ class LLMResultEnrichment:
     sentiment_llm: str = ""
     summary_llm: str = ""
 
-async def classify_rows_async(rows: List[Dict[str, str]], use_llm: bool = True) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+def normalize_llm_subject(value: str, fallback: str) -> str:
+    key = (value or "").strip().lower()
+    return freeze_enum(LLM_SUBJECT_MAP.get(key, fallback), EVENT_SUBJECT_ENUM, fallback)
+
+
+def normalize_llm_industry(value: str, fallback: str) -> str:
+    text = (value or "").strip()
+    return freeze_enum(text if text in INDUSTRY_ENUM else fallback, INDUSTRY_ENUM, fallback)
+
+
+def normalize_llm_sentiment(value: str, fallback: str) -> str:
+    key = (value or "").strip().lower()
+    return freeze_enum(LLM_SENTIMENT_MAP.get(key, fallback), SENTIMENT_ENUM, fallback)
+
+
+async def classify_rows_async(
+    rows: List[Dict[str, str]], use_llm: bool = False, llm_max_rows: int = 20
+) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
     """Classify rows with optional LLM second pass."""
     client = AsyncLLMClient()
+    ollama_client = AsyncOllamaClient()
     semaphore = asyncio.Semaphore(5) # Concurrency limit to avoid rate limits
     
     # First Pass: Deterministic Rules (Fast & Free)
@@ -674,38 +792,85 @@ async def classify_rows_async(rows: List[Dict[str, str]], use_llm: bool = True) 
     for row in rows:
         candidate_results.append(detect_event(row, duplicate_counts[dedup_key(row)]))
     
-    async def process_one(row, res):
+    llm_budget = 0
+
+    async def process_one(row, res, allow_llm: bool):
         # We only call LLM if rules say it MIGHT be an event OR for enrichment
-        if res.is_event and use_llm and client.api_key:
+        if res.is_event and allow_llm and use_llm and client.api_key:
             async with semaphore:
                 llm_data = await client.extract_event_data(row["title"], row["content"])
                 if llm_data:
                     # Enrich original result
                     structured_row = build_structured_row(row, res)
+                    llm_subject = normalize_llm_subject(
+                        llm_data.get("subject_type", ""), structured_row["event_subject_type"]
+                    )
+                    llm_industry = normalize_llm_industry(
+                        llm_data.get("industry", ""), structured_row["industry_type"]
+                    )
+                    llm_sentiment = normalize_llm_sentiment(
+                        llm_data.get("sentiment", ""), structured_row["sentiment"]
+                    )
+                    llm_summary = (llm_data.get("summary") or structured_row["event_summary"]).strip()[:120]
+                    llm_event_name = (llm_data.get("event_name") or structured_row["event_name"]).strip()[:80]
                     structured_row.update({
-                        "event_name": llm_data.get("event_name", structured_row["event_name"]),
-                        "event_subject_type": llm_data.get("subject_type", structured_row["event_subject_type"]),
-                        "industry_type": llm_data.get("industry", structured_row["industry_type"]),
-                        "sentiment": llm_data.get("sentiment", structured_row["sentiment"]),
-                        "event_summary": llm_data.get("summary", structured_row["event_summary"]),
+                        "event_name": llm_event_name,
+                        "event_subject_type": llm_subject,
+                        "industry_type": llm_industry,
+                        "sentiment": llm_sentiment,
+                        "event_summary": llm_summary,
+                        "classification_evidence": structured_row["classification_evidence"]
+                        + f"|llm=1|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
                     })
                     return build_candidate_row(row, res), structured_row
-        
+        if res.is_event and allow_llm and use_llm:
+            async with semaphore:
+                llm_data = await ollama_client.extract_event_data(row["title"], row["content"])
+                if llm_data:
+                    structured_row = build_structured_row(row, res)
+                    llm_subject = normalize_llm_subject(
+                        llm_data.get("subject_type", ""), structured_row["event_subject_type"]
+                    )
+                    llm_industry = normalize_llm_industry(
+                        llm_data.get("industry", ""), structured_row["industry_type"]
+                    )
+                    llm_sentiment = normalize_llm_sentiment(
+                        llm_data.get("sentiment", ""), structured_row["sentiment"]
+                    )
+                    llm_summary = (llm_data.get("summary") or structured_row["event_summary"]).strip()[:120]
+                    llm_event_name = (llm_data.get("event_name") or structured_row["event_name"]).strip()[:80]
+                    structured_row.update({
+                        "event_name": llm_event_name,
+                        "event_subject_type": llm_subject,
+                        "industry_type": llm_industry,
+                        "sentiment": llm_sentiment,
+                        "event_summary": llm_summary,
+                        "classification_evidence": structured_row["classification_evidence"]
+                        + f"|llm=1|llm_backend=ollama|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
+                    })
+                    return build_candidate_row(row, res), structured_row
+
         # Fallback to rules-only
         return build_candidate_row(row, res), (build_structured_row(row, res) if res.is_event else None)
 
-    tasks = [process_one(row, res) for row, res in zip(rows, candidate_results)]
+    tasks = []
+    for row, res in zip(rows, candidate_results):
+        allow_llm = False
+        if res.is_event and llm_budget < llm_max_rows:
+            allow_llm = True
+            llm_budget += 1
+        tasks.append(process_one(row, res, allow_llm))
     results = await asyncio.gather(*tasks)
     
     candidate_rows = []
     structured_rows = []
     seen_structured_dedup_keys = set()
     
-    for cand, struct in results:
+    for row, (cand, struct) in zip(rows, results):
         candidate_rows.append(cand)
         if struct:
             # Simple dedup for structured events
-            d_key = dedup_key(rows[candidate_rows.index(cand)])
+            d_key = dedup_key(row)
             if d_key not in seen_structured_dedup_keys:
                 seen_structured_dedup_keys.add(d_key)
                 structured_rows.append(struct)
@@ -731,7 +896,12 @@ def load_rows_from_db(db: str) -> List[Dict[str, str]]:
             return [dict(zip(columns, row)) for row in cur.fetchall()]
 
 
-async def run_classification_pipeline(db: str, input_rows: List[Dict[str, str]] = None) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+async def run_classification_pipeline(
+    db: str,
+    input_rows: Optional[List[Dict[str, str]]] = None,
+    use_llm: bool = False,
+    llm_max_rows: int = 20,
+) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
     """Orchestrate classification and write results to Stage tables (Async)."""
     from capabilities.storage.load_task1 import load_stage_tables
     
@@ -740,7 +910,9 @@ async def run_classification_pipeline(db: str, input_rows: List[Dict[str, str]] 
         print("No documents found for classification.")
         return [], []
         
-    candidate_rows, structured_rows = await classify_rows_async(rows)
+    candidate_rows, structured_rows = await classify_rows_async(
+        rows, use_llm=use_llm, llm_max_rows=llm_max_rows
+    )
     
     load_stage_tables(db, [], candidate_rows, structured_rows)
     return candidate_rows, structured_rows
@@ -754,10 +926,20 @@ def main() -> None:
             input_paths = [Path(p).resolve() for p in args.inputs]
             rows = load_rows_from_inputs(input_paths)
             print(f"Loaded {len(rows)} rows from {len(input_paths)} input file(s)")
-            candidate_rows, structured_rows = await classify_rows_async(rows)
+            candidate_rows, structured_rows = await classify_rows_async(
+                rows, use_llm=args.use_llm, llm_max_rows=args.llm_max_rows
+            )
         else:
             print(f"No input files provided. Reading from database: {args.db}")
-            candidate_rows, structured_rows = await run_classification_pipeline(args.db)
+            if args.skip_db_load:
+                rows = load_rows_from_db(args.db)
+                candidate_rows, structured_rows = await classify_rows_async(
+                    rows, use_llm=args.use_llm, llm_max_rows=args.llm_max_rows
+                )
+            else:
+                candidate_rows, structured_rows = await run_classification_pipeline(
+                    args.db, use_llm=args.use_llm, llm_max_rows=args.llm_max_rows
+                )
 
         output_dir = Path(args.output_dir).resolve()
         raw_output_path = output_dir / "raw_event_candidates.csv"

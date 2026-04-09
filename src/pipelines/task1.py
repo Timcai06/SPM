@@ -59,6 +59,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-analysis-rows", type=int, default=300, help="Max rows for analysis step.")
     parser.add_argument("--api-timeout-sec", type=float, default=20.0, help="Per request timeout for analysis fetch.")
     parser.add_argument("--progress-every", type=int, default=10, help="Print analysis progress every N rows.")
+    parser.add_argument("--use-llm", action="store_true", help="Enable LLM enrichment for a small rule-positive subset.")
+    parser.add_argument("--llm-max-rows", type=int, default=20, help="Max rows to enrich with LLM in one run.")
     return parser.parse_args()
 
 
@@ -94,7 +96,9 @@ def main() -> None:
 
     # 3. Classification
     print(f"--- Phase 2: Identification & Classification (DB: {db}) ---")
-    candidate_rows, structured_rows = asyncio.run(run_classification_pipeline(db))
+    candidate_rows, structured_rows = asyncio.run(
+        run_classification_pipeline(db, use_llm=args.use_llm, llm_max_rows=args.llm_max_rows)
+    )
     print(f"Identified {len(structured_rows)} structured events from candidates.")
 
     # 4. Canonicalization

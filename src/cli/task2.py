@@ -19,6 +19,7 @@ from capabilities.storage import (
     import_companies_tushare,
     import_company_stats_akshare,
     import_company_stats_local,
+    import_company_stats_sina,
     import_company_stats_tushare,
     load_companies,
     load_company_stats,
@@ -61,7 +62,7 @@ def parse_args() -> argparse.Namespace:
     import_stats_parser = sub.add_parser("import-company-stats", help="import company stats from Tushare or AKShare")
     import_stats_parser.add_argument("--db", default="stock_event_mining")
     import_stats_parser.add_argument("--output", default="output/seeds/company_stats.csv")
-    import_stats_parser.add_argument("--source", choices=["auto", "tushare", "akshare"], default="auto")
+    import_stats_parser.add_argument("--source", choices=["auto", "tushare", "akshare", "sina"], default="auto")
     import_stats_parser.add_argument("--tushare-token", default="")
     import_stats_parser.add_argument("--tushare-token-file", default="")
     import_stats_parser.add_argument("--days", type=int, default=30)
@@ -69,6 +70,7 @@ def parse_args() -> argparse.Namespace:
     import_stats_parser.add_argument("--sleep-sec", type=float, default=0.05)
     import_stats_parser.add_argument("--progress-every", type=int, default=20)
     import_stats_parser.add_argument("--timeout-sec", type=float, default=12.0)
+    import_stats_parser.add_argument("--max-rows", type=int, default=1200)
 
     import_local_parser = sub.add_parser("import-company-stats-local", help="import company stats from local price CSV")
     import_local_parser.add_argument("--input", required=True)
@@ -134,6 +136,29 @@ def main() -> None:
         return
 
     if args.command == "import-company-stats":
+        if args.source == "sina":
+            argv = [
+                "import_company_stats_sina.py",
+                "--output",
+                args.output,
+                "--db",
+                args.db,
+                "--days",
+                str(args.days),
+                "--max-symbols",
+                str(args.max_symbols),
+                "--max-rows",
+                str(args.max_rows),
+                "--sleep-sec",
+                str(args.sleep_sec),
+                "--progress-every",
+                str(args.progress_every),
+                "--timeout-sec",
+                str(args.timeout_sec),
+            ]
+            with patched_argv(argv):
+                import_company_stats_sina.main()
+            return
         if args.source in ("tushare", "auto"):
             argv = ["import_company_stats_tushare.py", "--output", args.output, "--days", str(args.days)]
             if args.tushare_token:
