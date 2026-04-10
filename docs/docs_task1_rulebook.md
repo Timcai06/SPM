@@ -30,6 +30,50 @@
 - `event_threshold`
 - `rule_version`
 
+### 2.4 本地 LLM 辅助判定口径
+
+- 当前口径不是“纯规则驱动”，也不是“LLM 接管主判断”，而是：`规则优先 + 本地 LLM 辅助边界样本`
+- 默认主判官仍是规则分数与硬过滤条件；LLM 只在小范围样本上参与辅助判断与摘要增强
+- 当前本地 LLM 后端：`ollama`
+
+LLM 触发条件（命中其一即可）：
+- `borderline_score`：`event_score` 与阈值距离不超过 1 分
+- `high_value_source`：来源属于高价值来源，如中国政府网、发改委、证监会、交易所、巨潮、财新、第一财经
+- `industry_other`：规则输出 `industry_type=其他`
+- `subject_default`：主体分类仍然模糊或默认
+- `duplicate_cluster`：重复聚类规模较大，说明该文本具备发酵可能
+
+LLM 后置锚点修正（防止强语义被弱化）：
+- 地缘锚点：标题或正文命中 `中东/霍尔木兹/战事/停火/冲突/空战/印巴/克什米尔` 时，`event_subject_type` 优先保留 `地缘类`
+- 消费景气锚点：命中 `轻工业/零售/餐饮/文旅/旅游/消费` 时，`industry_type` 优先保留 `消费`
+- 科技政策锚点：命中 `无线电/卫星/通信/物联网/人工智能/具身智能` 时，`industry_type` 优先保留 `科技`
+- 若 LLM 输出 `industry_type=其他`，但规则已有明确行业标签，则优先保留规则行业
+
+LLM 允许做的事：
+- 生成更稳定的 `event_name`
+- 辅助修正 `event_subject_type`
+- 辅助修正 `industry_type`
+- 辅助补充 `sentiment`
+- 为 `classification_evidence` 增加解释字段
+
+LLM 不允许做的事：
+- 覆盖强规则负例
+- 直接决定收益标签
+- 直接生成热度/强度数值
+
+强规则负例不可被 LLM 翻盘的典型情形：
+- `non_financial_noise`
+- `generic_announcement_without_signal`
+- 其他被硬过滤的非金融披露或噪声文本
+
+`structured_events.csv` / 入库事件表中的 `classification_evidence` 需保留以下证据字段：
+- `llm=1`
+- `llm_backend=ollama`
+- `llm_trigger=...`
+- `llm_subject=...`
+- `llm_industry=...`
+- `llm_sentiment=...`
+
 ## 3. 四大分类维度（附件3对齐，枚举冻结）
 
 - `event_subject_type`：`政策类 / 公司类 / 行业类 / 宏观类 / 地缘类`
@@ -73,3 +117,9 @@
 - 枚举合法性（四大维度 + `impact_scope`）
 - `rule_version` 一致性
 - 关键正负样例回归通过
+
+补充验收口径（规则版 vs 规则+LLM 版）：
+- 同批输入上比较 `structured_events` 数量变化
+- 抽查 LLM 新增事件是否具有真实金融意义
+- 抽查 LLM 改写后的 `event_name / event_subject_type / industry_type / sentiment` 是否更稳定
+- 单独监控 `industry_type=其他` 占比，防止 LLM 把模糊样本重新打回“其他”

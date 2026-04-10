@@ -140,6 +140,21 @@ LLM_SENTIMENT_MAP = {
     "negative": "利空",
     "neutral": "中性",
 }
+LLM_HIGH_VALUE_SOURCE_TOKENS = ("中国政府网", "国家发展改革委", "中国证监会", "上交所", "深交所", "巨潮资讯网", "财新", "第一财经")
+LLM_NO_OVERRIDE_REASONS = {
+    "non_financial_noise",
+    "routine_disclosure_without_signal",
+    "routine_announcement_without_signal",
+    "announcement_template_without_signal",
+    "generic_announcement_without_signal",
+    "government_narrative_without_action",
+    "csrc_routine_without_policy_action",
+}
+GEO_SUBJECT_ANCHOR_KEYWORDS = ("中东", "霍尔木兹", "战事", "停火", "冲突", "空战", "印巴", "克什米尔")
+INDUSTRY_ANCHOR_RULES = {
+    "消费": ("轻工业", "零售", "餐饮", "文旅", "旅游", "消费"),
+    "科技": ("无线电", "卫星", "通信", "物联网", "人工智能", "具身智能"),
+}
 
 
 def _copy_rules(source: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -615,6 +630,43 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
     }
 
 
+def should_trigger_llm(row: Dict[str, str], result: CandidateResult, structured_preview: Optional[Dict[str, object]]) -> tuple[bool, list[str]]:
+    reasons: list[str] = []
+    score_gap = abs(result.event_score - result.event_threshold)
+    if score_gap <= 1:
+        reasons.append("borderline_score")
+    source_text = row.get("source", "")
+    if any(token in source_text for token in LLM_HIGH_VALUE_SOURCE_TOKENS):
+        reasons.append("high_value_source")
+    if structured_preview:
+        if structured_preview.get("industry_type") == "其他":
+            reasons.append("industry_other")
+        if structured_preview.get("event_subject_type") == SUBJECT_DEFAULT:
+            reasons.append("subject_default")
+    if result.duplicate_group_size >= 3:
+        reasons.append("duplicate_cluster")
+    return bool(reasons), reasons
+
+
+def promote_candidate_result(result: CandidateResult, reason_suffix: str) -> CandidateResult:
+    return CandidateResult(
+        row=result.row,
+        normalized_publish_time=result.normalized_publish_time,
+        dedup_key=result.dedup_key,
+        duplicate_group_size=result.duplicate_group_size,
+        is_event=True,
+        filter_reason="llm_promoted_event",
+        evidence=result.evidence + f"; llm_override={reason_suffix}",
+        score_hint=result.score_hint,
+        event_score=result.event_score,
+        event_threshold=result.event_threshold,
+    )
+
+
+def can_llm_promote(result: CandidateResult) -> bool:
+    return result.filter_reason not in LLM_NO_OVERRIDE_REASONS
+
+
 import asyncio
 import aiohttp
 import os
@@ -778,6 +830,25 @@ def normalize_llm_sentiment(value: str, fallback: str) -> str:
     return freeze_enum(LLM_SENTIMENT_MAP.get(key, fallback), SENTIMENT_ENUM, fallback)
 
 
+def anchored_subject_type(row: Dict[str, str], current_subject: str) -> str:
+    text = f"{row.get('title', '')} {row.get('content', '')}"
+    if any(token in text for token in GEO_SUBJECT_ANCHOR_KEYWORDS):
+        return "地缘类"
+    return current_subject
+
+
+def anchored_industry_type(row: Dict[str, str], current_industry: str, rule_industry: str) -> str:
+    text = f"{row.get('title', '')} {row.get('content', '')}"
+    anchored = current_industry
+    for label, keywords in INDUSTRY_ANCHOR_RULES.items():
+        if any(token in text for token in keywords):
+            anchored = label
+            break
+    if anchored == "其他" and rule_industry and rule_industry != "其他":
+        return rule_industry
+    return anchored
+
+
 async def classify_rows_async(
     rows: List[Dict[str, str]], use_llm: bool = False, llm_max_rows: int = 20
 ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
@@ -795,13 +866,26 @@ async def classify_rows_async(
     llm_budget = 0
 
     async def process_one(row, res, allow_llm: bool):
-        # We only call LLM if rules say it MIGHT be an event OR for enrichment
-        if res.is_event and allow_llm and use_llm and client.api_key:
+        structured_preview = build_structured_row(row, res)
+        llm_trigger, llm_reasons = should_trigger_llm(row, res, structured_preview)
+
+        # Remote compatible API first when enabled and this row is selected for LLM assist.
+        if allow_llm and llm_trigger and use_llm and client.api_key:
             async with semaphore:
                 llm_data = await client.extract_event_data(row["title"], row["content"])
                 if llm_data:
-                    # Enrich original result
-                    structured_row = build_structured_row(row, res)
+                    effective_result = res
+                    if (
+                        not res.is_event
+                        and llm_data.get("is_event")
+                        and res.event_score >= res.event_threshold - 1
+                        and can_llm_promote(res)
+                    ):
+                        effective_result = promote_candidate_result(res, "remote_llm_borderline")
+                    candidate_row = build_candidate_row(row, effective_result)
+                    structured_row = build_structured_row(row, effective_result) if effective_result.is_event else None
+                    if structured_row is None:
+                        return candidate_row, None
                     llm_subject = normalize_llm_subject(
                         llm_data.get("subject_type", ""), structured_row["event_subject_type"]
                     )
@@ -813,6 +897,8 @@ async def classify_rows_async(
                     )
                     llm_summary = (llm_data.get("summary") or structured_row["event_summary"]).strip()[:120]
                     llm_event_name = (llm_data.get("event_name") or structured_row["event_name"]).strip()[:80]
+                    llm_subject = anchored_subject_type(row, llm_subject)
+                    llm_industry = anchored_industry_type(row, llm_industry, structured_row["industry_type"])
                     structured_row.update({
                         "event_name": llm_event_name,
                         "event_subject_type": llm_subject,
@@ -820,14 +906,25 @@ async def classify_rows_async(
                         "sentiment": llm_sentiment,
                         "event_summary": llm_summary,
                         "classification_evidence": structured_row["classification_evidence"]
-                        + f"|llm=1|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
+                        + f"|llm=1|llm_backend=remote|llm_trigger={','.join(llm_reasons)}|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
                     })
-                    return build_candidate_row(row, res), structured_row
-        if res.is_event and allow_llm and use_llm:
+                    return candidate_row, structured_row
+        if allow_llm and llm_trigger and use_llm:
             async with semaphore:
                 llm_data = await ollama_client.extract_event_data(row["title"], row["content"])
                 if llm_data:
-                    structured_row = build_structured_row(row, res)
+                    effective_result = res
+                    if (
+                        not res.is_event
+                        and llm_data.get("is_event")
+                        and res.event_score >= res.event_threshold - 1
+                        and can_llm_promote(res)
+                    ):
+                        effective_result = promote_candidate_result(res, "ollama_llm_borderline")
+                    candidate_row = build_candidate_row(row, effective_result)
+                    structured_row = build_structured_row(row, effective_result) if effective_result.is_event else None
+                    if structured_row is None:
+                        return candidate_row, None
                     llm_subject = normalize_llm_subject(
                         llm_data.get("subject_type", ""), structured_row["event_subject_type"]
                     )
@@ -839,6 +936,8 @@ async def classify_rows_async(
                     )
                     llm_summary = (llm_data.get("summary") or structured_row["event_summary"]).strip()[:120]
                     llm_event_name = (llm_data.get("event_name") or structured_row["event_name"]).strip()[:80]
+                    llm_subject = anchored_subject_type(row, llm_subject)
+                    llm_industry = anchored_industry_type(row, llm_industry, structured_row["industry_type"])
                     structured_row.update({
                         "event_name": llm_event_name,
                         "event_subject_type": llm_subject,
@@ -846,17 +945,19 @@ async def classify_rows_async(
                         "sentiment": llm_sentiment,
                         "event_summary": llm_summary,
                         "classification_evidence": structured_row["classification_evidence"]
-                        + f"|llm=1|llm_backend=ollama|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
+                        + f"|llm=1|llm_backend=ollama|llm_trigger={','.join(llm_reasons)}|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
                     })
-                    return build_candidate_row(row, res), structured_row
+                    return candidate_row, structured_row
 
         # Fallback to rules-only
-        return build_candidate_row(row, res), (build_structured_row(row, res) if res.is_event else None)
+        return build_candidate_row(row, res), (structured_preview if res.is_event else None)
 
     tasks = []
     for row, res in zip(rows, candidate_results):
+        preview = build_structured_row(row, res)
+        trigger, _ = should_trigger_llm(row, res, preview)
         allow_llm = False
-        if res.is_event and llm_budget < llm_max_rows:
+        if trigger and llm_budget < llm_max_rows:
             allow_llm = True
             llm_budget += 1
         tasks.append(process_one(row, res, allow_llm))
