@@ -9,8 +9,13 @@ CREATE TABLE IF NOT EXISTS company_stats (
     turnover_rate NUMERIC(18,4),
     volume_ratio NUMERIC(18,4),
     daily_return NUMERIC(12,6),
+    trailing_return_5d NUMERIC(12,6),
     trailing_return_20d NUMERIC(12,6),
+    trailing_return_60d NUMERIC(12,6),
+    volatility_5d NUMERIC(12,6),
     volatility_20d NUMERIC(12,6),
+    volatility_60d NUMERIC(12,6),
+    up_days_20d INTEGER,
     forward_return_1d NUMERIC(12,6),
     forward_return_3d NUMERIC(12,6),
     forward_return_5d NUMERIC(12,6),
@@ -26,6 +31,12 @@ CREATE INDEX IF NOT EXISTS idx_company_stats_ts_code_trade_date
 CREATE INDEX IF NOT EXISTS idx_company_stats_trade_date
     ON company_stats (trade_date DESC);
 
+ALTER TABLE company_stats ADD COLUMN IF NOT EXISTS trailing_return_5d NUMERIC(12,6);
+ALTER TABLE company_stats ADD COLUMN IF NOT EXISTS trailing_return_60d NUMERIC(12,6);
+ALTER TABLE company_stats ADD COLUMN IF NOT EXISTS volatility_5d NUMERIC(12,6);
+ALTER TABLE company_stats ADD COLUMN IF NOT EXISTS volatility_60d NUMERIC(12,6);
+ALTER TABLE company_stats ADD COLUMN IF NOT EXISTS up_days_20d INTEGER;
+
 ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS company_stat_date DATE;
 ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS total_mv NUMERIC(18,4);
 ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS circ_mv NUMERIC(18,4);
@@ -33,8 +44,13 @@ ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS pe_ttm NUMERIC(18,4);
 ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS pb NUMERIC(18,4);
 ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS turnover_rate NUMERIC(18,4);
 ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS volume_ratio NUMERIC(18,4);
+ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS trailing_return_5d NUMERIC(12,6);
 ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS trailing_return_20d NUMERIC(12,6);
+ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS trailing_return_60d NUMERIC(12,6);
+ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS volatility_5d NUMERIC(12,6);
 ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS volatility_20d NUMERIC(12,6);
+ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS volatility_60d NUMERIC(12,6);
+ALTER TABLE model_event_samples ADD COLUMN IF NOT EXISTS up_days_20d INTEGER;
 
 CREATE TABLE IF NOT EXISTS model_non_event_samples (
     id BIGSERIAL PRIMARY KEY,
@@ -54,8 +70,13 @@ CREATE TABLE IF NOT EXISTS model_non_event_samples (
     pb NUMERIC(18,4),
     turnover_rate NUMERIC(18,4),
     volume_ratio NUMERIC(18,4),
+    trailing_return_5d NUMERIC(12,6),
     trailing_return_20d NUMERIC(12,6),
+    trailing_return_60d NUMERIC(12,6),
+    volatility_5d NUMERIC(12,6),
     volatility_20d NUMERIC(12,6),
+    volatility_60d NUMERIC(12,6),
+    up_days_20d INTEGER,
     label_ret_w1 NUMERIC(12,6),
     label_ret_w3 NUMERIC(12,6),
     label_ret_w5 NUMERIC(12,6),
@@ -72,3 +93,9 @@ CREATE INDEX IF NOT EXISTS idx_model_non_event_samples_sample_date
 
 CREATE INDEX IF NOT EXISTS idx_model_non_event_samples_ts_code
     ON model_non_event_samples (ts_code);
+
+ALTER TABLE model_non_event_samples ADD COLUMN IF NOT EXISTS trailing_return_5d NUMERIC(12,6);
+ALTER TABLE model_non_event_samples ADD COLUMN IF NOT EXISTS trailing_return_60d NUMERIC(12,6);
+ALTER TABLE model_non_event_samples ADD COLUMN IF NOT EXISTS volatility_5d NUMERIC(12,6);
+ALTER TABLE model_non_event_samples ADD COLUMN IF NOT EXISTS volatility_60d NUMERIC(12,6);
+ALTER TABLE model_non_event_samples ADD COLUMN IF NOT EXISTS up_days_20d INTEGER;

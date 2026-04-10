@@ -9,7 +9,6 @@ import json
 import math
 import os
 import statistics
-import subprocess
 import sys
 import time
 from collections import defaultdict
@@ -17,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import psycopg
 import requests
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +24,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.analysis.tushare_adapter import fetch_index_returns, fetch_stock_returns, load_tushare
+from capabilities.storage.db_guard import dsn_for
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -125,21 +126,36 @@ def close_series_to_returns(kline: List[Dict[str, str]]) -> Dict[str, float]:
     return result
 
 
-def run_psql_csv(db: str, sql: str) -> List[Dict[str, str]]:
-    cmd = [
-        "psql",
-        "-d",
-        db,
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-A",
-        "-F",
-        ",",
-        "-c",
-        f"\\copy ({sql}) TO STDOUT WITH CSV HEADER",
-    ]
-    proc = subprocess.run(cmd, check=True, cwd=str(ROOT), capture_output=True, text=True)
-    return list(csv.DictReader(proc.stdout.splitlines()))
+def run_query_rows(db: str, sql: str) -> List[Dict[str, str]]:
+    with psycopg.connect(dsn_for(db), row_factory=psycopg.rows.dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+    normalized: List[Dict[str, str]] = []
+    for row in rows:
+        normalized.append({str(k): ("" if v is None else str(v)) for k, v in row.items()})
+    return normalized
+
+
+def fetch_company_stats_returns(db: str, ts_code: str) -> Dict[str, float]:
+    sql = """
+        SELECT trade_date::text AS trade_date, daily_return
+        FROM company_stats
+        WHERE ts_code = %s
+          AND daily_return IS NOT NULL
+        ORDER BY trade_date
+    """
+    with psycopg.connect(dsn_for(db), row_factory=psycopg.rows.dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (ts_code,))
+            rows = cur.fetchall()
+    returns: Dict[str, float] = {}
+    for row in rows:
+        try:
+            returns[str(row["trade_date"])] = float(row["daily_return"])
+        except Exception:
+            continue
+    return returns
 
 
 def mean_and_t(values: List[float]) -> tuple[float, Optional[float]]:
@@ -348,7 +364,7 @@ def main() -> None:
     WHERE l.final_link_score >= {args.min_link_score}
     ORDER BY e.event_date DESC, l.final_link_score DESC
     """
-    rows = run_psql_csv(args.db, sql_links)
+    rows = run_query_rows(args.db, sql_links)
     link_source = "event_company_links"
     if not rows:
         sql_fallback = """
@@ -375,11 +391,8 @@ def main() -> None:
         WHERE d.symbol_or_subject ~ '^[0-9]{6}$'
         ORDER BY e.event_date DESC
         """
-        rows = run_psql_csv(args.db, sql_fallback)
+        rows = run_query_rows(args.db, sql_fallback)
         link_source = "raw_documents_symbol_or_subject"
-    if args.max_rows > 0:
-        rows = rows[: args.max_rows]
-
     token, token_source = resolve_tushare_token(args)
     ts_module = load_tushare() if token else None
     use_tushare = ts_module is not None
@@ -454,11 +467,15 @@ def main() -> None:
     started_at = time.time()
 
     total_rows = len(rows)
+    processed_rows = 0
     print(
         f"[feature] start rows={total_rows}, use_tushare={use_tushare}, "
         f"benchmark_source={benchmark_source}, token_source={token_source}"
     )
     for idx_row, row in enumerate(rows, start=1):
+        processed_rows = idx_row
+        if args.max_rows > 0 and len(dataset_rows) >= args.max_rows:
+            break
         if args.time_budget_sec > 0 and (time.time() - started_at) >= args.time_budget_sec:
             reason_counts["time_budget_exceeded"] += 1
             print(f"[feature] stop by time budget at row={idx_row}/{total_rows}")
@@ -477,28 +494,34 @@ def main() -> None:
             stock_cache_key = f"stock:{ts_code}"
             returns: Dict[str, float] = {}
             source_name = "none"
-            if not args.disable_cache:
+            try:
+                returns = fetch_company_stats_returns(args.db, ts_code)
+            except Exception as exc:
+                returns = {}
+                reason_counts[f"company_stats_error:{exc.__class__.__name__}"] += 1
+            if returns:
+                source_name = "company_stats"
+            elif not args.disable_cache:
                 returns, source_name = get_cached_series(cache_payload, stock_cache_key)
                 if returns:
                     source_name = f"cache:{source_name}"
-            if use_tushare:
-                if not returns:
-                    try:
-                        ret_obj = fetch_stock_returns(
-                            ts_module,
-                            token,
-                            ts_code,
-                            "20200101",
-                            datetime.now().strftime("%Y%m%d"),
-                            timeout_seconds=args.api_timeout_sec,
-                        )
-                        returns = ret_obj.returns
-                        source_name = ret_obj.source
-                        if returns and not args.disable_cache:
-                            put_cached_series(cache_payload, stock_cache_key, returns, source_name)
-                    except Exception as exc:
-                        returns = {}
-                        reason_counts[f"tushare_stock_error:{exc.__class__.__name__}"] += 1
+            if use_tushare and not returns:
+                try:
+                    ret_obj = fetch_stock_returns(
+                        ts_module,
+                        token,
+                        ts_code,
+                        "20200101",
+                        datetime.now().strftime("%Y%m%d"),
+                        timeout_seconds=args.api_timeout_sec,
+                    )
+                    returns = ret_obj.returns
+                    source_name = ret_obj.source
+                    if returns and not args.disable_cache:
+                        put_cached_series(cache_payload, stock_cache_key, returns, source_name)
+                except Exception as exc:
+                    returns = {}
+                    reason_counts[f"tushare_stock_error:{exc.__class__.__name__}"] += 1
             if not returns and ENABLE_EASTMONEY_FALLBACK:
                 eastmoney_secid = ts_to_eastmoney_secid(ts_code)
                 if eastmoney_secid:
@@ -568,9 +591,13 @@ def main() -> None:
 
         metrics: Dict[str, str] = {}
         valid_any = False
+        has_max_window = True
+        max_window = event_windows[-1] if event_windows else 0
         for w in event_windows:
             if event_idx + w >= len(common_dates):
                 metrics[f"car_w{w}"] = ""
+                if w == max_window:
+                    has_max_window = False
                 continue
             ar_values = []
             for idx in range(event_idx, event_idx + w + 1):
@@ -583,6 +610,9 @@ def main() -> None:
             valid_any = True
         if not valid_any:
             reason_counts["insufficient_event_window"] += 1
+            continue
+        if max_window and not has_max_window:
+            reason_counts["insufficient_max_event_window"] += 1
             continue
 
         dataset_rows.append(
@@ -646,7 +676,8 @@ def main() -> None:
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"- 分析模式：{args.analysis_mode}",
         f"- 事件-公司有效样本：{len(dataset_rows)}",
-        f"- 分析输入行数：{len(rows)}",
+        f"- 分析输入总行数：{len(rows)}",
+        f"- 实际扫描行数：{processed_rows}",
         f"- 链接来源：{link_source}",
         f"- 基准：{benchmark_key}（{benchmark_source}）",
         f"- token来源：{token_source}",

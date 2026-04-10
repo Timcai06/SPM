@@ -167,12 +167,19 @@ def build_rows(
             returns.append(daily_ret)
 
         for j, item in enumerate(parsed):
+            hist_returns_5 = [x for x in returns[max(0, j - 4) : j + 1] if x is not None]
             hist_returns = [x for x in returns[max(0, j - 19) : j + 1] if x is not None]
+            hist_returns_60 = [x for x in returns[max(0, j - 59) : j + 1] if x is not None]
             future_1 = compound([x for x in returns[j + 1 : j + 2] if x is not None])
             future_3 = compound([x for x in returns[j + 1 : j + 4] if x is not None])
             future_5 = compound([x for x in returns[j + 1 : j + 6] if x is not None])
+            trailing_5 = compound(hist_returns_5[-5:]) if hist_returns_5 else None
             trailing_20 = compound(hist_returns[-20:]) if hist_returns else None
+            trailing_60 = compound(hist_returns_60[-60:]) if hist_returns_60 else None
+            vol_5 = statistics.stdev(hist_returns_5[-5:]) if len(hist_returns_5[-5:]) >= 2 else None
             vol_20 = statistics.stdev(hist_returns[-20:]) if len(hist_returns[-20:]) >= 2 else None
+            vol_60 = statistics.stdev(hist_returns_60[-60:]) if len(hist_returns_60[-60:]) >= 2 else None
+            up_days_20 = len([x for x in hist_returns[-20:] if x is not None and x > 0]) if hist_returns else None
 
             volume_ratio = None
             cur_volume = item["volume"]
@@ -194,8 +201,13 @@ def build_rows(
                     "turnover_rate": "",
                     "volume_ratio": "" if volume_ratio is None else f"{volume_ratio:.6f}",
                     "daily_return": "" if daily_ret is None else f"{daily_ret:.6f}",
+                    "trailing_return_5d": "" if trailing_5 is None else f"{trailing_5:.6f}",
                     "trailing_return_20d": "" if trailing_20 is None else f"{trailing_20:.6f}",
+                    "trailing_return_60d": "" if trailing_60 is None else f"{trailing_60:.6f}",
+                    "volatility_5d": "" if vol_5 is None else f"{vol_5:.6f}",
                     "volatility_20d": "" if vol_20 is None else f"{vol_20:.6f}",
+                    "volatility_60d": "" if vol_60 is None else f"{vol_60:.6f}",
+                    "up_days_20d": "" if up_days_20 is None else str(up_days_20),
                     "forward_return_1d": "" if future_1 is None else f"{future_1:.6f}",
                     "forward_return_3d": "" if future_3 is None else f"{future_3:.6f}",
                     "forward_return_5d": "" if future_5 is None else f"{future_5:.6f}",
@@ -220,8 +232,13 @@ def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         "turnover_rate",
         "volume_ratio",
         "daily_return",
+        "trailing_return_5d",
         "trailing_return_20d",
+        "trailing_return_60d",
+        "volatility_5d",
         "volatility_20d",
+        "volatility_60d",
+        "up_days_20d",
         "forward_return_1d",
         "forward_return_3d",
         "forward_return_5d",

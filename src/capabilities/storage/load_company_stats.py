@@ -53,13 +53,15 @@ def main() -> None:
                     INSERT INTO company_stats (
                         ts_code, trade_date, total_mv, circ_mv, pe_ttm, pb,
                         turnover_rate, volume_ratio, daily_return,
-                        trailing_return_20d, volatility_20d,
+                        trailing_return_5d, trailing_return_20d, trailing_return_60d,
+                        volatility_5d, volatility_20d, volatility_60d, up_days_20d,
                         forward_return_1d, forward_return_3d, forward_return_5d, data_source
                     )
                     VALUES (
                         %s, %s, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
                         NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
-                        NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
+                        NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
+                        NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::int,
                         NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, %s
                     )
                     ON CONFLICT (ts_code, trade_date) DO UPDATE
@@ -71,8 +73,13 @@ def main() -> None:
                         turnover_rate = EXCLUDED.turnover_rate,
                         volume_ratio = EXCLUDED.volume_ratio,
                         daily_return = EXCLUDED.daily_return,
+                        trailing_return_5d = EXCLUDED.trailing_return_5d,
                         trailing_return_20d = EXCLUDED.trailing_return_20d,
+                        trailing_return_60d = EXCLUDED.trailing_return_60d,
+                        volatility_5d = EXCLUDED.volatility_5d,
                         volatility_20d = EXCLUDED.volatility_20d,
+                        volatility_60d = EXCLUDED.volatility_60d,
+                        up_days_20d = EXCLUDED.up_days_20d,
                         forward_return_1d = EXCLUDED.forward_return_1d,
                         forward_return_3d = EXCLUDED.forward_return_3d,
                         forward_return_5d = EXCLUDED.forward_return_5d,
@@ -89,8 +96,13 @@ def main() -> None:
                         row.get("turnover_rate", ""),
                         row.get("volume_ratio", ""),
                         row.get("daily_return", ""),
+                        row.get("trailing_return_5d", ""),
                         row.get("trailing_return_20d", ""),
+                        row.get("trailing_return_60d", ""),
+                        row.get("volatility_5d", ""),
                         row.get("volatility_20d", ""),
+                        row.get("volatility_60d", ""),
+                        row.get("up_days_20d", ""),
                         row.get("forward_return_1d", ""),
                         row.get("forward_return_3d", ""),
                         row.get("forward_return_5d", ""),

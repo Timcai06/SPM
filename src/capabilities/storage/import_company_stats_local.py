@@ -121,9 +121,16 @@ def main() -> None:
         for idx, row in enumerate(items):
             daily_return = computed_returns[idx]
 
+            hist_returns_5 = computed_returns[max(0, idx - 4) : idx + 1]
             hist_returns = computed_returns[max(0, idx - 19) : idx + 1]
+            hist_returns_60 = computed_returns[max(0, idx - 59) : idx + 1]
+            trailing_ret_5 = trailing_return(hist_returns_5)
             trailing_ret = trailing_return(hist_returns)
+            trailing_ret_60 = trailing_return(hist_returns_60)
+            vol_5 = volatility(hist_returns_5)
             vol_20 = volatility(hist_returns)
+            vol_60 = volatility(hist_returns_60)
+            up_days_20 = len([x for x in hist_returns if x is not None and x > 0]) if hist_returns else None
 
             forward_1 = trailing_return(computed_returns[idx + 1 : idx + 2])
             forward_3 = trailing_return(computed_returns[idx + 1 : idx + 4])
@@ -149,8 +156,13 @@ def main() -> None:
                     "turnover_rate": "" if row["turnover_rate"] is None else f"{row['turnover_rate']:.6f}",
                     "volume_ratio": "" if volume_ratio is None else f"{volume_ratio:.6f}",
                     "daily_return": "" if daily_return is None else f"{daily_return:.6f}",
+                    "trailing_return_5d": "" if trailing_ret_5 is None else f"{trailing_ret_5:.6f}",
                     "trailing_return_20d": "" if trailing_ret is None else f"{trailing_ret:.6f}",
+                    "trailing_return_60d": "" if trailing_ret_60 is None else f"{trailing_ret_60:.6f}",
+                    "volatility_5d": "" if vol_5 is None else f"{vol_5:.6f}",
                     "volatility_20d": "" if vol_20 is None else f"{vol_20:.6f}",
+                    "volatility_60d": "" if vol_60 is None else f"{vol_60:.6f}",
+                    "up_days_20d": "" if up_days_20 is None else str(up_days_20),
                     "forward_return_1d": "" if forward_1 is None else f"{forward_1:.6f}",
                     "forward_return_3d": "" if forward_3 is None else f"{forward_3:.6f}",
                     "forward_return_5d": "" if forward_5 is None else f"{forward_5:.6f}",
@@ -170,8 +182,13 @@ def main() -> None:
             "turnover_rate",
             "volume_ratio",
             "daily_return",
+            "trailing_return_5d",
             "trailing_return_20d",
+            "trailing_return_60d",
+            "volatility_5d",
             "volatility_20d",
+            "volatility_60d",
+            "up_days_20d",
             "forward_return_1d",
             "forward_return_3d",
             "forward_return_5d",

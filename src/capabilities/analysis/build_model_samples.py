@@ -133,8 +133,13 @@ def fetch_base_rows(conn: psycopg.Connection, min_link_score: float) -> list[dic
             cs.pb,
             cs.turnover_rate,
             cs.volume_ratio,
+            cs.trailing_return_5d,
             cs.trailing_return_20d,
-            cs.volatility_20d
+            cs.trailing_return_60d,
+            cs.volatility_5d,
+            cs.volatility_20d,
+            cs.volatility_60d,
+            cs.up_days_20d
         FROM structured_events se
         JOIN event_company_links l ON l.structured_event_id = se.id
         JOIN companies c ON c.id = l.company_id
@@ -189,7 +194,8 @@ def main() -> None:
                         sentiment, heat_score, intensity_score, impact_scope,
                         link_type, final_link_score, company_industry_l1, company_industry_l2, concept_tags,
                         company_stat_date, total_mv, circ_mv, pe_ttm, pb, turnover_rate, volume_ratio,
-                        trailing_return_20d, volatility_20d,
+                        trailing_return_5d, trailing_return_20d, trailing_return_60d,
+                        volatility_5d, volatility_20d, volatility_60d, up_days_20d,
                         label_car_w1, label_car_w3, label_car_w5, label_up_w1, label_up_w3, label_up_w5, label_source,
                         updated_at
                     )
@@ -200,7 +206,7 @@ def main() -> None:
                         %s, %s, %s, %s,
                         %s, %s, %s, %s, %s::jsonb,
                         %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s,
                         NOW()
                     )
@@ -231,8 +237,13 @@ def main() -> None:
                         pb = EXCLUDED.pb,
                         turnover_rate = EXCLUDED.turnover_rate,
                         volume_ratio = EXCLUDED.volume_ratio,
+                        trailing_return_5d = EXCLUDED.trailing_return_5d,
                         trailing_return_20d = EXCLUDED.trailing_return_20d,
+                        trailing_return_60d = EXCLUDED.trailing_return_60d,
+                        volatility_5d = EXCLUDED.volatility_5d,
                         volatility_20d = EXCLUDED.volatility_20d,
+                        volatility_60d = EXCLUDED.volatility_60d,
+                        up_days_20d = EXCLUDED.up_days_20d,
                         label_car_w1 = EXCLUDED.label_car_w1,
                         label_car_w3 = EXCLUDED.label_car_w3,
                         label_car_w5 = EXCLUDED.label_car_w5,
@@ -272,8 +283,13 @@ def main() -> None:
                         row.get("pb"),
                         row.get("turnover_rate"),
                         row.get("volume_ratio"),
+                        row.get("trailing_return_5d"),
                         row.get("trailing_return_20d"),
+                        row.get("trailing_return_60d"),
+                        row.get("volatility_5d"),
                         row.get("volatility_20d"),
+                        row.get("volatility_60d"),
+                        row.get("up_days_20d"),
                         car_w1,
                         car_w3,
                         car_w5,
