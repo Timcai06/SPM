@@ -140,7 +140,7 @@ def run_query_rows(db: str, sql: str) -> List[Dict[str, str]]:
 def fetch_company_stats_returns(db: str, ts_code: str) -> Dict[str, float]:
     sql = """
         SELECT trade_date::text AS trade_date, daily_return
-        FROM company_stats
+        FROM int_company_stats
         WHERE ts_code = %s
           AND daily_return IS NOT NULL
         ORDER BY trade_date
@@ -386,7 +386,7 @@ def main() -> None:
             END AS ts_code,
             1.0::text AS final_link_score
         FROM structured_events e
-        JOIN event_candidates c ON c.id = e.candidate_id
+        JOIN int_event_candidates c ON c.id = e.candidate_id
         JOIN raw_documents d ON d.id = c.raw_document_id
         WHERE d.symbol_or_subject ~ '^[0-9]{6}$'
         ORDER BY e.event_date DESC
@@ -498,9 +498,9 @@ def main() -> None:
                 returns = fetch_company_stats_returns(args.db, ts_code)
             except Exception as exc:
                 returns = {}
-                reason_counts[f"company_stats_error:{exc.__class__.__name__}"] += 1
+                reason_counts[f"int_company_stats_error:{exc.__class__.__name__}"] += 1
             if returns:
-                source_name = "company_stats"
+                source_name = "int_company_stats"
             elif not args.disable_cache:
                 returns, source_name = get_cached_series(cache_payload, stock_cache_key)
                 if returns:

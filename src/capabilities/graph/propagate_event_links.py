@@ -74,7 +74,7 @@ def main() -> None:
     canonical_map = load_canonical_map_from_csv(Path(args.canonical_map).resolve())
     with write_guard(
         db_name=args.db,
-        required_tables=["event_company_links", "company_relations", "event_propagation_links"],
+        required_tables=["event_company_links", "company_relations", "int_event_propagation_links"],
         lock_timeout_sec=args.lock_timeout_sec,
     ):
         with psycopg.connect(dsn_for(args.db), row_factory=psycopg.rows.dict_row) as conn:
@@ -142,7 +142,7 @@ def main() -> None:
                             sid = int(structured_event_id)
                             cur.execute(
                                 """
-                                INSERT INTO event_propagation_links (
+                                INSERT INTO int_event_propagation_links (
                                     structured_event_id, source_company_id, target_company_id, relation_id,
                                     hop_count, propagation_type, source_link_score, relation_strength,
                                     propagation_score, propagation_path, evidence
@@ -216,7 +216,7 @@ def main() -> None:
                         )
                     cur.execute(
                         """
-                        DELETE FROM event_propagation_links p
+                        DELETE FROM int_event_propagation_links p
                         WHERE p.structured_event_id = ANY(%s)
                           AND NOT EXISTS (
                               SELECT 1

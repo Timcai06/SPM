@@ -25,7 +25,7 @@ DEFAULT_DB = "stock_event_mining"
 
 
 CREATE_SQL = """
-CREATE TABLE IF NOT EXISTS canonical_events (
+CREATE TABLE IF NOT EXISTS int_canonical_events (
     id BIGSERIAL PRIMARY KEY,
     canonical_event_id TEXT NOT NULL UNIQUE,
     canonical_event_name TEXT NOT NULL,
@@ -46,24 +46,24 @@ CREATE TABLE IF NOT EXISTS canonical_events (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_canonical_events_date_start
-    ON canonical_events (date_start DESC);
+CREATE INDEX IF NOT EXISTS idx_int_canonical_events_date_start
+    ON int_canonical_events (date_start DESC);
 
-CREATE INDEX IF NOT EXISTS idx_canonical_events_subject_type
-    ON canonical_events (event_subject_type);
+CREATE INDEX IF NOT EXISTS idx_int_canonical_events_subject_type
+    ON int_canonical_events (event_subject_type);
 
-CREATE TABLE IF NOT EXISTS event_canonical_links (
+CREATE TABLE IF NOT EXISTS int_event_canonical_links (
     id BIGSERIAL PRIMARY KEY,
     structured_event_id BIGINT NOT NULL UNIQUE REFERENCES structured_events(id) ON DELETE CASCADE,
-    canonical_event_id TEXT NOT NULL REFERENCES canonical_events(canonical_event_id) ON DELETE CASCADE,
+    canonical_event_id TEXT NOT NULL REFERENCES int_canonical_events(canonical_event_id) ON DELETE CASCADE,
     is_representative BOOLEAN NOT NULL DEFAULT FALSE,
     cluster_size INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_event_canonical_links_canonical_event
-    ON event_canonical_links (canonical_event_id);
+CREATE INDEX IF NOT EXISTS idx_int_event_canonical_links_canonical_event
+    ON int_event_canonical_links (canonical_event_id);
 """
 
 
@@ -109,7 +109,7 @@ def to_json(value: str, default: str) -> str:
 
 def load_canonical_events(cur: psycopg.Cursor, rows: list[dict[str, str]]) -> int:
     sql = """
-    INSERT INTO canonical_events (
+    INSERT INTO int_canonical_events (
         canonical_event_id, canonical_event_name, cluster_size, date_start, date_end,
         event_subject_type, industry_type, impact_scope, representative_event_id,
         representative_source, max_heat_score, max_intensity_score,
@@ -167,9 +167,9 @@ def load_event_links(cur: psycopg.Cursor, rows: list[dict[str, str]]) -> int:
     cur.execute("SELECT id, event_id FROM structured_events")
     event_id_to_structured = {row[1]: row[0] for row in cur.fetchall()}
 
-    cur.execute("DELETE FROM event_canonical_links")
+    cur.execute("DELETE FROM int_event_canonical_links")
     sql = """
-    INSERT INTO event_canonical_links (
+    INSERT INTO int_event_canonical_links (
         structured_event_id, canonical_event_id, is_representative, cluster_size
     )
     VALUES (%(structured_event_id)s, %(canonical_event_id)s, %(is_representative)s, %(cluster_size)s)
@@ -208,7 +208,7 @@ def run_loading_pipeline(db: str, canonical_event_rows: list[dict[str, str]] = N
 
     with write_guard(
         db_name=db,
-        required_tables=["structured_events", "canonical_events", "event_canonical_links"],
+        required_tables=["structured_events", "int_canonical_events", "int_event_canonical_links"],
         lock_timeout_sec=lock_timeout_sec,
     ) as conn:
         with conn.cursor() as cur:
@@ -217,8 +217,8 @@ def run_loading_pipeline(db: str, canonical_event_rows: list[dict[str, str]] = N
         conn.commit()
 
     if not quiet:
-        print(f"Upserted {upserted} canonical events into {db}")
-        print(f"Loaded {linked} event-canonical links into {db}")
+        print(f"Upserted {upserted} int_canonical_events into {db}")
+        print(f"Loaded {linked} int_event_canonical_links into {db}")
 
 
 def main() -> None:

@@ -84,7 +84,7 @@ def main() -> None:
                         cs.forward_return_3d,
                         cs.forward_return_5d,
                         ROW_NUMBER() OVER (PARTITION BY cs.trade_date ORDER BY cs.turnover_rate DESC NULLS LAST, c.id) AS rn
-                    FROM company_stats cs
+                    FROM int_company_stats cs
                     JOIN companies c ON c.ts_code = cs.ts_code
                     WHERE NOT EXISTS (
                         SELECT 1
@@ -136,7 +136,7 @@ def main() -> None:
                 sample_key = f"{trade_date}:{company_id}"
                 cur.execute(
                     """
-                    INSERT INTO model_non_event_samples (
+                    INSERT INTO int_model_non_event_samples (
                         sample_key, sample_run_id, sample_date, company_id, ts_code, company_name,
                         company_industry_l1, company_industry_l2, concept_tags, company_stat_date,
                         total_mv, circ_mv, pe_ttm, pb, turnover_rate, volume_ratio,
@@ -151,7 +151,7 @@ def main() -> None:
                         %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s,
-                        %s, %s, %s, 'company_stats', NOW()
+                        %s, %s, %s, 'int_company_stats', NOW()
                     )
                     ON CONFLICT (sample_key) DO UPDATE
                     SET
@@ -217,7 +217,7 @@ def main() -> None:
                 )
                 upserted += 1
         conn.commit()
-    print(f"Built model_non_event_samples for db={args.db}: upserted={upserted}, run_id={run_id}")
+    print(f"Built int_model_non_event_samples for db={args.db}: upserted={upserted}, run_id={run_id}")
 
 
 if __name__ == "__main__":

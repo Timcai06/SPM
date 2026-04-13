@@ -43,7 +43,7 @@ def load_canonical_map_from_db(cur) -> dict[str, dict]:
         SELECT se.event_id,
                l.canonical_event_id,
                l.is_representative
-        FROM event_canonical_links l
+        FROM int_event_canonical_links l
         JOIN structured_events se ON se.id = l.structured_event_id
         """
     )

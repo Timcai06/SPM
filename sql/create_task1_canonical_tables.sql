@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS canonical_events (
+CREATE TABLE IF NOT EXISTS int_canonical_events (
     id BIGSERIAL PRIMARY KEY,
     canonical_event_id TEXT NOT NULL UNIQUE,
     canonical_event_name TEXT NOT NULL,
@@ -19,21 +19,21 @@ CREATE TABLE IF NOT EXISTS canonical_events (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_canonical_events_date_start
-    ON canonical_events (date_start DESC);
+CREATE INDEX IF NOT EXISTS idx_int_canonical_events_date_start
+    ON int_canonical_events (date_start DESC);
 
-CREATE INDEX IF NOT EXISTS idx_canonical_events_subject_type
-    ON canonical_events (event_subject_type);
+CREATE INDEX IF NOT EXISTS idx_int_canonical_events_subject_type
+    ON int_canonical_events (event_subject_type);
 
-CREATE TABLE IF NOT EXISTS event_canonical_links (
+CREATE TABLE IF NOT EXISTS int_event_canonical_links (
     id BIGSERIAL PRIMARY KEY,
     structured_event_id BIGINT NOT NULL UNIQUE REFERENCES structured_events(id) ON DELETE CASCADE,
-    canonical_event_id TEXT NOT NULL REFERENCES canonical_events(canonical_event_id) ON DELETE CASCADE,
+    canonical_event_id TEXT NOT NULL REFERENCES int_canonical_events(canonical_event_id) ON DELETE CASCADE,
     is_representative BOOLEAN NOT NULL DEFAULT FALSE,
     cluster_size INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_event_canonical_links_canonical_event
-    ON event_canonical_links (canonical_event_id);
+CREATE INDEX IF NOT EXISTS idx_int_event_canonical_links_canonical_event
+    ON int_event_canonical_links (canonical_event_id);

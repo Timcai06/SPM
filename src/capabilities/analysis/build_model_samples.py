@@ -110,16 +110,35 @@ def fetch_base_rows(conn: psycopg.Connection, min_link_score: float) -> list[dic
             se.event_id,
             se.event_date,
             se.event_subject_type,
+            se.event_subject_subtype,
+            se.source_type,
+            se.source_credibility_score,
             se.duration_type,
             se.predictability_type,
             se.industry_type AS event_industry_type,
             se.sentiment,
+            se.event_stage,
+            se.shock_source_type,
+            se.trigger_word_score,
+            se.explicitness_score,
+            se.uncertainty_score,
+            se.novelty_score,
+            se.event_code,
             se.heat_score,
             se.intensity_score,
             se.impact_scope,
+            CASE se.impact_scope
+                WHEN '个股链条' THEN 1
+                WHEN '行业' THEN 3
+                WHEN '全市场' THEN 4
+                ELSE 2
+            END AS impact_level_score,
             l.company_id,
             l.link_type,
             l.final_link_score,
+            COALESCE(ls.affected_company_count, 0) AS affected_company_count,
+            COALESCE(ls.affected_industry_count, 0) AS affected_industry_count,
+            ROW_NUMBER() OVER (PARTITION BY se.id ORDER BY l.final_link_score DESC, c.ts_code) AS relation_rank_in_event,
             c.ts_code,
             c.company_name,
             c.industry_l1 AS company_industry_l1,
@@ -143,10 +162,19 @@ def fetch_base_rows(conn: psycopg.Connection, min_link_score: float) -> list[dic
         FROM structured_events se
         JOIN event_company_links l ON l.structured_event_id = se.id
         JOIN companies c ON c.id = l.company_id
-        LEFT JOIN event_canonical_links cl ON cl.structured_event_id = se.id
+        LEFT JOIN (
+            SELECT
+                ecl.structured_event_id,
+                COUNT(*) AS affected_company_count,
+                COUNT(DISTINCT NULLIF(comp.industry_l1, '')) AS affected_industry_count
+            FROM event_company_links ecl
+            JOIN companies comp ON comp.id = ecl.company_id
+            GROUP BY ecl.structured_event_id
+        ) ls ON ls.structured_event_id = se.id
+        LEFT JOIN int_event_canonical_links cl ON cl.structured_event_id = se.id
         LEFT JOIN LATERAL (
             SELECT *
-            FROM company_stats cs
+            FROM int_company_stats cs
             WHERE cs.ts_code = c.ts_code
               AND cs.trade_date <= se.event_date
             ORDER BY cs.trade_date DESC
@@ -190,8 +218,11 @@ def main() -> None:
                     INSERT INTO model_event_samples (
                         sample_key, sample_run_id, structured_event_id, company_id, canonical_event_id,
                         event_id, event_date, ts_code, company_name,
-                        event_subject_type, duration_type, predictability_type, event_industry_type,
-                        sentiment, heat_score, intensity_score, impact_scope,
+                        event_subject_type, event_subject_subtype, source_type, source_credibility_score,
+                        duration_type, predictability_type, event_industry_type,
+                        sentiment, event_stage, shock_source_type, trigger_word_score, explicitness_score,
+                        uncertainty_score, novelty_score, event_code, heat_score, intensity_score, impact_scope,
+                        impact_level_score, affected_company_count, affected_industry_count, relation_rank_in_event,
                         link_type, final_link_score, company_industry_l1, company_industry_l2, concept_tags,
                         company_stat_date, total_mv, circ_mv, pe_ttm, pb, turnover_rate, volume_ratio,
                         trailing_return_5d, trailing_return_20d, trailing_return_60d,
@@ -203,6 +234,8 @@ def main() -> None:
                         %s, %s, %s, %s, %s,
                         %s, %s, %s, %s,
                         %s, %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s,
                         %s, %s, %s, %s, %s::jsonb,
                         %s, %s, %s, %s, %s, %s, %s,
@@ -218,13 +251,27 @@ def main() -> None:
                         ts_code = EXCLUDED.ts_code,
                         company_name = EXCLUDED.company_name,
                         event_subject_type = EXCLUDED.event_subject_type,
+                        event_subject_subtype = EXCLUDED.event_subject_subtype,
+                        source_type = EXCLUDED.source_type,
+                        source_credibility_score = EXCLUDED.source_credibility_score,
                         duration_type = EXCLUDED.duration_type,
                         predictability_type = EXCLUDED.predictability_type,
                         event_industry_type = EXCLUDED.event_industry_type,
                         sentiment = EXCLUDED.sentiment,
+                        event_stage = EXCLUDED.event_stage,
+                        shock_source_type = EXCLUDED.shock_source_type,
+                        trigger_word_score = EXCLUDED.trigger_word_score,
+                        explicitness_score = EXCLUDED.explicitness_score,
+                        uncertainty_score = EXCLUDED.uncertainty_score,
+                        novelty_score = EXCLUDED.novelty_score,
+                        event_code = EXCLUDED.event_code,
                         heat_score = EXCLUDED.heat_score,
                         intensity_score = EXCLUDED.intensity_score,
                         impact_scope = EXCLUDED.impact_scope,
+                        impact_level_score = EXCLUDED.impact_level_score,
+                        affected_company_count = EXCLUDED.affected_company_count,
+                        affected_industry_count = EXCLUDED.affected_industry_count,
+                        relation_rank_in_event = EXCLUDED.relation_rank_in_event,
                         link_type = EXCLUDED.link_type,
                         final_link_score = EXCLUDED.final_link_score,
                         company_industry_l1 = EXCLUDED.company_industry_l1,
@@ -264,13 +311,27 @@ def main() -> None:
                         ts_code,
                         row["company_name"],
                         row["event_subject_type"],
+                        row.get("event_subject_subtype"),
+                        row.get("source_type"),
+                        row.get("source_credibility_score"),
                         row["duration_type"],
                         row["predictability_type"],
                         row["event_industry_type"],
                         row["sentiment"],
+                        row.get("event_stage"),
+                        row.get("shock_source_type"),
+                        row.get("trigger_word_score"),
+                        row.get("explicitness_score"),
+                        row.get("uncertainty_score"),
+                        row.get("novelty_score"),
+                        row.get("event_code"),
                         int(row["heat_score"]),
                         int(row["intensity_score"]),
                         row["impact_scope"],
+                        row.get("impact_level_score"),
+                        row.get("affected_company_count"),
+                        row.get("affected_industry_count"),
+                        row.get("relation_rank_in_event"),
                         row["link_type"],
                         row["final_link_score"],
                         row.get("company_industry_l1"),

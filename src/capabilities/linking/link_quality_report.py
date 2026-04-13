@@ -71,7 +71,7 @@ def main() -> None:
                        l.final_link_score
                 from event_company_links l
                 join structured_events e on e.id=l.structured_event_id
-                join event_candidates ec on ec.id=e.candidate_id
+                join int_event_candidates ec on ec.id=e.candidate_id
                 join raw_documents rd on rd.id=ec.raw_document_id
                 join companies c on c.id=l.company_id
                 where rd.symbol_or_subject in ('政策/宏观','政策/通知','行业/市场新闻','行业/股市快讯')

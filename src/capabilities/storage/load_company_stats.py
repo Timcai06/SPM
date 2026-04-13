@@ -50,7 +50,7 @@ def main() -> None:
             for row in rows:
                 cur.execute(
                     """
-                    INSERT INTO company_stats (
+                    INSERT INTO int_company_stats (
                         ts_code, trade_date, total_mv, circ_mv, pe_ttm, pb,
                         turnover_rate, volume_ratio, daily_return,
                         trailing_return_5d, trailing_return_20d, trailing_return_60d,

@@ -286,7 +286,7 @@ def run_canonicalization_pipeline(db: str = None, input_rows: List[Dict[str, str
         from capabilities.storage.db_guard import dsn_for
         with psycopg.connect(dsn_for(db)) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT * FROM structured_events_stage")
+                cur.execute("SELECT * FROM int_structured_events_stage")
                 columns = [desc[0] for desc in cur.description]
                 rows = [dict(zip(columns, row)) for row in cur.fetchall()]
     else:
@@ -302,7 +302,7 @@ def run_canonicalization_pipeline(db: str = None, input_rows: List[Dict[str, str
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build canonical event clusters from structured events.")
-    parser.add_argument("--db", help="Database name to read structured_events_stage from.")
+    parser.add_argument("--db", help="Database name to read int_structured_events_stage from.")
     parser.add_argument("--input", default=str(INPUT_PATH), help="Structured events CSV path (if not using --db).")
     parser.add_argument("--canonical_output", default=str(CANONICAL_EVENTS_PATH), help="Canonical events CSV output path.")
     parser.add_argument("--mapping_output", default=str(CANONICAL_MAP_PATH), help="Event to canonical mapping CSV output path.")

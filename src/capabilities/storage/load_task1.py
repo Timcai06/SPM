@@ -40,6 +40,8 @@ RAW_SOURCE_FILES = [
 ]
 RAW_CANDIDATES_PATH = ROOT / "output" / "raw_event_candidates.csv"
 STRUCTURED_EVENTS_PATH = ROOT / "output" / "structured_events.csv"
+TASK1_DB_SQL_PATH = ROOT / "sql" / "create_task1_db.sql"
+TASK1_STAGE_SQL_PATH = ROOT / "sql" / "create_task1_stage_tables.sql"
 RAW_DOCUMENT_FIELDS = ["source", "source_type", "title", "content", "publish_time", "url", "symbol_or_subject", "content_hash"]
 CANDIDATE_STAGE_FIELDS = ["raw_document_url", "dedup_key", "duplicate_group_size", "is_event", "filter_reason", "evidence", "score_hint"]
 STRUCTURED_STAGE_FIELDS = [
@@ -48,11 +50,21 @@ STRUCTURED_STAGE_FIELDS = [
     "event_name",
     "event_date",
     "source",
+    "source_type",
+    "source_credibility_score",
     "event_subject_type",
+    "event_subject_subtype",
     "duration_type",
     "predictability_type",
     "industry_type",
     "sentiment",
+    "event_stage",
+    "shock_source_type",
+    "trigger_word_score",
+    "explicitness_score",
+    "uncertainty_score",
+    "novelty_score",
+    "event_code",
     "heat_score",
     "intensity_score",
     "impact_scope",
@@ -139,6 +151,11 @@ def run_psql(db: str, sql: str) -> None:
         check=True,
         cwd=str(ROOT),
     )
+
+
+def ensure_task1_schema(db: str) -> None:
+    sql = TASK1_DB_SQL_PATH.read_text(encoding="utf-8") + "\n" + TASK1_STAGE_SQL_PATH.read_text(encoding="utf-8")
+    run_psql(db, sql)
 
 
 def copy_csv_to_table(db: str, rows: list[dict[str, str]], fieldnames: list[str], table_name: str, truncate: bool = True) -> None:
@@ -236,11 +253,21 @@ def build_structured_stage_rows(structured_events: list[dict[str, str]]) -> list
                 "event_name": row["event_name"],
                 "event_date": row["event_date"],
                 "source": row["source"],
+                "source_type": row.get("source_type", "其他来源"),
+                "source_credibility_score": row.get("source_credibility_score", "1"),
                 "event_subject_type": row["event_subject_type"],
+                "event_subject_subtype": row.get("event_subject_subtype", "未细分"),
                 "duration_type": row["duration_type"],
                 "predictability_type": row["predictability_type"],
                 "industry_type": row["industry_type"],
                 "sentiment": row["sentiment"],
+                "event_stage": row.get("event_stage", "确认"),
+                "shock_source_type": row.get("shock_source_type", "其他"),
+                "trigger_word_score": row.get("trigger_word_score", "0"),
+                "explicitness_score": row.get("explicitness_score", "0"),
+                "uncertainty_score": row.get("uncertainty_score", "0"),
+                "novelty_score": row.get("novelty_score", "50"),
+                "event_code": row.get("event_code", ""),
                 "heat_score": row["heat_score"],
                 "intensity_score": row["intensity_score"],
                 "impact_scope": row["impact_scope"],
@@ -253,19 +280,20 @@ def build_structured_stage_rows(structured_events: list[dict[str, str]]) -> list
 
 
 def load_stage_tables(db: str, raw_documents: list[dict[str, str]], raw_candidates: list[dict[str, str]], structured_events: list[dict[str, str]]) -> None:
+    ensure_task1_schema(db)
     upsert_raw_documents(db, raw_documents)
     copy_csv_to_table(
         db,
         build_candidate_stage_rows(raw_candidates, raw_documents),
         CANDIDATE_STAGE_FIELDS,
-        "event_candidates_stage",
+        "int_event_candidates_stage",
         truncate=True,
     )
     copy_csv_to_table(
         db,
         build_structured_stage_rows(structured_events),
         STRUCTURED_STAGE_FIELDS,
-        "structured_events_stage",
+        "int_structured_events_stage",
         truncate=True,
     )
 
@@ -274,7 +302,7 @@ def insert_final_tables(db: str) -> None:
     run_psql(
         db,
         """
-        INSERT INTO event_candidates (raw_document_id, dedup_key, duplicate_group_size, is_event, filter_reason, evidence, score_hint)
+        INSERT INTO int_event_candidates (raw_document_id, dedup_key, duplicate_group_size, is_event, filter_reason, evidence, score_hint)
         SELECT d.id,
                s.dedup_key,
                s.duplicate_group_size::integer,
@@ -282,7 +310,7 @@ def insert_final_tables(db: str) -> None:
                s.filter_reason,
                s.evidence,
                NULLIF(s.score_hint, '')::integer
-        FROM event_candidates_stage s
+        FROM int_event_candidates_stage s
         JOIN raw_documents d ON d.url = s.raw_document_url
         ORDER BY d.id
         ON CONFLICT (raw_document_id) DO UPDATE
@@ -299,8 +327,10 @@ def insert_final_tables(db: str) -> None:
         """
         INSERT INTO structured_events (
             event_id, candidate_id, event_name, event_date, source,
-            event_subject_type, duration_type, predictability_type,
-            industry_type, sentiment, heat_score, intensity_score,
+            source_type, source_credibility_score, event_subject_type, event_subject_subtype,
+            duration_type, predictability_type, industry_type, sentiment,
+            event_stage, shock_source_type, trigger_word_score, explicitness_score,
+            uncertainty_score, novelty_score, event_code, heat_score, intensity_score,
             impact_scope, event_summary, subject_entities, raw_text_ref,
             classification_evidence
         )
@@ -309,11 +339,21 @@ def insert_final_tables(db: str) -> None:
                s.event_name,
                s.event_date::date,
                s.source,
+               COALESCE(NULLIF(s.source_type, ''), '其他来源'),
+               COALESCE(NULLIF(s.source_credibility_score, '')::numeric, 1),
                s.event_subject_type,
+               COALESCE(NULLIF(s.event_subject_subtype, ''), '未细分'),
                s.duration_type,
                s.predictability_type,
                s.industry_type,
                s.sentiment,
+               COALESCE(NULLIF(s.event_stage, ''), '确认'),
+               COALESCE(NULLIF(s.shock_source_type, ''), '其他'),
+               COALESCE(NULLIF(s.trigger_word_score, '')::integer, 0),
+               COALESCE(NULLIF(s.explicitness_score, '')::integer, 0),
+               COALESCE(NULLIF(s.uncertainty_score, '')::integer, 0),
+               COALESCE(NULLIF(s.novelty_score, '')::integer, 50),
+               COALESCE(s.event_code, ''),
                s.heat_score::integer,
                s.intensity_score::integer,
                s.impact_scope,
@@ -321,20 +361,30 @@ def insert_final_tables(db: str) -> None:
                s.subject_entities::jsonb,
                s.raw_text_ref,
                s.classification_evidence
-        FROM structured_events_stage s
+        FROM int_structured_events_stage s
         JOIN raw_documents d ON d.url = s.raw_text_ref
-        JOIN event_candidates c ON c.raw_document_id = d.id
+        JOIN int_event_candidates c ON c.raw_document_id = d.id
         ORDER BY c.id
         ON CONFLICT (candidate_id) DO UPDATE
         SET event_id = EXCLUDED.event_id,
             event_name = EXCLUDED.event_name,
             event_date = EXCLUDED.event_date,
             source = EXCLUDED.source,
+            source_type = EXCLUDED.source_type,
+            source_credibility_score = EXCLUDED.source_credibility_score,
             event_subject_type = EXCLUDED.event_subject_type,
+            event_subject_subtype = EXCLUDED.event_subject_subtype,
             duration_type = EXCLUDED.duration_type,
             predictability_type = EXCLUDED.predictability_type,
             industry_type = EXCLUDED.industry_type,
             sentiment = EXCLUDED.sentiment,
+            event_stage = EXCLUDED.event_stage,
+            shock_source_type = EXCLUDED.shock_source_type,
+            trigger_word_score = EXCLUDED.trigger_word_score,
+            explicitness_score = EXCLUDED.explicitness_score,
+            uncertainty_score = EXCLUDED.uncertainty_score,
+            novelty_score = EXCLUDED.novelty_score,
+            event_code = EXCLUDED.event_code,
             heat_score = EXCLUDED.heat_score,
             intensity_score = EXCLUDED.intensity_score,
             impact_scope = EXCLUDED.impact_scope,
@@ -348,13 +398,13 @@ def insert_final_tables(db: str) -> None:
         db,
         """
         DELETE FROM structured_events se
-        USING event_candidates ec
+        USING int_event_candidates ec
         WHERE se.candidate_id = ec.id
           AND ec.id IN (
               SELECT c.id
-              FROM event_candidates_stage s
+              FROM int_event_candidates_stage s
               JOIN raw_documents d ON d.url = s.raw_document_url
-              JOIN event_candidates c ON c.raw_document_id = d.id
+              JOIN int_event_candidates c ON c.raw_document_id = d.id
           )
           AND ec.is_event = false;
         """,
@@ -369,10 +419,10 @@ def main() -> None:
         db_name=db,
         required_tables=[
             "raw_documents",
-            "event_candidates",
+            "int_event_candidates",
             "structured_events",
-            "event_candidates_stage",
-            "structured_events_stage",
+            "int_event_candidates_stage",
+            "int_structured_events_stage",
         ],
         lock_timeout_sec=args.lock_timeout_sec,
     ):

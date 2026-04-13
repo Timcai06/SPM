@@ -27,7 +27,7 @@ CREATE INDEX IF NOT EXISTS idx_raw_documents_title_trgm
     ON raw_documents
     USING gin (title gin_trgm_ops);
 
-CREATE TABLE IF NOT EXISTS event_candidates (
+CREATE TABLE IF NOT EXISTS int_event_candidates (
     id BIGSERIAL PRIMARY KEY,
     raw_document_id BIGINT NOT NULL REFERENCES raw_documents(id) ON DELETE CASCADE,
     dedup_key TEXT NOT NULL,
@@ -40,24 +40,34 @@ CREATE TABLE IF NOT EXISTS event_candidates (
     UNIQUE (raw_document_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_event_candidates_is_event
-    ON event_candidates (is_event);
+CREATE INDEX IF NOT EXISTS idx_int_event_candidates_is_event
+    ON int_event_candidates (is_event);
 
-CREATE INDEX IF NOT EXISTS idx_event_candidates_dedup_key
-    ON event_candidates (dedup_key);
+CREATE INDEX IF NOT EXISTS idx_int_event_candidates_dedup_key
+    ON int_event_candidates (dedup_key);
 
 CREATE TABLE IF NOT EXISTS structured_events (
     id BIGSERIAL PRIMARY KEY,
     event_id TEXT NOT NULL UNIQUE,
-    candidate_id BIGINT NOT NULL REFERENCES event_candidates(id) ON DELETE CASCADE,
+    candidate_id BIGINT NOT NULL REFERENCES int_event_candidates(id) ON DELETE CASCADE,
     event_name TEXT NOT NULL,
     event_date DATE NOT NULL,
     source TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT '其他来源',
+    source_credibility_score NUMERIC(4,2) NOT NULL DEFAULT 1,
     event_subject_type TEXT NOT NULL,
+    event_subject_subtype TEXT NOT NULL DEFAULT '未细分',
     duration_type TEXT NOT NULL,
     predictability_type TEXT NOT NULL,
     industry_type TEXT NOT NULL,
     sentiment TEXT NOT NULL,
+    event_stage TEXT NOT NULL DEFAULT '确认',
+    shock_source_type TEXT NOT NULL DEFAULT '其他',
+    trigger_word_score INTEGER NOT NULL DEFAULT 0,
+    explicitness_score INTEGER NOT NULL DEFAULT 0,
+    uncertainty_score INTEGER NOT NULL DEFAULT 0,
+    novelty_score INTEGER NOT NULL DEFAULT 50,
+    event_code TEXT NOT NULL DEFAULT '',
     heat_score INTEGER NOT NULL,
     intensity_score INTEGER NOT NULL,
     impact_scope TEXT NOT NULL,
@@ -80,6 +90,17 @@ CREATE INDEX IF NOT EXISTS idx_structured_events_industry_type
 
 CREATE INDEX IF NOT EXISTS idx_structured_events_sentiment
     ON structured_events (sentiment);
+
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS source_type TEXT NOT NULL DEFAULT '其他来源';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS source_credibility_score NUMERIC(4,2) NOT NULL DEFAULT 1;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS event_subject_subtype TEXT NOT NULL DEFAULT '未细分';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS event_stage TEXT NOT NULL DEFAULT '确认';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS shock_source_type TEXT NOT NULL DEFAULT '其他';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS trigger_word_score INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS explicitness_score INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS uncertainty_score INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS novelty_score INTEGER NOT NULL DEFAULT 50;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS event_code TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS label_dictionary (
     id BIGSERIAL PRIMARY KEY,

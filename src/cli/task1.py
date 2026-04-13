@@ -137,13 +137,13 @@ def parse_args() -> argparse.Namespace:
 def print_db_status(db_name: str) -> None:
     table_names = [
         "raw_documents",
-        "event_candidates",
+        "int_event_candidates",
         "structured_events",
-        "canonical_events",
-        "event_canonical_links",
-        "company_stats",
+        "int_canonical_events",
+        "int_event_canonical_links",
+        "int_company_stats",
         "model_event_samples",
-        "model_non_event_samples",
+        "int_model_non_event_samples",
     ]
     print(f"Database status for: {db_name}")
     with psycopg.connect(dsn_for(db_name)) as conn:
@@ -207,10 +207,10 @@ def print_qa_summary(db_name: str, snapshot_path: Path, collector_report: Path, 
         "raw_documents",
         "structured_events",
         "event_company_links",
-        "event_propagation_links",
+        "int_event_propagation_links",
         "model_event_samples",
-        "model_non_event_samples",
-        "company_stats",
+        "int_model_non_event_samples",
+        "int_company_stats",
     ]
     counts: dict[str, int] = {}
     labeled = 0

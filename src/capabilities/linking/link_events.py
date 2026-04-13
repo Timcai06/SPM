@@ -244,7 +244,7 @@ def main() -> None:
                            rd.symbol_or_subject AS raw_symbol
                     FROM structured_events
                     se
-                    JOIN event_candidates ec ON ec.id = se.candidate_id
+                    JOIN int_event_candidates ec ON ec.id = se.candidate_id
                     JOIN raw_documents rd ON rd.id = ec.raw_document_id
                     ORDER BY se.id
                     """
