@@ -11,3 +11,6 @@ output/*.csv
 output/*.json
 output/sources/
 data/local/
+
+# Conda environment
+env/

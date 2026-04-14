@@ -22,7 +22,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
@@ -110,11 +110,21 @@ STRUCTURED_EVENT_FIELDS = [
     "event_name",
     "event_date",
     "source",
+    "source_type",
+    "source_credibility_score",
     "event_subject_type",
+    "event_subject_subtype",
     "duration_type",
     "predictability_type",
     "industry_type",
     "sentiment",
+    "event_stage",
+    "shock_source_type",
+    "trigger_word_score",
+    "explicitness_score",
+    "uncertainty_score",
+    "novelty_score",
+    "event_code",
     "heat_score",
     "intensity_score",
     "impact_scope",
@@ -155,6 +165,47 @@ INDUSTRY_ANCHOR_RULES = {
     "消费": ("轻工业", "零售", "餐饮", "文旅", "旅游", "消费"),
     "科技": ("无线电", "卫星", "通信", "物联网", "人工智能", "具身智能"),
 }
+SOURCE_TYPE_RULES = (
+    ("官方文件", ("中国政府网", "国务院", "国家发展改革委", "发改委", "工信部", "商务部", "财政部", "央行")),
+    ("监管/交易所", ("中国证监会", "证监会", "上交所", "深交所", "北交所")),
+    ("公司公告", ("巨潮资讯网", "公司公告", "公告")),
+    ("主流财经媒体", ("财新", "第一财经", "东方财富", "36氪", "证券时报", "中国证券报")),
+    ("行业协会/机构", ("协会", "商会", "联盟", "研究院")),
+)
+SUBTYPE_RULES = {
+    "产业政策": ("产业政策", "行动计划", "实施方案", "发展方案", "促进", "支持", "补贴"),
+    "监管政策": ("监管", "规范", "审查", "处罚", "问询", "征求意见", "规则"),
+    "财政税收": ("财政", "税", "减免", "退税", "专项债"),
+    "货币金融": ("利率", "降准", "降息", "社融", "信贷", "汇率"),
+    "业绩公告": ("业绩", "营收", "净利润", "利润", "财报", "预告"),
+    "重大合同": ("合同", "订单", "中标", "采购"),
+    "产能投产": ("投产", "扩产", "产能", "开工", "竣工"),
+    "产品发布": ("产品发布", "新品", "发布会"),
+    "股权变动": ("股权", "增持", "减持", "回购", "并购", "重组"),
+    "技术标准": ("技术标准", "行业标准", "标准发布"),
+    "供需价格": ("价格", "涨价", "降价", "库存", "供需"),
+    "宏观数据": ("GDP", "CPI", "PPI", "PMI", "社融", "失业率", "增加值"),
+    "贸易摩擦": ("贸易摩擦", "关税", "制裁", "出口管制"),
+    "区域冲突": ("冲突", "战事", "空战", "停火", "中东", "霍尔木兹", "印巴"),
+    "自然灾害": ("地震", "洪水", "台风", "灾害"),
+    "公共卫生": ("疫情", "公共卫生", "传染病"),
+    "安全事故": ("事故", "爆炸", "停产", "罢工"),
+}
+STAGE_RULES = {
+    "预期": ("拟", "计划", "预计", "可能", "或将", "有望", "征求意见"),
+    "落地/执行": ("发布", "印发", "实施", "落地", "执行", "正式", "启动"),
+    "反馈": ("同比", "增长", "下降", "运行", "成效", "反馈", "数据"),
+}
+SHOCK_SOURCE_RULES = {
+    "自然灾害": ("地震", "洪水", "台风", "灾害"),
+    "公共卫生": ("疫情", "公共卫生", "传染病"),
+    "安全事故": ("事故", "爆炸", "停产", "罢工"),
+    "地缘政治": GEO_SUBJECT_ANCHOR_KEYWORDS,
+    "政策制度": ("政策", "监管", "制度", "规则", "方案", "通知", "办法", "标准"),
+    "技术系统冲击": ("技术突破", "人工智能", "物联网", "通信", "卫星", "网络安全", "系统故障"),
+}
+STRONG_TRIGGER_WORDS = ("重大", "首次", "突破", "全面", "紧急", "超预期", "重磅", "落地", "提速", "大幅")
+UNCERTAINTY_WORDS = ("拟", "计划", "预计", "可能", "或将", "有望", "研究", "探讨", "征求意见")
 
 
 def _copy_rules(source: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -467,6 +518,70 @@ def compute_impact_scope(subject_type: str, industry_type: str, text: str) -> st
     return freeze_enum(default_scope, IMPACT_SCOPE_ENUM, IMPACT_SCOPE_DEFAULT)
 
 
+def choose_first_label(text: str, rules: Any, default: str) -> str:
+    items = rules.items() if hasattr(rules, "items") else rules
+    for label, keywords in items:
+        if any(keyword in text for keyword in keywords):
+            return label
+    return default
+
+
+def compute_source_type(source: str) -> str:
+    return choose_first_label(source, SOURCE_TYPE_RULES, "其他来源")
+
+
+def compute_source_credibility_score(source_type: str) -> int:
+    if source_type in {"官方文件", "监管/交易所", "公司公告"}:
+        return 3
+    if source_type in {"主流财经媒体", "行业协会/机构"}:
+        return 2
+    return 1
+
+
+def compute_event_subject_subtype(text: str) -> str:
+    return choose_first_label(text, SUBTYPE_RULES, "未细分")
+
+
+def compute_event_stage(text: str) -> str:
+    return choose_first_label(text, STAGE_RULES, "确认")
+
+
+def compute_shock_source_type(text: str) -> str:
+    return choose_first_label(text, SHOCK_SOURCE_RULES, "其他")
+
+
+def count_keyword_score(text: str, keywords: Iterable[str]) -> int:
+    return sum(1 for keyword in keywords if keyword in text)
+
+
+def compute_explicitness_score(text: str) -> int:
+    score = 0
+    if re.search(r"\d+(?:\.\d+)?\s*(?:亿|万亿|万元|亿元|万美元|亿美元)", text):
+        score += 1
+    if re.search(r"\d+(?:\.\d+)?\s*%", text):
+        score += 1
+    if re.search(r"20\d{2}年|\d{1,2}月\d{1,2}日|截至|到期|期限", text):
+        score += 1
+    if extract_subject_entities(text) or re.search(r"公司|企业|行业|部门|机构", text):
+        score += 1
+    return score
+
+
+def compute_novelty_score(duplicate_group_size: int) -> int:
+    return max(20, 90 - max(duplicate_group_size - 1, 0) * 15)
+
+
+def compute_event_code(
+    subject_type: str,
+    subtype: str,
+    duration_type: str,
+    impact_scope: str,
+    shock_source_type: str,
+) -> str:
+    parts = [subject_type, subtype, duration_type, impact_scope, shock_source_type]
+    return "-".join(part.replace("/", "") for part in parts if part)
+
+
 def extract_subject_entities(text: str) -> List[str]:
     seen = []
     for match in ENTITY_PATTERN.findall(text):
@@ -602,16 +717,41 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
     heat_score = compute_heat_score(row["title"], row["source"], result.duplicate_group_size)
     intensity_score = compute_intensity_score(full_text, subject_type, predictability_type)
     impact_scope = compute_impact_scope(subject_type, industry_type, full_text)
+    source_type = compute_source_type(row["source"])
+    event_subject_subtype = compute_event_subject_subtype(full_text)
+    event_stage = compute_event_stage(full_text)
+    shock_source_type = compute_shock_source_type(full_text)
+    trigger_word_score = count_keyword_score(full_text, STRONG_TRIGGER_WORDS)
+    explicitness_score = compute_explicitness_score(full_text)
+    uncertainty_score = count_keyword_score(full_text, UNCERTAINTY_WORDS)
+    novelty_score = compute_novelty_score(result.duplicate_group_size)
+    event_code_value = compute_event_code(
+        subject_type,
+        event_subject_subtype,
+        duration_type,
+        impact_scope,
+        shock_source_type,
+    )
     return {
         "event_id": event_id(result),
         "event_name": build_event_name(row["title"], subject_entities),
         "event_date": result.normalized_publish_time.split(" ")[0],
         "source": row["source"],
+        "source_type": source_type,
+        "source_credibility_score": compute_source_credibility_score(source_type),
         "event_subject_type": subject_type,
+        "event_subject_subtype": event_subject_subtype,
         "duration_type": duration_type,
         "predictability_type": predictability_type,
         "industry_type": industry_type,
         "sentiment": sentiment,
+        "event_stage": event_stage,
+        "shock_source_type": shock_source_type,
+        "trigger_word_score": trigger_word_score,
+        "explicitness_score": explicitness_score,
+        "uncertainty_score": uncertainty_score,
+        "novelty_score": novelty_score,
+        "event_code": event_code_value,
         "heat_score": heat_score,
         "intensity_score": intensity_score,
         "impact_scope": impact_scope,

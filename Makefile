@@ -1,4 +1,4 @@
-PY := python3
+PY ?= /opt/homebrew/bin/python3
 DB ?= stock_event_mining
 LIMIT ?= 20
 TOP_K ?= 3

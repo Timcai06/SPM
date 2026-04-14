@@ -120,20 +120,41 @@ def build_rows(
     total = len(ts_codes)
     out_rows: list[dict[str, str]] = []
     fail_count = 0
+    success_count = 0
+    started_at = time.time()
+
+    print(
+        f"[sina-stats] start symbols={total}, max_rows={max_rows}, timeout_sec={timeout_sec}, "
+        f"sleep_sec={sleep_sec}, progress_every={progress_every}",
+        flush=True,
+    )
 
     for idx, ts_code in enumerate(ts_codes, start=1):
-        if progress_every > 0 and (idx == 1 or idx % progress_every == 0):
-            print(f"[sina-stats] progress {idx}/{total}, rows={len(out_rows)}, fails={fail_count}")
-
         sina_symbol = ts_code_to_sina_symbol(ts_code)
+        before_rows = len(out_rows)
         if not sina_symbol:
             fail_count += 1
+            if progress_every > 0 and (idx == 1 or idx % progress_every == 0):
+                elapsed = int(time.time() - started_at)
+                print(
+                    f"[sina-stats] progress {idx}/{total}, current={ts_code}, rows={len(out_rows)}, "
+                    f"added=0, success={success_count}, fails={fail_count}, elapsed={elapsed}s, reason=bad_symbol",
+                    flush=True,
+                )
             continue
 
         try:
             kline = fetch_sina_kline(sina_symbol, max_rows=max_rows, timeout_seconds=timeout_sec)
-        except Exception:
+        except Exception as exc:
             fail_count += 1
+            if progress_every > 0 and (idx == 1 or idx % progress_every == 0):
+                elapsed = int(time.time() - started_at)
+                print(
+                    f"[sina-stats] progress {idx}/{total}, current={ts_code}/{sina_symbol}, rows={len(out_rows)}, "
+                    f"added=0, success={success_count}, fails={fail_count}, elapsed={elapsed}s, "
+                    f"reason={type(exc).__name__}",
+                    flush=True,
+                )
             time.sleep(sleep_sec)
             continue
 
@@ -154,6 +175,13 @@ def build_rows(
 
         parsed.sort(key=lambda item: item["trade_date"])
         if len(parsed) < 2:
+            if progress_every > 0 and (idx == 1 or idx % progress_every == 0):
+                elapsed = int(time.time() - started_at)
+                print(
+                    f"[sina-stats] progress {idx}/{total}, current={ts_code}/{sina_symbol}, rows={len(out_rows)}, "
+                    f"added=0, success={success_count}, fails={fail_count}, elapsed={elapsed}s, reason=short_series",
+                    flush=True,
+                )
             time.sleep(sleep_sec)
             continue
 
@@ -214,9 +242,23 @@ def build_rows(
                     "data_source": "sina",
                 }
             )
+        success_count += 1
+        if progress_every > 0 and (idx == 1 or idx % progress_every == 0):
+            elapsed = int(time.time() - started_at)
+            print(
+                f"[sina-stats] progress {idx}/{total}, current={ts_code}/{sina_symbol}, rows={len(out_rows)}, "
+                f"added={len(out_rows) - before_rows}, success={success_count}, fails={fail_count}, elapsed={elapsed}s",
+                flush=True,
+            )
         time.sleep(sleep_sec)
 
     out_rows.sort(key=lambda item: (item["trade_date"], item["ts_code"]))
+    elapsed = int(time.time() - started_at)
+    print(
+        f"[sina-stats] done symbols={total}, success={success_count}, fails={fail_count}, rows={len(out_rows)}, "
+        f"elapsed={elapsed}s",
+        flush=True,
+    )
     return out_rows
 
 
