@@ -48,12 +48,13 @@ CREATE INDEX IF NOT EXISTS idx_int_event_candidates_dedup_key
 
 CREATE TABLE IF NOT EXISTS structured_events (
     id BIGSERIAL PRIMARY KEY,
-    event_id TEXT NOT NULL UNIQUE,
+    event_id TEXT NOT NULL,
     candidate_id BIGINT NOT NULL REFERENCES int_event_candidates(id) ON DELETE CASCADE,
     event_name TEXT NOT NULL,
     event_date DATE NOT NULL,
     source TEXT NOT NULL,
     source_type TEXT NOT NULL DEFAULT '其他来源',
+    authority_level TEXT NOT NULL DEFAULT 'general_media',
     source_credibility_score NUMERIC(4,2) NOT NULL DEFAULT 1,
     event_subject_type TEXT NOT NULL,
     event_subject_subtype TEXT NOT NULL DEFAULT '未细分',
@@ -61,12 +62,15 @@ CREATE TABLE IF NOT EXISTS structured_events (
     predictability_type TEXT NOT NULL,
     industry_type TEXT NOT NULL,
     sentiment TEXT NOT NULL,
+    time_orientation TEXT NOT NULL DEFAULT 'current_confirmed',
     event_stage TEXT NOT NULL DEFAULT '确认',
     shock_source_type TEXT NOT NULL DEFAULT '其他',
+    region_scope TEXT NOT NULL DEFAULT 'domestic',
     trigger_word_score INTEGER NOT NULL DEFAULT 0,
     explicitness_score INTEGER NOT NULL DEFAULT 0,
     uncertainty_score INTEGER NOT NULL DEFAULT 0,
     novelty_score INTEGER NOT NULL DEFAULT 50,
+    amount_scale TEXT NOT NULL DEFAULT 'none',
     event_code TEXT NOT NULL DEFAULT '',
     heat_score INTEGER NOT NULL,
     intensity_score INTEGER NOT NULL,
@@ -82,6 +86,9 @@ CREATE TABLE IF NOT EXISTS structured_events (
 CREATE INDEX IF NOT EXISTS idx_structured_events_event_date
     ON structured_events (event_date DESC);
 
+CREATE INDEX IF NOT EXISTS idx_structured_events_event_id
+    ON structured_events (event_id);
+
 CREATE INDEX IF NOT EXISTS idx_structured_events_subject_type
     ON structured_events (event_subject_type);
 
@@ -92,15 +99,22 @@ CREATE INDEX IF NOT EXISTS idx_structured_events_sentiment
     ON structured_events (sentiment);
 
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS source_type TEXT NOT NULL DEFAULT '其他来源';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS authority_level TEXT NOT NULL DEFAULT 'general_media';
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS source_credibility_score NUMERIC(4,2) NOT NULL DEFAULT 1;
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS event_subject_subtype TEXT NOT NULL DEFAULT '未细分';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS time_orientation TEXT NOT NULL DEFAULT 'current_confirmed';
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS event_stage TEXT NOT NULL DEFAULT '确认';
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS shock_source_type TEXT NOT NULL DEFAULT '其他';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS region_scope TEXT NOT NULL DEFAULT 'domestic';
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS trigger_word_score INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS explicitness_score INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS uncertainty_score INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS novelty_score INTEGER NOT NULL DEFAULT 50;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS amount_scale TEXT NOT NULL DEFAULT 'none';
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS event_code TEXT NOT NULL DEFAULT '';
+ALTER TABLE structured_events DROP CONSTRAINT IF EXISTS structured_events_event_id_key;
+CREATE INDEX IF NOT EXISTS idx_structured_events_event_id
+    ON structured_events (event_id);
 
 CREATE TABLE IF NOT EXISTS label_dictionary (
     id BIGSERIAL PRIMARY KEY,

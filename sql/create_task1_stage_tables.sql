@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS int_structured_events_stage (
     event_date TEXT NOT NULL,
     source TEXT NOT NULL,
     source_type TEXT,
+    authority_level TEXT,
     source_credibility_score TEXT,
     event_subject_type TEXT NOT NULL,
     event_subject_subtype TEXT,
@@ -22,12 +23,15 @@ CREATE TABLE IF NOT EXISTS int_structured_events_stage (
     predictability_type TEXT NOT NULL,
     industry_type TEXT NOT NULL,
     sentiment TEXT NOT NULL,
+    time_orientation TEXT,
     event_stage TEXT,
     shock_source_type TEXT,
+    region_scope TEXT,
     trigger_word_score TEXT,
     explicitness_score TEXT,
     uncertainty_score TEXT,
     novelty_score TEXT,
+    amount_scale TEXT,
     event_code TEXT,
     heat_score TEXT NOT NULL,
     intensity_score TEXT NOT NULL,
@@ -38,12 +42,16 @@ CREATE TABLE IF NOT EXISTS int_structured_events_stage (
 );
 
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS source_type TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS authority_level TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS source_credibility_score TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS event_subject_subtype TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS time_orientation TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS event_stage TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS shock_source_type TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS region_scope TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS trigger_word_score TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS explicitness_score TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS uncertainty_score TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS novelty_score TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS amount_scale TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS event_code TEXT;

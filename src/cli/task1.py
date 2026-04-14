@@ -137,12 +137,17 @@ def parse_args() -> argparse.Namespace:
 def print_db_status(db_name: str) -> None:
     table_names = [
         "raw_documents",
-        "int_event_candidates",
         "structured_events",
+        "company_relations",
+        "company_profiles",
+        "stock_daily_quotes",
+        "market_environment_daily",
+        "sentiment_propagation_daily",
+        "model_event_samples",
+        "int_event_candidates",
         "int_canonical_events",
         "int_event_canonical_links",
         "int_company_stats",
-        "model_event_samples",
         "int_model_non_event_samples",
     ]
     print(f"Database status for: {db_name}")
@@ -206,6 +211,11 @@ def print_qa_summary(db_name: str, snapshot_path: Path, collector_report: Path, 
     keys = [
         "raw_documents",
         "structured_events",
+        "company_relations",
+        "company_profiles",
+        "stock_daily_quotes",
+        "market_environment_daily",
+        "sentiment_propagation_daily",
         "event_company_links",
         "int_event_propagation_links",
         "model_event_samples",
@@ -331,7 +341,8 @@ def main() -> None:
 
     if args.command == "classify":
         argv = ["classify.py", "--db", args.db]
-        for input_file in CLASSIFY_INPUT_FILES:
+        existing_inputs = [input_file for input_file in CLASSIFY_INPUT_FILES if (ROOT / input_file).exists()]
+        for input_file in existing_inputs:
             argv.extend(["--input", input_file])
         if args.skip_db_load:
             argv.append("--skip-db-load")

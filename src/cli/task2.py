@@ -21,6 +21,9 @@ from capabilities.storage import (
     import_company_stats_local,
     import_company_stats_sina,
     import_company_stats_tushare,
+    load_company_profiles,
+    load_market_environment,
+    load_sentiment_propagation,
     load_companies,
     load_company_stats,
 )
@@ -62,6 +65,7 @@ def parse_args() -> argparse.Namespace:
     import_stats_parser = sub.add_parser("import-company-stats", help="import company stats from Tushare or AKShare")
     import_stats_parser.add_argument("--db", default="stock_event_mining")
     import_stats_parser.add_argument("--output", default="output/seeds/company_stats.csv")
+    import_stats_parser.add_argument("--quotes-output", default="output/seeds/stock_daily_quotes.csv")
     import_stats_parser.add_argument("--source", choices=["auto", "tushare", "akshare", "sina"], default="auto")
     import_stats_parser.add_argument("--tushare-token", default="")
     import_stats_parser.add_argument("--tushare-token-file", default="")
@@ -79,6 +83,23 @@ def parse_args() -> argparse.Namespace:
     load_stats_parser = sub.add_parser("load-company-stats", help="load company stats csv")
     load_stats_parser.add_argument("--db", default="stock_event_mining")
     load_stats_parser.add_argument("--input", default="output/seeds/company_stats.csv")
+    load_stats_parser.add_argument("--quotes-input", default="output/seeds/stock_daily_quotes.csv")
+
+    load_profiles_parser = sub.add_parser("load-company-profiles", help="load company profiles snapshot from companies table")
+    load_profiles_parser.add_argument("--db", default="stock_event_mining")
+    load_profiles_parser.add_argument("--snapshot-date", default="")
+    load_profiles_parser.add_argument("--lock-timeout-sec", type=int, default=120)
+
+    load_market_parser = sub.add_parser("load-market-environment", help="load market environment daily rows from stock quotes")
+    load_market_parser.add_argument("--db", default="stock_event_mining")
+    load_market_parser.add_argument("--benchmark", default="hs300")
+    load_market_parser.add_argument("--timeout-sec", type=float, default=12.0)
+    load_market_parser.add_argument("--lock-timeout-sec", type=int, default=120)
+
+    load_sentiment_parser = sub.add_parser("load-sentiment-propagation", help="load sentiment propagation daily rows")
+    load_sentiment_parser.add_argument("--db", default="stock_event_mining")
+    load_sentiment_parser.add_argument("--lock-timeout-sec", type=int, default=120)
+    load_sentiment_parser.add_argument("--quiet", action="store_true")
 
     link_parser = sub.add_parser("link-events", help="generate event-company links")
     link_parser.add_argument("--db", default="stock_event_mining")
@@ -141,6 +162,8 @@ def main() -> None:
                 "import_company_stats_sina.py",
                 "--output",
                 args.output,
+                "--quotes-output",
+                args.quotes_output,
                 "--db",
                 args.db,
                 "--days",
@@ -200,8 +223,64 @@ def main() -> None:
         return
 
     if args.command == "load-company-stats":
-        with patched_argv(["load_company_stats.py", "--db", args.db, "--input", args.input]):
+        with patched_argv(
+            [
+                "load_company_stats.py",
+                "--db",
+                args.db,
+                "--input",
+                args.input,
+                "--quotes-input",
+                args.quotes_input,
+            ]
+        ):
             load_company_stats.main()
+        return
+
+    if args.command == "load-company-profiles":
+        with patched_argv(
+            [
+                "load_company_profiles.py",
+                "--db",
+                args.db,
+                "--snapshot-date",
+                args.snapshot_date,
+                "--lock-timeout-sec",
+                str(args.lock_timeout_sec),
+            ]
+        ):
+            load_company_profiles.main()
+        return
+
+    if args.command == "load-market-environment":
+        with patched_argv(
+            [
+                "load_market_environment.py",
+                "--db",
+                args.db,
+                "--benchmark",
+                args.benchmark,
+                "--timeout-sec",
+                str(args.timeout_sec),
+                "--lock-timeout-sec",
+                str(args.lock_timeout_sec),
+            ]
+        ):
+            load_market_environment.main()
+        return
+
+    if args.command == "load-sentiment-propagation":
+        argv = [
+            "load_sentiment_propagation.py",
+            "--db",
+            args.db,
+            "--lock-timeout-sec",
+            str(args.lock_timeout_sec),
+        ]
+        if args.quiet:
+            argv.append("--quiet")
+        with patched_argv(argv):
+            load_sentiment_propagation.main()
         return
 
     if args.command == "link-events":

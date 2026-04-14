@@ -111,6 +111,7 @@ STRUCTURED_EVENT_FIELDS = [
     "event_date",
     "source",
     "source_type",
+    "authority_level",
     "source_credibility_score",
     "event_subject_type",
     "event_subject_subtype",
@@ -118,12 +119,15 @@ STRUCTURED_EVENT_FIELDS = [
     "predictability_type",
     "industry_type",
     "sentiment",
+    "time_orientation",
     "event_stage",
     "shock_source_type",
+    "region_scope",
     "trigger_word_score",
     "explicitness_score",
     "uncertainty_score",
     "novelty_score",
+    "amount_scale",
     "event_code",
     "heat_score",
     "intensity_score",
@@ -172,6 +176,13 @@ SOURCE_TYPE_RULES = (
     ("主流财经媒体", ("财新", "第一财经", "东方财富", "36氪", "证券时报", "中国证券报")),
     ("行业协会/机构", ("协会", "商会", "联盟", "研究院")),
 )
+AUTHORITY_LEVEL_RULES = (
+    ("central", ("中国政府网", "国务院", "新华社", "人民日报", "央视财经")),
+    ("ministry", ("国家发展改革委", "发改委", "工信部", "财政部", "央行", "商务部", "国家统计局", "海关总署")),
+    ("exchange", ("中国证监会", "证监会", "上交所", "深交所", "北交所")),
+    ("listed_company", ("巨潮资讯网", "公司公告", "年度报告", "临时公告")),
+    ("top_media", ("财新", "第一财经", "上海证券报", "证券时报", "中国证券报", "Bloomberg", "Reuters")),
+)
 SUBTYPE_RULES = {
     "产业政策": ("产业政策", "行动计划", "实施方案", "发展方案", "促进", "支持", "补贴"),
     "监管政策": ("监管", "规范", "审查", "处罚", "问询", "征求意见", "规则"),
@@ -203,6 +214,15 @@ SHOCK_SOURCE_RULES = {
     "地缘政治": GEO_SUBJECT_ANCHOR_KEYWORDS,
     "政策制度": ("政策", "监管", "制度", "规则", "方案", "通知", "办法", "标准"),
     "技术系统冲击": ("技术突破", "人工智能", "物联网", "通信", "卫星", "网络安全", "系统故障"),
+}
+TIME_ORIENTATION_RULES = {
+    "future_oriented": ("将", "未来", "明年", "后续", "预计", "有望", "计划", "拟"),
+    "retrospective": ("已", "此前", "过去", "去年", "以来", "回顾", "复盘"),
+}
+REGION_SCOPE_RULES = {
+    "global": ("全球", "国际", "世界", "跨市场", "跨资产"),
+    "overseas": ("美国", "欧洲", "日韩", "东南亚", "海外", "境外"),
+    "regional": ("长三角", "珠三角", "京津冀", "区域", "省内", "本地"),
 }
 STRONG_TRIGGER_WORDS = ("重大", "首次", "突破", "全面", "紧急", "超预期", "重磅", "落地", "提速", "大幅")
 UNCERTAINTY_WORDS = ("拟", "计划", "预计", "可能", "或将", "有望", "研究", "探讨", "征求意见")
@@ -530,6 +550,15 @@ def compute_source_type(source: str) -> str:
     return choose_first_label(source, SOURCE_TYPE_RULES, "其他来源")
 
 
+def compute_authority_level(source: str, source_type: str) -> str:
+    level = choose_first_label(source, AUTHORITY_LEVEL_RULES, "")
+    if level:
+        return level
+    if source_type == "行业协会/机构":
+        return "general_media"
+    return "general_media"
+
+
 def compute_source_credibility_score(source_type: str) -> int:
     if source_type in {"官方文件", "监管/交易所", "公司公告"}:
         return 3
@@ -548,6 +577,14 @@ def compute_event_stage(text: str) -> str:
 
 def compute_shock_source_type(text: str) -> str:
     return choose_first_label(text, SHOCK_SOURCE_RULES, "其他")
+
+
+def compute_time_orientation(text: str) -> str:
+    return choose_first_label(text, TIME_ORIENTATION_RULES, "current_confirmed")
+
+
+def compute_region_scope(text: str) -> str:
+    return choose_first_label(text, REGION_SCOPE_RULES, "domestic")
 
 
 def count_keyword_score(text: str, keywords: Iterable[str]) -> int:
@@ -569,6 +606,20 @@ def compute_explicitness_score(text: str) -> int:
 
 def compute_novelty_score(duplicate_group_size: int) -> int:
     return max(20, 90 - max(duplicate_group_size - 1, 0) * 15)
+
+
+def compute_amount_scale(text: str) -> str:
+    amounts = [float(m.group(1)) for m in re.finditer(r"(\d+(?:\.\d+)?)\s*(亿|万亿|亿元|亿美元)", text)]
+    if not amounts:
+        return "none"
+    amount = max(amounts)
+    if amount >= 1000:
+        return "huge"
+    if amount >= 100:
+        return "large"
+    if amount >= 10:
+        return "medium"
+    return "small"
 
 
 def compute_event_code(
@@ -718,13 +769,17 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
     intensity_score = compute_intensity_score(full_text, subject_type, predictability_type)
     impact_scope = compute_impact_scope(subject_type, industry_type, full_text)
     source_type = compute_source_type(row["source"])
+    authority_level = compute_authority_level(row["source"], source_type)
     event_subject_subtype = compute_event_subject_subtype(full_text)
+    time_orientation = compute_time_orientation(full_text)
     event_stage = compute_event_stage(full_text)
     shock_source_type = compute_shock_source_type(full_text)
+    region_scope = compute_region_scope(full_text)
     trigger_word_score = count_keyword_score(full_text, STRONG_TRIGGER_WORDS)
     explicitness_score = compute_explicitness_score(full_text)
     uncertainty_score = count_keyword_score(full_text, UNCERTAINTY_WORDS)
     novelty_score = compute_novelty_score(result.duplicate_group_size)
+    amount_scale = compute_amount_scale(full_text)
     event_code_value = compute_event_code(
         subject_type,
         event_subject_subtype,
@@ -738,6 +793,7 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
         "event_date": result.normalized_publish_time.split(" ")[0],
         "source": row["source"],
         "source_type": source_type,
+        "authority_level": authority_level,
         "source_credibility_score": compute_source_credibility_score(source_type),
         "event_subject_type": subject_type,
         "event_subject_subtype": event_subject_subtype,
@@ -745,12 +801,15 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
         "predictability_type": predictability_type,
         "industry_type": industry_type,
         "sentiment": sentiment,
+        "time_orientation": time_orientation,
         "event_stage": event_stage,
         "shock_source_type": shock_source_type,
+        "region_scope": region_scope,
         "trigger_word_score": trigger_word_score,
         "explicitness_score": explicitness_score,
         "uncertainty_score": uncertainty_score,
         "novelty_score": novelty_score,
+        "amount_scale": amount_scale,
         "event_code": event_code_value,
         "heat_score": heat_score,
         "intensity_score": intensity_score,
@@ -1128,7 +1187,6 @@ def load_rows_from_db(db: str) -> List[Dict[str, str]]:
         SELECT source, title, content, publish_time::text, url, symbol_or_subject 
         FROM raw_documents
         ORDER BY publish_time DESC
-        LIMIT 1000;
     """
     with psycopg.connect(dsn_for(db)) as conn:
         with conn.cursor() as cur:
@@ -1143,8 +1201,8 @@ async def run_classification_pipeline(
     use_llm: bool = False,
     llm_max_rows: int = 20,
 ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
-    """Orchestrate classification and write results to Stage tables (Async)."""
-    from capabilities.storage.load_task1 import load_stage_tables
+    """Orchestrate classification and persist results into stage and final tables."""
+    from capabilities.storage.load_task1 import insert_final_tables, load_stage_tables
     
     rows = input_rows if input_rows is not None else load_rows_from_db(db)
     if not rows:
@@ -1156,6 +1214,7 @@ async def run_classification_pipeline(
     )
     
     load_stage_tables(db, [], candidate_rows, structured_rows)
+    insert_final_tables(db)
     return candidate_rows, structured_rows
 
 

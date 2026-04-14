@@ -88,6 +88,8 @@ def load_label_map(path: Path) -> tuple[dict[tuple[int, str], dict[str, object]]
                 "label_car_w1": parse_float(row.get("car_w1", "")),
                 "label_car_w3": parse_float(row.get("car_w3", "")),
                 "label_car_w5": parse_float(row.get("car_w5", "")),
+                "event_trade_date": (row.get("event_trade_date") or "").strip() or None,
+                "event_trade_alignment_type": (row.get("event_date_alignment") or "").strip() or None,
                 "label_source": (
                     f"{(row.get('benchmark_source') or '').strip()}|{(row.get('stock_source') or '').strip()}"
                 ).strip("|")
@@ -112,17 +114,21 @@ def fetch_base_rows(conn: psycopg.Connection, min_link_score: float) -> list[dic
             se.event_subject_type,
             se.event_subject_subtype,
             se.source_type,
+            se.authority_level,
             se.source_credibility_score,
             se.duration_type,
             se.predictability_type,
             se.industry_type AS event_industry_type,
             se.sentiment,
+            se.time_orientation,
             se.event_stage,
             se.shock_source_type,
+            se.region_scope,
             se.trigger_word_score,
             se.explicitness_score,
             se.uncertainty_score,
             se.novelty_score,
+            se.amount_scale,
             se.event_code,
             se.heat_score,
             se.intensity_score,
@@ -185,7 +191,19 @@ def fetch_base_rows(conn: psycopg.Connection, min_link_score: float) -> list[dic
     """
     with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(sql, (min_link_score,))
-        return list(cur.fetchall())
+        rows = list(cur.fetchall())
+    for row in rows:
+        event_industry = (row.get("event_industry_type") or "").strip()
+        company_industry = (row.get("company_industry_l1") or "").strip()
+        row["industry_match_score"] = 1.0 if event_industry and company_industry and event_industry == company_industry else 0.0
+        concepts = row.get("concept_tags") or []
+        if isinstance(concepts, str):
+            try:
+                concepts = json.loads(concepts)
+            except Exception:
+                concepts = []
+        row["concept_match_count"] = sum(1 for tag in concepts if event_industry and event_industry in str(tag))
+    return rows
 
 
 def main() -> None:
@@ -202,7 +220,24 @@ def main() -> None:
         ensure_tables(conn)
         base_rows = fetch_base_rows(conn, args.min_link_score)
         upserted = 0
+        deleted = 0
+        active_sample_keys = {
+            f"{int(row['structured_event_id'])}:{int(row['company_id'])}:{row['event_date']}"
+            for row in base_rows
+        }
         with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TEMP TABLE current_model_event_sample_keys (
+                    sample_key TEXT PRIMARY KEY
+                ) ON COMMIT DROP
+                """
+            )
+            if active_sample_keys:
+                cur.executemany(
+                    "INSERT INTO current_model_event_sample_keys (sample_key) VALUES (%s)",
+                    [(sample_key,) for sample_key in sorted(active_sample_keys)],
+                )
             for row in base_rows:
                 sid = int(row["structured_event_id"])
                 ts_code = (row["ts_code"] or "").upper()
@@ -210,19 +245,98 @@ def main() -> None:
                 car_w1 = labels.get("label_car_w1")
                 car_w3 = labels.get("label_car_w3")
                 car_w5 = labels.get("label_car_w5")
+                event_trade_date = labels.get("event_trade_date")
+                event_trade_alignment_type = labels.get("event_trade_alignment_type")
                 label_source = str(labels.get("label_source") or "none")
+                event_age_days = None
+                if event_trade_date and row.get("event_date"):
+                    try:
+                        event_age_days = (
+                            datetime.strptime(str(event_trade_date), "%Y-%m-%d").date()
+                            - datetime.strptime(str(row["event_date"]), "%Y-%m-%d").date()
+                        ).days
+                    except Exception:
+                        event_age_days = None
                 sample_key = f"{sid}:{int(row['company_id'])}:{row['event_date']}"
-
+                payload = (
+                    sample_key,
+                    run_id,
+                    sid,
+                    int(row["company_id"]),
+                    row.get("canonical_event_id"),
+                    row["event_id"],
+                    row["event_date"],
+                    ts_code,
+                    row["company_name"],
+                    row["event_subject_type"],
+                    row.get("event_subject_subtype"),
+                    row.get("source_type"),
+                    row.get("authority_level"),
+                    row.get("source_credibility_score"),
+                    row["duration_type"],
+                    row["predictability_type"],
+                    row["event_industry_type"],
+                    row["sentiment"],
+                    row.get("time_orientation"),
+                    row.get("event_stage"),
+                    row.get("shock_source_type"),
+                    row.get("region_scope"),
+                    row.get("trigger_word_score"),
+                    row.get("explicitness_score"),
+                    row.get("uncertainty_score"),
+                    row.get("novelty_score"),
+                    row.get("amount_scale"),
+                    row.get("event_code"),
+                    int(row["heat_score"]),
+                    int(row["intensity_score"]),
+                    row["impact_scope"],
+                    row.get("impact_level_score"),
+                    row.get("affected_company_count"),
+                    row.get("affected_industry_count"),
+                    row.get("relation_rank_in_event"),
+                    row.get("industry_match_score"),
+                    row.get("concept_match_count"),
+                    event_age_days,
+                    event_trade_alignment_type,
+                    row["link_type"],
+                    row["final_link_score"],
+                    row.get("company_industry_l1"),
+                    row.get("company_industry_l2"),
+                    json.dumps(row.get("concept_tags") or [], ensure_ascii=False),
+                    row.get("company_stat_date"),
+                    row.get("total_mv"),
+                    row.get("circ_mv"),
+                    row.get("pe_ttm"),
+                    row.get("pb"),
+                    row.get("turnover_rate"),
+                    row.get("volume_ratio"),
+                    row.get("trailing_return_5d"),
+                    row.get("trailing_return_20d"),
+                    row.get("trailing_return_60d"),
+                    row.get("volatility_5d"),
+                    row.get("volatility_20d"),
+                    row.get("volatility_60d"),
+                    row.get("up_days_20d"),
+                    car_w1,
+                    car_w3,
+                    car_w5,
+                    parse_bool_up(car_w1),
+                    parse_bool_up(car_w3),
+                    parse_bool_up(car_w5),
+                    label_source,
+                )
+                placeholders = ", ".join(["%s"] * len(payload))
                 cur.execute(
-                    """
+                    f"""
                     INSERT INTO model_event_samples (
                         sample_key, sample_run_id, structured_event_id, company_id, canonical_event_id,
                         event_id, event_date, ts_code, company_name,
-                        event_subject_type, event_subject_subtype, source_type, source_credibility_score,
+                        event_subject_type, event_subject_subtype, source_type, authority_level, source_credibility_score,
                         duration_type, predictability_type, event_industry_type,
-                        sentiment, event_stage, shock_source_type, trigger_word_score, explicitness_score,
-                        uncertainty_score, novelty_score, event_code, heat_score, intensity_score, impact_scope,
+                        sentiment, time_orientation, event_stage, shock_source_type, region_scope, trigger_word_score, explicitness_score,
+                        uncertainty_score, novelty_score, amount_scale, event_code, heat_score, intensity_score, impact_scope,
                         impact_level_score, affected_company_count, affected_industry_count, relation_rank_in_event,
+                        industry_match_score, concept_match_count, event_age_days, event_trade_alignment_type,
                         link_type, final_link_score, company_industry_l1, company_industry_l2, concept_tags,
                         company_stat_date, total_mv, circ_mv, pe_ttm, pb, turnover_rate, volume_ratio,
                         trailing_return_5d, trailing_return_20d, trailing_return_60d,
@@ -230,19 +344,7 @@ def main() -> None:
                         label_car_w1, label_car_w3, label_car_w5, label_up_w1, label_up_w3, label_up_w5, label_source,
                         updated_at
                     )
-                    VALUES (
-                        %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s,
-                        %s, %s, %s, %s,
-                        %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s::jsonb,
-                        %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s,
-                        NOW()
-                    )
+                    VALUES ({placeholders}, NOW())
                     ON CONFLICT (sample_key) DO UPDATE
                     SET
                         sample_run_id = EXCLUDED.sample_run_id,
@@ -253,17 +355,21 @@ def main() -> None:
                         event_subject_type = EXCLUDED.event_subject_type,
                         event_subject_subtype = EXCLUDED.event_subject_subtype,
                         source_type = EXCLUDED.source_type,
+                        authority_level = EXCLUDED.authority_level,
                         source_credibility_score = EXCLUDED.source_credibility_score,
                         duration_type = EXCLUDED.duration_type,
                         predictability_type = EXCLUDED.predictability_type,
                         event_industry_type = EXCLUDED.event_industry_type,
                         sentiment = EXCLUDED.sentiment,
+                        time_orientation = EXCLUDED.time_orientation,
                         event_stage = EXCLUDED.event_stage,
                         shock_source_type = EXCLUDED.shock_source_type,
+                        region_scope = EXCLUDED.region_scope,
                         trigger_word_score = EXCLUDED.trigger_word_score,
                         explicitness_score = EXCLUDED.explicitness_score,
                         uncertainty_score = EXCLUDED.uncertainty_score,
                         novelty_score = EXCLUDED.novelty_score,
+                        amount_scale = EXCLUDED.amount_scale,
                         event_code = EXCLUDED.event_code,
                         heat_score = EXCLUDED.heat_score,
                         intensity_score = EXCLUDED.intensity_score,
@@ -272,6 +378,10 @@ def main() -> None:
                         affected_company_count = EXCLUDED.affected_company_count,
                         affected_industry_count = EXCLUDED.affected_industry_count,
                         relation_rank_in_event = EXCLUDED.relation_rank_in_event,
+                        industry_match_score = EXCLUDED.industry_match_score,
+                        concept_match_count = EXCLUDED.concept_match_count,
+                        event_age_days = EXCLUDED.event_age_days,
+                        event_trade_alignment_type = EXCLUDED.event_trade_alignment_type,
                         link_type = EXCLUDED.link_type,
                         final_link_score = EXCLUDED.final_link_score,
                         company_industry_l1 = EXCLUDED.company_industry_l1,
@@ -300,72 +410,26 @@ def main() -> None:
                         label_source = EXCLUDED.label_source,
                         updated_at = NOW()
                     """,
-                    (
-                        sample_key,
-                        run_id,
-                        sid,
-                        int(row["company_id"]),
-                        row.get("canonical_event_id"),
-                        row["event_id"],
-                        row["event_date"],
-                        ts_code,
-                        row["company_name"],
-                        row["event_subject_type"],
-                        row.get("event_subject_subtype"),
-                        row.get("source_type"),
-                        row.get("source_credibility_score"),
-                        row["duration_type"],
-                        row["predictability_type"],
-                        row["event_industry_type"],
-                        row["sentiment"],
-                        row.get("event_stage"),
-                        row.get("shock_source_type"),
-                        row.get("trigger_word_score"),
-                        row.get("explicitness_score"),
-                        row.get("uncertainty_score"),
-                        row.get("novelty_score"),
-                        row.get("event_code"),
-                        int(row["heat_score"]),
-                        int(row["intensity_score"]),
-                        row["impact_scope"],
-                        row.get("impact_level_score"),
-                        row.get("affected_company_count"),
-                        row.get("affected_industry_count"),
-                        row.get("relation_rank_in_event"),
-                        row["link_type"],
-                        row["final_link_score"],
-                        row.get("company_industry_l1"),
-                        row.get("company_industry_l2"),
-                        json.dumps(row.get("concept_tags") or [], ensure_ascii=False),
-                        row.get("company_stat_date"),
-                        row.get("total_mv"),
-                        row.get("circ_mv"),
-                        row.get("pe_ttm"),
-                        row.get("pb"),
-                        row.get("turnover_rate"),
-                        row.get("volume_ratio"),
-                        row.get("trailing_return_5d"),
-                        row.get("trailing_return_20d"),
-                        row.get("trailing_return_60d"),
-                        row.get("volatility_5d"),
-                        row.get("volatility_20d"),
-                        row.get("volatility_60d"),
-                        row.get("up_days_20d"),
-                        car_w1,
-                        car_w3,
-                        car_w5,
-                        parse_bool_up(car_w1),
-                        parse_bool_up(car_w3),
-                        parse_bool_up(car_w5),
-                        label_source,
-                    ),
+                    payload,
                 )
                 upserted += 1
+            if active_sample_keys:
+                cur.execute(
+                    """
+                    DELETE FROM model_event_samples ms
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM current_model_event_sample_keys keys
+                        WHERE keys.sample_key = ms.sample_key
+                    )
+                    """
+                )
+                deleted = cur.rowcount or 0
         conn.commit()
 
     print(
         f"Built model_event_samples for db={args.db}: "
-        f"upserted={upserted}, labels_loaded={len(label_map)}, label_path={label_path_used}"
+        f"upserted={upserted}, deleted_stale={deleted}, labels_loaded={len(label_map)}, label_path={label_path_used}"
     )
     print(f"run_id={run_id}")
 

@@ -25,11 +25,13 @@ from capabilities.storage.db_guard import dsn_for
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = ROOT / "output" / "seeds" / "company_stats.csv"
+DEFAULT_QUOTES_OUTPUT = ROOT / "output" / "seeds" / "stock_daily_quotes.csv"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import company daily stats from Sina K-line API.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
+    parser.add_argument("--quotes-output", default=str(DEFAULT_QUOTES_OUTPUT))
     parser.add_argument("--days", type=int, default=120, help="Reserved for compatibility; rows are limited by max-rows.")
     parser.add_argument("--max-symbols", type=int, default=300, help="Max stock symbols to fetch.")
     parser.add_argument("--max-rows", type=int, default=1200, help="Max K-line rows fetched per symbol.")
@@ -115,10 +117,11 @@ def build_rows(
     timeout_sec: float,
     sleep_sec: float,
     progress_every: int,
-) -> list[dict[str, str]]:
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     ts_codes = get_ts_codes_from_db(db_name=db_name, max_symbols=max_symbols)
     total = len(ts_codes)
     out_rows: list[dict[str, str]] = []
+    quote_rows: list[dict[str, str]] = []
     fail_count = 0
     success_count = 0
     started_at = time.time()
@@ -218,6 +221,29 @@ def build_rows(
                     volume_ratio = cur_volume / avg_vol
 
             daily_ret = returns[j]
+            prev_close = parsed[j - 1]["close"] if j > 0 else None
+            pct_chg = daily_ret
+            quote_rows.append(
+                {
+                    "ts_code": ts_code,
+                    "trade_date": item["trade_date"],
+                    "open": "" if prev_close is None else f"{prev_close:.4f}",
+                    "high": f"{item['close']:.4f}",
+                    "low": f"{item['close']:.4f}",
+                    "close": f"{item['close']:.4f}",
+                    "pre_close": "" if prev_close is None else f"{prev_close:.4f}",
+                    "pct_chg": "" if pct_chg is None else f"{pct_chg:.6f}",
+                    "volume": "" if item["volume"] is None else f"{item['volume']:.4f}",
+                    "amount": "",
+                    "turnover_rate": "",
+                    "adj_factor": "",
+                    "is_suspended": "false",
+                    "is_st": "false",
+                    "is_limit_up": "false",
+                    "is_limit_down": "false",
+                    "data_source": "sina",
+                }
+            )
             out_rows.append(
                 {
                     "ts_code": ts_code,
@@ -259,10 +285,10 @@ def build_rows(
         f"elapsed={elapsed}s",
         flush=True,
     )
-    return out_rows
+    return out_rows, quote_rows
 
 
-def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
+def write_stats_csv(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
         "ts_code",
@@ -292,9 +318,36 @@ def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+def write_quotes_csv(path: Path, rows: list[dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "ts_code",
+        "trade_date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "pct_chg",
+        "volume",
+        "amount",
+        "turnover_rate",
+        "adj_factor",
+        "is_suspended",
+        "is_st",
+        "is_limit_up",
+        "is_limit_down",
+        "data_source",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def main() -> None:
     args = parse_args()
-    rows = build_rows(
+    rows, quote_rows = build_rows(
         db_name=args.db,
         max_symbols=args.max_symbols,
         max_rows=args.max_rows,
@@ -303,8 +356,11 @@ def main() -> None:
         progress_every=args.progress_every,
     )
     output_path = Path(args.output).resolve()
-    write_csv(output_path, rows)
+    quotes_output_path = Path(args.quotes_output).resolve()
+    write_stats_csv(output_path, rows)
+    write_quotes_csv(quotes_output_path, quote_rows)
     print(f"Wrote {len(rows)} company stat rows to {output_path}")
+    print(f"Wrote {len(quote_rows)} stock quote rows to {quotes_output_path}")
     print("Source: sina")
 
 

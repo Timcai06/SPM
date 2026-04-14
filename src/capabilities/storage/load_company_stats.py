@@ -20,6 +20,7 @@ from capabilities.storage.db_guard import dsn_for, write_guard
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = "stock_event_mining"
 DEFAULT_INPUT = ROOT / "output" / "seeds" / "company_stats.csv"
+DEFAULT_QUOTES_INPUT = ROOT / "output" / "seeds" / "stock_daily_quotes.csv"
 CREATE_SQL_PATH = ROOT / "sql" / "create_training_support_tables.sql"
 
 
@@ -27,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load company stats into PostgreSQL.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--input", default=str(DEFAULT_INPUT))
+    parser.add_argument("--quotes-input", default=str(DEFAULT_QUOTES_INPUT))
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
     return parser.parse_args()
 
@@ -39,6 +41,8 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 def main() -> None:
     args = parse_args()
     rows = read_rows(Path(args.input).resolve())
+    quotes_path = Path(args.quotes_input).resolve()
+    quote_rows = read_rows(quotes_path) if quotes_path.exists() else []
 
     with write_guard(
         db_name=args.db,
@@ -47,6 +51,59 @@ def main() -> None:
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(CREATE_SQL_PATH.read_text(encoding="utf-8"))
+            for row in quote_rows:
+                cur.execute(
+                    """
+                    INSERT INTO stock_daily_quotes (
+                        ts_code, trade_date, open, high, low, close, pre_close, pct_chg,
+                        volume, amount, turnover_rate, adj_factor, is_suspended, is_st,
+                        is_limit_up, is_limit_down, data_source
+                    )
+                    VALUES (
+                        %s, %s, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
+                        NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
+                        NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
+                        NULLIF(%s, '')::numeric, %s::boolean, %s::boolean, %s::boolean, %s::boolean, %s
+                    )
+                    ON CONFLICT (ts_code, trade_date) DO UPDATE
+                    SET
+                        open = EXCLUDED.open,
+                        high = EXCLUDED.high,
+                        low = EXCLUDED.low,
+                        close = EXCLUDED.close,
+                        pre_close = EXCLUDED.pre_close,
+                        pct_chg = EXCLUDED.pct_chg,
+                        volume = EXCLUDED.volume,
+                        amount = EXCLUDED.amount,
+                        turnover_rate = EXCLUDED.turnover_rate,
+                        adj_factor = EXCLUDED.adj_factor,
+                        is_suspended = EXCLUDED.is_suspended,
+                        is_st = EXCLUDED.is_st,
+                        is_limit_up = EXCLUDED.is_limit_up,
+                        is_limit_down = EXCLUDED.is_limit_down,
+                        data_source = EXCLUDED.data_source,
+                        updated_at = NOW()
+                    """,
+                    (
+                        row["ts_code"],
+                        row["trade_date"],
+                        row.get("open", ""),
+                        row.get("high", ""),
+                        row.get("low", ""),
+                        row.get("close", ""),
+                        row.get("pre_close", ""),
+                        row.get("pct_chg", ""),
+                        row.get("volume", ""),
+                        row.get("amount", ""),
+                        row.get("turnover_rate", ""),
+                        row.get("adj_factor", ""),
+                        row.get("is_suspended", "false"),
+                        row.get("is_st", "false"),
+                        row.get("is_limit_up", "false"),
+                        row.get("is_limit_down", "false"),
+                        row.get("data_source", "sina"),
+                    ),
+                )
             for row in rows:
                 cur.execute(
                     """
@@ -110,6 +167,7 @@ def main() -> None:
                     ),
                 )
         conn.commit()
+    print(f"Loaded {len(quote_rows)} stock_daily_quotes rows into {args.db}")
     print(f"Loaded {len(rows)} company stats into {args.db}")
 
 

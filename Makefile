@@ -29,6 +29,9 @@ endif
 
 .PHONY: help \
 	collect link feature train status qa stats-import stats-load negatives \
+	profiles \
+	market-env \
+	sentiment \
 	full full-with-stats backfill \
 	text market llm trial \
 	go r q c l f t s qa si sl n bf
@@ -42,6 +45,9 @@ help:
 	@echo "  make go              # 跑一轮核心数据链（collect+link+feature+train+status）"
 	@echo "  make text            # 只扩文本事件链（等价于 make go）"
 	@echo "  make market          # 只扩市场/公司特征（默认用 Sina）"
+	@echo "  make profiles        # 生成公司画像快照"
+	@echo "  make market-env      # 生成市场环境日表"
+	@echo "  make sentiment       # 生成舆情传播日表"
 	@echo "  make llm             # 用本地 Ollama 做小批量事件结构化试点"
 	@echo "  make trial           # 文本+市场一键试跑（适合日常）"
 	@echo "  make r               # 完整训练底座（go + stats-import + stats-load + negatives + status）"
@@ -83,18 +89,27 @@ stats-load:
 negatives:
 	$(PY) src/cli/task2.py build-negative-samples --db $(DB) --max-per-day $(NEG_MAX_PER_DAY)
 
-full: collect link feature train status
+full: collect link sentiment feature train status
 
-full-with-stats: full stats-import stats-load negatives status
+full-with-stats: full stats-import stats-load profiles market-env negatives status
 
 text: full
 
-market: stats-import stats-load qa
+profiles:
+	$(PY) src/cli/task2.py load-company-profiles --db $(DB)
+
+market-env:
+	$(PY) src/cli/task2.py load-market-environment --db $(DB)
+
+sentiment:
+	$(PY) src/cli/task2.py load-sentiment-propagation --db $(DB)
+
+market: stats-import stats-load profiles market-env sentiment qa
 
 llm:
 	$(PY) src/cli/task1.py classify --db $(DB) --use-llm --llm-max-rows 10 --skip-db-load
 
-trial: full stats-import stats-load qa
+trial: full stats-import stats-load profiles market-env qa
 
 backfill:
 	@echo "[backfill] rounds=$(BACKFILL_ROUNDS), limit=$(BACKFILL_LIMIT), max_rows=$(BACKFILL_MAX_ROWS)"
@@ -109,6 +124,7 @@ backfill:
 	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(BACKFILL_DAYS) --max-symbols $(BACKFILL_STATS_MAX_SYMBOLS) --max-rows $(STATS_MAX_ROWS) --tushare-token-file $(TOKEN_FILE)
 	$(PY) src/cli/task2.py load-company-stats --db $(DB)
 	$(PY) src/cli/task2.py build-negative-samples --db $(DB) --max-per-day $(NEG_MAX_PER_DAY)
+	$(PY) src/cli/task2.py load-sentiment-propagation --db $(DB)
 	$(PY) src/cli/task1.py qa --db $(DB)
 
 # Short aliases
