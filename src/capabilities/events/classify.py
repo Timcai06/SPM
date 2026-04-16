@@ -30,6 +30,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from capabilities.events.rules import (
     ANNOUNCEMENT_TEMPLATE_KEYWORDS,
+    COMPANY_ACTION_STRONG_KEYWORDS,
     CSRC_HARD_EVENT_KEYWORDS,
     CSRC_ROUTINE_TITLE_KEYWORDS,
     DURATION_DEFAULT,
@@ -193,6 +194,7 @@ SUBTYPE_RULES = {
     "产能投产": ("投产", "扩产", "产能", "开工", "竣工"),
     "产品发布": ("产品发布", "新品", "发布会"),
     "股权变动": ("股权", "增持", "减持", "回购", "并购", "重组"),
+    "诉讼仲裁": ("诉讼", "仲裁", "法院裁定", "处罚", "监管措施"),
     "技术标准": ("技术标准", "行业标准", "标准发布"),
     "供需价格": ("价格", "涨价", "降价", "库存", "供需"),
     "宏观数据": ("GDP", "CPI", "PPI", "PMI", "社融", "失业率", "增加值"),
@@ -361,7 +363,8 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
     csrc_routine_hits = keyword_hits(row["title"], CSRC_ROUTINE_TITLE_KEYWORDS)
     csrc_hard_event_hits = keyword_hits(full_text, CSRC_HARD_EVENT_KEYWORDS)
     event_hits = keyword_hits(full_text, ACTIVE_EVENT_KEYWORDS)
-    strong_event_hits = [kw for kw in event_hits if kw not in GENERIC_EVENT_HITS]
+    company_action_hits = keyword_hits(full_text, COMPANY_ACTION_STRONG_KEYWORDS)
+    strong_event_hits = [kw for kw in event_hits if kw not in GENERIC_EVENT_HITS] + company_action_hits
 
     if non_event_hits:
         return CandidateResult(
@@ -430,6 +433,21 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             evidence="公告源文本仅含通用披露词; score=1; threshold=" + str(EVENT_SCORE_THRESHOLD),
             score_hint=1,
             event_score=1,
+            event_threshold=EVENT_SCORE_THRESHOLD,
+        )
+
+    if row.get("source", "").startswith(("上交所", "深交所", "巨潮资讯网")) and company_action_hits:
+        score_hint = max(EVENT_SCORE_THRESHOLD, len(company_action_hits) + min(duplicate_group_size, EVENT_DUPLICATE_BONUS_CAP))
+        return CandidateResult(
+            row=row,
+            normalized_publish_time=publish_time,
+            dedup_key=dedup_key(row),
+            duplicate_group_size=duplicate_group_size,
+            is_event=True,
+            filter_reason="event_signal_detected",
+            evidence="公告强事项关键词: " + "|".join(company_action_hits) + f"; score={score_hint}; threshold={EVENT_SCORE_THRESHOLD}",
+            score_hint=score_hint,
+            event_score=score_hint,
             event_threshold=EVENT_SCORE_THRESHOLD,
         )
 

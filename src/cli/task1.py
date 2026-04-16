@@ -18,6 +18,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from capabilities.analysis import build_model_samples, feature_return
 from capabilities.collectors import run as collector_run
+from capabilities.collectors import history as history_collector
 from capabilities.events import canonicalize, classify
 from capabilities.quality import check, delivery_status, quality_report
 from capabilities.storage import load_task1_canonical
@@ -79,11 +80,42 @@ def parse_args() -> argparse.Namespace:
     collect_parser.add_argument("--limit", type=int, default=10)
     collect_parser.add_argument("--include-non-keyword", action="store_true")
 
+    collect_history_parser = sub.add_parser("collect-history", help="historically backfill raw documents")
+    collect_history_parser.add_argument("--db", default="stock_event_mining")
+    collect_history_parser.add_argument("--source", choices=["akshare-news", "cninfo-disclosure"], default="akshare-news")
+    collect_history_parser.add_argument("--symbol-source", choices=["db", "all-a"], default="db")
+    collect_history_parser.add_argument("--symbol-file", default="")
+    collect_history_parser.add_argument("--start-date", default="2020-01-01")
+    collect_history_parser.add_argument("--end-date", default=datetime.now().date().isoformat())
+    collect_history_parser.add_argument("--max-symbols", type=int, default=200)
+    collect_history_parser.add_argument("--offset", type=int, default=0)
+    collect_history_parser.add_argument("--limit-per-symbol", type=int, default=20)
+    collect_history_parser.add_argument("--workers", type=int, default=4)
+    collect_history_parser.add_argument("--retries", type=int, default=2)
+    collect_history_parser.add_argument("--sleep-sec", type=float, default=0.05)
+    collect_history_parser.add_argument("--output-dir", default="output/history")
+    collect_history_parser.add_argument("--skip-db-load", action="store_true")
+
     classify_parser = sub.add_parser("classify", help="classify and structure events")
     classify_parser.add_argument("--db", default="stock_event_mining")
     classify_parser.add_argument("--skip-db-load", action="store_true")
     classify_parser.add_argument("--use-llm", action="store_true")
     classify_parser.add_argument("--llm-max-rows", type=int, default=20)
+
+    classify_pending_parser = sub.add_parser("classify-pending", help="classify raw_documents not yet in int_event_candidates")
+    classify_pending_parser.add_argument("--db", default="stock_event_mining")
+    classify_pending_parser.add_argument("--batch-size", type=int, default=2000)
+    classify_pending_parser.add_argument("--max-batches", type=int, default=1)
+    classify_pending_parser.add_argument("--use-llm", action="store_true")
+    classify_pending_parser.add_argument("--llm-max-rows", type=int, default=20)
+
+    reclassify_source_parser = sub.add_parser("reclassify-source", help="reclassify raw_documents for one source")
+    reclassify_source_parser.add_argument("--db", default="stock_event_mining")
+    reclassify_source_parser.add_argument("--source", required=True)
+    reclassify_source_parser.add_argument("--batch-size", type=int, default=3000)
+    reclassify_source_parser.add_argument("--max-batches", type=int, default=1)
+    reclassify_source_parser.add_argument("--use-llm", action="store_true")
+    reclassify_source_parser.add_argument("--llm-max-rows", type=int, default=20)
 
     sub.add_parser("canonicalize", help="build canonical event clusters")
     canonical_load_parser = sub.add_parser("canonical-load", help="load canonical events into PostgreSQL")
@@ -167,6 +199,50 @@ def print_db_status(db_name: str) -> None:
                 cur.execute(f"SELECT count(*) FROM {table}")
                 count = cur.fetchone()[0]
                 print(f"- {table}: {count}")
+
+
+def load_pending_raw_documents(db_name: str, batch_size: int) -> list[dict[str, str]]:
+    with psycopg.connect(dsn_for(db_name), row_factory=psycopg.rows.dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT d.source,
+                       d.title,
+                       d.content,
+                       d.publish_time::text AS publish_time,
+                       d.url,
+                       COALESCE(d.symbol_or_subject, '') AS symbol_or_subject
+                FROM raw_documents d
+                LEFT JOIN int_event_candidates c ON c.raw_document_id = d.id
+                WHERE c.id IS NULL
+                ORDER BY d.publish_time, d.id
+                LIMIT %s
+                """,
+                (batch_size,),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+
+def load_source_raw_documents(db_name: str, source: str, batch_size: int, offset: int) -> list[dict[str, str]]:
+    with psycopg.connect(dsn_for(db_name), row_factory=psycopg.rows.dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT source,
+                       title,
+                       content,
+                       publish_time::text AS publish_time,
+                       url,
+                       COALESCE(symbol_or_subject, '') AS symbol_or_subject
+                FROM raw_documents
+                WHERE source = %s
+                ORDER BY publish_time, id
+                OFFSET %s
+                LIMIT %s
+                """,
+                (source, offset, batch_size),
+            )
+            return [dict(row) for row in cur.fetchall()]
 
 
 def parse_feature_top_reasons(path: Path, top_n: int = 3) -> list[tuple[str, int]]:
@@ -344,6 +420,42 @@ def main() -> None:
             collector_run.main()
         return
 
+    if args.command == "collect-history":
+        argv = [
+            "history.py",
+            "--db",
+            args.db,
+            "--source",
+            args.source,
+            "--symbol-source",
+            args.symbol_source,
+            "--symbol-file",
+            args.symbol_file,
+            "--start-date",
+            args.start_date,
+            "--end-date",
+            args.end_date,
+            "--max-symbols",
+            str(args.max_symbols),
+            "--offset",
+            str(args.offset),
+            "--limit-per-symbol",
+            str(args.limit_per_symbol),
+            "--workers",
+            str(args.workers),
+            "--retries",
+            str(args.retries),
+            "--sleep-sec",
+            str(args.sleep_sec),
+            "--output-dir",
+            args.output_dir,
+        ]
+        if args.skip_db_load:
+            argv.append("--skip-db-load")
+        with patched_argv(argv):
+            history_collector.main()
+        return
+
     if args.command == "classify":
         argv = ["classify.py", "--db", args.db]
         existing_inputs = [input_file for input_file in CLASSIFY_INPUT_FILES if (ROOT / input_file).exists()]
@@ -355,6 +467,65 @@ def main() -> None:
             argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
         with patched_argv(argv):
             classify.main()
+        return
+
+    if args.command == "classify-pending":
+        import asyncio
+
+        total_candidates = 0
+        total_structured = 0
+        for batch_idx in range(args.max_batches):
+            rows = load_pending_raw_documents(args.db, args.batch_size)
+            if not rows:
+                print(f"[classify-pending] no pending raw_documents at batch {batch_idx + 1}")
+                break
+            candidate_rows, structured_rows = asyncio.run(
+                classify.run_classification_pipeline(
+                    args.db,
+                    input_rows=rows,
+                    use_llm=args.use_llm,
+                    llm_max_rows=args.llm_max_rows,
+                )
+            )
+            total_candidates += len(candidate_rows)
+            total_structured += len(structured_rows)
+            print(
+                f"[classify-pending] batch {batch_idx + 1}/{args.max_batches}: "
+                f"candidates={len(candidate_rows)}, structured={len(structured_rows)}"
+            )
+            if len(rows) < args.batch_size:
+                break
+        print(f"[classify-pending] total candidates={total_candidates}, structured={total_structured}")
+        return
+
+    if args.command == "reclassify-source":
+        import asyncio
+
+        total_candidates = 0
+        total_structured = 0
+        for batch_idx in range(args.max_batches):
+            offset = batch_idx * args.batch_size
+            rows = load_source_raw_documents(args.db, args.source, args.batch_size, offset)
+            if not rows:
+                print(f"[reclassify-source] no rows for source={args.source!r} at batch {batch_idx + 1}")
+                break
+            candidate_rows, structured_rows = asyncio.run(
+                classify.run_classification_pipeline(
+                    args.db,
+                    input_rows=rows,
+                    use_llm=args.use_llm,
+                    llm_max_rows=args.llm_max_rows,
+                )
+            )
+            total_candidates += len(candidate_rows)
+            total_structured += len(structured_rows)
+            print(
+                f"[reclassify-source] batch {batch_idx + 1}/{args.max_batches}: "
+                f"source={args.source!r}, candidates={len(candidate_rows)}, structured={len(structured_rows)}"
+            )
+            if len(rows) < args.batch_size:
+                break
+        print(f"[reclassify-source] total candidates={total_candidates}, structured={total_structured}")
         return
 
     if args.command == "check":

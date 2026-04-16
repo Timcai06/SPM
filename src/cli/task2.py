@@ -15,6 +15,7 @@ if str(SRC_ROOT) not in sys.path:
 from capabilities.linking import link_events
 from capabilities.analysis import build_negative_samples
 from capabilities.storage import (
+    import_companies_akshare,
     import_companies_public,
     import_companies_tushare,
     import_company_profiles_akshare,
@@ -60,6 +61,12 @@ def parse_args() -> argparse.Namespace:
     import_parser.add_argument("--tushare-token", default="")
     import_parser.add_argument("--tushare-token-file", default="")
 
+    import_all_a_parser = sub.add_parser("import-companies-all-a", help="import A-share company universe directly into DB")
+    import_all_a_parser.add_argument("--db", default="stock_event_mining")
+    import_all_a_parser.add_argument("--max-symbols", type=int, default=0)
+    import_all_a_parser.add_argument("--offset", type=int, default=0)
+    import_all_a_parser.add_argument("--lock-timeout-sec", type=int, default=120)
+
     import_public_parser = sub.add_parser("import-companies-public", help="build company seed from collected public sources")
     import_public_parser.add_argument("--output", default="output/seeds/companies_public.csv")
 
@@ -81,10 +88,14 @@ def parse_args() -> argparse.Namespace:
     import_stats_parser.add_argument("--tushare-token-file", default="")
     import_stats_parser.add_argument("--days", type=int, default=30)
     import_stats_parser.add_argument("--max-symbols", type=int, default=300)
+    import_stats_parser.add_argument("--offset", type=int, default=0)
     import_stats_parser.add_argument("--sleep-sec", type=float, default=0.05)
     import_stats_parser.add_argument("--progress-every", type=int, default=20)
     import_stats_parser.add_argument("--timeout-sec", type=float, default=12.0)
     import_stats_parser.add_argument("--max-rows", type=int, default=1200)
+    import_stats_parser.add_argument("--retries", type=int, default=2)
+    import_stats_parser.add_argument("--failure-backoff-sec", type=float, default=0.8)
+    import_stats_parser.add_argument("--resume-existing", action="store_true")
 
     import_local_parser = sub.add_parser("import-company-stats-local", help="import company stats from local price CSV")
     import_local_parser.add_argument("--input", required=True)
@@ -164,6 +175,23 @@ def main() -> None:
             import_companies_tushare.main()
         return
 
+    if args.command == "import-companies-all-a":
+        with patched_argv(
+            [
+                "import_companies_akshare.py",
+                "--db",
+                args.db,
+                "--max-symbols",
+                str(args.max_symbols),
+                "--offset",
+                str(args.offset),
+                "--lock-timeout-sec",
+                str(args.lock_timeout_sec),
+            ]
+        ):
+            import_companies_akshare.main()
+        return
+
     if args.command == "import-companies-public":
         with patched_argv(["import_companies_public.py", "--output", args.output]):
             import_companies_public.main()
@@ -230,13 +258,21 @@ def main() -> None:
                 str(args.days),
                 "--max-symbols",
                 str(args.max_symbols),
+                "--offset",
+                str(args.offset),
                 "--sleep-sec",
                 str(args.sleep_sec),
                 "--progress-every",
                 str(args.progress_every),
                 "--timeout-sec",
                 str(args.timeout_sec),
+                "--retries",
+                str(args.retries),
+                "--failure-backoff-sec",
+                str(args.failure_backoff_sec),
             ]
+            if args.resume_existing:
+                argv.append("--resume-existing")
             with patched_argv(argv):
                 import_company_stats_akshare.main()
 
