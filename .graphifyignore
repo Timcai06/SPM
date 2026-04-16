@@ -1,0 +1,16 @@
+.git/
+.omx/
+.secrets/
+.playwright-cli/
+env/
+output/
+graphify-out/
+__pycache__/
+*.pyc
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+*.csv
+*.json
+.DS_Store
