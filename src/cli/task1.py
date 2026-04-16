@@ -19,7 +19,7 @@ if str(SRC_ROOT) not in sys.path:
 from capabilities.analysis import build_model_samples, feature_return
 from capabilities.collectors import run as collector_run
 from capabilities.events import canonicalize, classify
-from capabilities.quality import check, quality_report
+from capabilities.quality import check, delivery_status, quality_report
 from capabilities.storage import load_task1_canonical
 from capabilities.storage.db_guard import dsn_for
 from pipelines import task1 as task1_pipeline
@@ -130,6 +130,11 @@ def parse_args() -> argparse.Namespace:
     qa_parser.add_argument("--snapshot-path", default=str(DEFAULT_QA_SNAPSHOT))
     qa_parser.add_argument("--collector-report", default=str(DEFAULT_COLLECTOR_REPORT))
     qa_parser.add_argument("--feature-report", default=str(DEFAULT_FEATURE_REPORT))
+
+    delivery_parser = sub.add_parser("delivery-status", help="check formal data-delivery table readiness")
+    delivery_parser.add_argument("--db", default="stock_event_mining")
+    delivery_parser.add_argument("--output", default="")
+    delivery_parser.add_argument("--fail-on-blockers", action="store_true")
 
     return parser.parse_args()
 
@@ -454,6 +459,16 @@ def main() -> None:
             collector_report=Path(args.collector_report).resolve(),
             feature_report=Path(args.feature_report).resolve(),
         )
+        return
+
+    if args.command == "delivery-status":
+        argv = ["delivery_status.py", "--db", args.db]
+        if args.output:
+            argv.extend(["--output", args.output])
+        if args.fail_on_blockers:
+            argv.append("--fail-on-blockers")
+        with patched_argv(argv):
+            delivery_status.main()
         return
 
 if __name__ == "__main__":
