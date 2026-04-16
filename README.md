@@ -36,7 +36,7 @@
 - 任务 1 一键总入口：`src/pipelines/task1.py`
 - 任务 1 统一命令入口：`src/cli/task1.py`
 - 任务 2 表结构：`sql/create_task2_tables.sql`
-- 任务 1 规则说明（答辩版）：`docs/docs_task1_rulebook.md`
+- 交付层分类字典与字段映射：`docs/delivery_classification_mapping.md`
 - 附录 2 来源目录（运行时生成）：`output/meta/appendix2_sources.csv`
 - 公司导入脚本：`src/capabilities/storage/load_companies.py`
 - 公司统计特征导入脚本：`src/capabilities/storage/load_company_stats.py`
@@ -47,7 +47,7 @@
 - 任务 3 事件传播构建：`src/capabilities/graph/propagate_event_links.py`
 - 任务 3 一键入口：`src/pipelines/task3.py`
 - 任务 3 统一命令入口：`src/cli/task3.py`
-- 当前综合进展报告：`report/project_progress_20260403.md`
+- 正式表补数与无 token 路线说明：`docs/no_tushare_workflow.md`
 
 ## 已覆盖的任务 1 能力
 
@@ -342,15 +342,15 @@ psql -d stock_event_mining -f sql/create_readable_views.sql
 - 适合放入 Git：否（除“答辩快照”外）。
 - 约束：优先写库；CSV 仅用于排查、抽样复核、对外演示导出。
 
-`report/`（可追踪，面向答辩）
-- 用途：里程碑报告、质量报告、事件研究结果摘要。
-- 适合放入 Git：是（建议按批次保留关键版本）。
+`report/`（按需生成，默认不保留）
+- 用途：临时里程碑报告、质量报告、事件研究结果摘要。
+- 适合放入 Git：默认否；只有最终答辩稿或明确要求归档的报告才提交。
 - 约束：报告引用的统计口径应可通过数据库复算，不以某个临时 CSV 为准。
 
 工作流建议（与你当前双 worktree 一致）
 1. `run worktree`：执行采集/分类/入库；`output/*.csv` 只做本地缓存，不作为协作主介质。  
 2. `main/dev worktree`：只维护源码、SQL、文档（不保留 CSV）。  
-3. 需要分享数据时：从数据库按 SQL 导出“受控快照 CSV”，放到 `report/` 对应批次目录并注明 `run_id`。  
+3. 需要分享数据时：从数据库按 SQL 导出“受控快照 CSV”，按需新建 `report/` 对应批次目录并注明 `run_id`。  
 
 什么时候必须看库而不是看 CSV
 - 判断“是否真正入库成功”：以表行数和主键/唯一键冲突处理结果为准。
