@@ -60,7 +60,8 @@ def write_guard(db_name: str, required_tables: list[str], lock_timeout_sec: int 
         yield conn
     finally:
         if locked:
+            if conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
+                conn.rollback()
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_advisory_unlock(%s)", (WRITE_LOCK_KEY,))
         conn.close()
-

@@ -10,6 +10,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
@@ -27,6 +28,8 @@ INDUSTRY_L1_KEYWORDS = {
     "消费": ["食品", "饮料", "旅游", "酒店", "零售", "家电", "服装", "医美", "白酒"],
     "金融": ["银行", "保险", "证券", "多元金融"],
 }
+STOCK_BASIC_FIELDS = "ts_code,name,industry,fullname,area,market,list_date"
+STOCK_COMPANY_FIELDS = "ts_code,province,city,employees,main_business,business_scope"
 
 
 def parse_args() -> argparse.Namespace:
@@ -116,7 +119,58 @@ def build_concept_tags(industry_l1: str, industry_l2: str, name: str) -> list[st
     return tags
 
 
-def normalize_rows(df) -> list[dict[str, str]]:
+def normalize_company_type(market: str, exchange: str) -> str:
+    text = (market or "").strip()
+    if text:
+        return text
+    if exchange == "SZSE":
+        return "深市A股"
+    if exchange == "SSE":
+        return "沪市A股"
+    if exchange == "BSE":
+        return "北交所"
+    return "A股"
+
+
+def build_profile_map(pro) -> dict[str, dict[str, Any]]:
+    profile_map: dict[str, dict[str, Any]] = {}
+    for exchange in ("SSE", "SZSE", "BSE"):
+        try:
+            df = call_with_retry(
+                lambda exch=exchange: pro.stock_company(exchange=exch, fields=STOCK_COMPANY_FIELDS)
+            )
+        except Exception:
+            continue
+        if df is None or df.empty:
+            continue
+        for _, row in df.iterrows():
+            ts_code = str(row.get("ts_code") or "").strip()
+            if not ts_code:
+                continue
+            profile_map[ts_code] = {
+                "province": str(row.get("province") or "").strip(),
+                "city": str(row.get("city") or "").strip(),
+                "employees": row.get("employees"),
+                "main_business": str(row.get("main_business") or "").strip(),
+                "business_scope": str(row.get("business_scope") or "").strip(),
+            }
+    return profile_map
+
+
+def normalize_region(area: str, province: str, city: str) -> str:
+    province_text = (province or "").strip()
+    city_text = (city or "").strip()
+    area_text = (area or "").strip()
+    if province_text and city_text and city_text != province_text:
+        return f"{province_text}-{city_text}"
+    if province_text:
+        return province_text
+    if city_text:
+        return city_text
+    return area_text
+
+
+def normalize_rows(df, profile_map: dict[str, dict[str, Any]]) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
     for _, row in df.iterrows():
@@ -127,16 +181,35 @@ def normalize_rows(df) -> list[dict[str, str]]:
         company_name = str(row.get("name") or "").strip()
         industry_l2 = str(row.get("industry") or "").strip()
         industry_l1 = map_industry_l1(industry_l2)
+        exchange = map_exchange(ts_code)
+        area = str(row.get("area") or "").strip()
+        market = str(row.get("market") or "").strip()
+        list_date = str(row.get("list_date") or "").strip()
+        profile = profile_map.get(ts_code, {})
+        region = normalize_region(area, str(profile.get("province") or ""), str(profile.get("city") or ""))
+        company_type = normalize_company_type(market=market, exchange=exchange)
+        business_scope = str(profile.get("business_scope") or "").strip() or str(row.get("fullname") or "").strip()
+        main_business = str(profile.get("main_business") or "").strip()
+        employees = profile.get("employees")
         rows.append(
             {
                 "ts_code": ts_code,
                 "company_name": company_name,
-                "exchange": map_exchange(ts_code),
+                "exchange": exchange,
                 "industry_l1": industry_l1,
                 "industry_l2": industry_l2 or industry_l1,
-                "business_scope": str(row.get("fullname") or "").strip(),
-                "core_products": industry_l2 or industry_l1,
+                "business_scope": business_scope,
+                "core_products": main_business or industry_l2 or industry_l1,
                 "concept_tags": json.dumps(build_concept_tags(industry_l1, industry_l2, company_name), ensure_ascii=False),
+                "region": region,
+                "list_date": list_date,
+                "state_owned_flag": "",
+                "company_type": company_type,
+                "employees": "" if employees in (None, "") else str(employees),
+                "total_shares": "",
+                "float_shares": "",
+                "main_customers": "[]",
+                "main_suppliers": "[]",
             }
         )
     rows.sort(key=lambda item: item["ts_code"])
@@ -154,6 +227,15 @@ def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         "business_scope",
         "core_products",
         "concept_tags",
+        "region",
+        "list_date",
+        "state_owned_flag",
+        "company_type",
+        "employees",
+        "total_shares",
+        "float_shares",
+        "main_customers",
+        "main_suppliers",
     ]
     with path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -174,10 +256,11 @@ def main() -> None:
         lambda: pro.stock_basic(
             exchange="",
             list_status=args.list_status,
-            fields="ts_code,name,industry,fullname",
+            fields=STOCK_BASIC_FIELDS,
         )
     )
-    rows = normalize_rows(df)
+    profile_map = build_profile_map(pro)
+    rows = normalize_rows(df, profile_map)
     output_path = Path(args.output).resolve()
     write_csv(output_path, rows)
     print(f"Wrote {len(rows)} company rows to {output_path}")

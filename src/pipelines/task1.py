@@ -4,37 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 
 SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.analysis import feature_return
-from capabilities.collectors import run as collector_run
-from capabilities.events import canonicalize, classify
-from capabilities.quality import check
-from capabilities.storage import load_task1_canonical
-
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = "stock_event_mining"
-CLASSIFY_INPUT_FILES = [
-    "output/sources/source_gov.csv",
-    "output/sources/source_ndrc.csv",
-    "output/sources/source_csrc.csv",
-    "output/sources/source_sse.csv",
-    "output/sources/source_cninfo.csv",
-    "output/sources/source_szse.csv",
-    "output/sources/source_szse_suspension.csv",
-    "output/sources/source_yicai.csv",
-    "output/sources/source_eastmoney.csv",
-    "output/sources/source_36kr.csv",
-    "output/sources/source_caixin.csv",
-    "output/sources/source_miit.csv",
-    "output/seeds/manual_news.csv",
-]
 
 
 def parse_args() -> argparse.Namespace:
@@ -63,8 +42,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-max-rows", type=int, default=20, help="Max rows to enrich with LLM in one run.")
     return parser.parse_args()
 
-
-import asyncio
 from capabilities.collectors.run import collect_all_async
 from capabilities.events.classify import run_classification_pipeline
 from capabilities.events.canonicalize import run_canonicalization_pipeline
@@ -72,9 +49,6 @@ from capabilities.quality.check import run_validation_pipeline
 from capabilities.storage.load_task1_canonical import run_loading_pipeline
 from capabilities.storage.load_task1 import upsert_raw_documents
 from capabilities.analysis.feature_return import main as analysis_main
-
-ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DB = "stock_event_mining"
 
 
 def main() -> None:

@@ -17,6 +17,7 @@ from capabilities.analysis import build_negative_samples
 from capabilities.storage import (
     import_companies_public,
     import_companies_tushare,
+    import_company_profiles_akshare,
     import_company_stats_akshare,
     import_company_stats_local,
     import_company_stats_sina,
@@ -62,6 +63,15 @@ def parse_args() -> argparse.Namespace:
     import_public_parser = sub.add_parser("import-companies-public", help="build company seed from collected public sources")
     import_public_parser.add_argument("--output", default="output/seeds/companies_public.csv")
 
+    import_profiles_parser = sub.add_parser("import-company-profiles", help="build company profile seed from public sources")
+    import_profiles_parser.add_argument("--db", default="stock_event_mining")
+    import_profiles_parser.add_argument("--input", default="output/seeds/company_profiles_seed.csv")
+    import_profiles_parser.add_argument("--output", default="output/seeds/company_profiles_seed.csv")
+    import_profiles_parser.add_argument("--max-symbols", type=int, default=0)
+    import_profiles_parser.add_argument("--sleep-sec", type=float, default=0.05)
+    import_profiles_parser.add_argument("--progress-every", type=int, default=10)
+    import_profiles_parser.add_argument("--with-holders", action="store_true")
+
     import_stats_parser = sub.add_parser("import-company-stats", help="import company stats from Tushare or AKShare")
     import_stats_parser.add_argument("--db", default="stock_event_mining")
     import_stats_parser.add_argument("--output", default="output/seeds/company_stats.csv")
@@ -79,6 +89,7 @@ def parse_args() -> argparse.Namespace:
     import_local_parser = sub.add_parser("import-company-stats-local", help="import company stats from local price CSV")
     import_local_parser.add_argument("--input", required=True)
     import_local_parser.add_argument("--output", default="output/seeds/company_stats.csv")
+    import_local_parser.add_argument("--quotes-output", default="output/seeds/stock_daily_quotes.csv")
 
     load_stats_parser = sub.add_parser("load-company-stats", help="load company stats csv")
     load_stats_parser.add_argument("--db", default="stock_event_mining")
@@ -88,11 +99,13 @@ def parse_args() -> argparse.Namespace:
     load_profiles_parser = sub.add_parser("load-company-profiles", help="load company profiles snapshot from companies table")
     load_profiles_parser.add_argument("--db", default="stock_event_mining")
     load_profiles_parser.add_argument("--snapshot-date", default="")
+    load_profiles_parser.add_argument("--input", default="")
     load_profiles_parser.add_argument("--lock-timeout-sec", type=int, default=120)
 
     load_market_parser = sub.add_parser("load-market-environment", help="load market environment daily rows from stock quotes")
     load_market_parser.add_argument("--db", default="stock_event_mining")
     load_market_parser.add_argument("--benchmark", default="hs300")
+    load_market_parser.add_argument("--input", default="")
     load_market_parser.add_argument("--timeout-sec", type=float, default=12.0)
     load_market_parser.add_argument("--lock-timeout-sec", type=int, default=120)
 
@@ -156,6 +169,28 @@ def main() -> None:
             import_companies_public.main()
         return
 
+    if args.command == "import-company-profiles":
+        with patched_argv(
+            [
+                "import_company_profiles_akshare.py",
+                "--db",
+                args.db,
+                "--input",
+                args.input,
+                "--output",
+                args.output,
+                "--max-symbols",
+                str(args.max_symbols),
+                "--sleep-sec",
+                str(args.sleep_sec),
+                "--progress-every",
+                str(args.progress_every),
+            ]
+            + (["--with-holders"] if args.with_holders else [])
+        ):
+            import_company_profiles_akshare.main()
+        return
+
     if args.command == "import-company-stats":
         if args.source == "sina":
             argv = [
@@ -182,8 +217,43 @@ def main() -> None:
             with patched_argv(argv):
                 import_company_stats_sina.main()
             return
+        def run_akshare_import() -> None:
+            argv = [
+                "import_company_stats_akshare.py",
+                "--output",
+                args.output,
+                "--quotes-output",
+                args.quotes_output,
+                "--db",
+                args.db,
+                "--days",
+                str(args.days),
+                "--max-symbols",
+                str(args.max_symbols),
+                "--sleep-sec",
+                str(args.sleep_sec),
+                "--progress-every",
+                str(args.progress_every),
+                "--timeout-sec",
+                str(args.timeout_sec),
+            ]
+            with patched_argv(argv):
+                import_company_stats_akshare.main()
+
         if args.source in ("tushare", "auto"):
-            argv = ["import_company_stats_tushare.py", "--output", args.output, "--days", str(args.days)]
+            argv = [
+                "import_company_stats_tushare.py",
+                "--output",
+                args.output,
+                "--quotes-output",
+                args.quotes_output,
+                "--db",
+                args.db,
+                "--days",
+                str(args.days),
+                "--max-symbols",
+                str(args.max_symbols),
+            ]
             if args.tushare_token:
                 argv.extend(["--tushare-token", args.tushare_token])
             if args.tushare_token_file:
@@ -192,33 +262,54 @@ def main() -> None:
                 with patched_argv(argv):
                     import_company_stats_tushare.main()
                 return
-            except Exception as exc:
+            except (Exception, SystemExit) as exc:
                 if args.source == "tushare":
                     raise
                 print(f"[import-company-stats] tushare failed, fallback to akshare: {exc}")
-        argv = [
-            "import_company_stats_akshare.py",
-            "--output",
-            args.output,
-            "--db",
-            args.db,
-            "--days",
-            str(args.days),
-            "--max-symbols",
-            str(args.max_symbols),
-            "--sleep-sec",
-            str(args.sleep_sec),
-            "--progress-every",
-            str(args.progress_every),
-            "--timeout-sec",
-            str(args.timeout_sec),
-        ]
-        with patched_argv(argv):
-            import_company_stats_akshare.main()
+            try:
+                run_akshare_import()
+                return
+            except (Exception, SystemExit) as exc:
+                print(f"[import-company-stats] akshare failed, fallback to sina: {exc}")
+                argv = [
+                    "import_company_stats_sina.py",
+                    "--output",
+                    args.output,
+                    "--quotes-output",
+                    args.quotes_output,
+                    "--db",
+                    args.db,
+                    "--days",
+                    str(args.days),
+                    "--max-symbols",
+                    str(args.max_symbols),
+                    "--max-rows",
+                    str(args.max_rows),
+                    "--sleep-sec",
+                    str(args.sleep_sec),
+                    "--progress-every",
+                    str(args.progress_every),
+                    "--timeout-sec",
+                    str(args.timeout_sec),
+                ]
+                with patched_argv(argv):
+                    import_company_stats_sina.main()
+                return
+        run_akshare_import()
         return
 
     if args.command == "import-company-stats-local":
-        with patched_argv(["import_company_stats_local.py", "--input", args.input, "--output", args.output]):
+        with patched_argv(
+            [
+                "import_company_stats_local.py",
+                "--input",
+                args.input,
+                "--output",
+                args.output,
+                "--quotes-output",
+                args.quotes_output,
+            ]
+        ):
             import_company_stats_local.main()
         return
 
@@ -245,6 +336,8 @@ def main() -> None:
                 args.db,
                 "--snapshot-date",
                 args.snapshot_date,
+                "--input",
+                args.input,
                 "--lock-timeout-sec",
                 str(args.lock_timeout_sec),
             ]
@@ -260,6 +353,8 @@ def main() -> None:
                 args.db,
                 "--benchmark",
                 args.benchmark,
+                "--input",
+                args.input,
                 "--timeout-sec",
                 str(args.timeout_sec),
                 "--lock-timeout-sec",

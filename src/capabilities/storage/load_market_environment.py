@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import statistics
 import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import psycopg
 import requests
@@ -24,12 +25,18 @@ from capabilities.storage.db_guard import dsn_for, write_guard
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = "stock_event_mining"
+DEFAULT_INPUT = ROOT / "output" / "seeds" / "market_environment_seed.csv"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load market environment daily rows into PostgreSQL.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--benchmark", default="hs300")
+    parser.add_argument(
+        "--input",
+        default="",
+        help="Optional market environment seed CSV for northbound flow / benchmark overlay.",
+    )
     parser.add_argument("--timeout-sec", type=float, default=12.0)
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
     return parser.parse_args()
@@ -77,8 +84,11 @@ def get_trade_rows(conn: psycopg.Connection) -> list[dict[str, object]]:
                    q.ts_code,
                    q.close,
                    q.volume,
+                   q.amount,
                    q.pct_chg,
                    q.turnover_rate,
+                   q.is_limit_up,
+                   q.is_limit_down,
                    c.industry_l1
             FROM stock_daily_quotes q
             LEFT JOIN companies c ON c.ts_code = q.ts_code
@@ -88,7 +98,42 @@ def get_trade_rows(conn: psycopg.Connection) -> list[dict[str, object]]:
         return list(cur.fetchall())
 
 
-def build_market_rows(trade_rows: list[dict[str, object]], benchmark: str, timeout_sec: float) -> list[dict[str, str]]:
+def resolve_input_path(value: str) -> Path | None:
+    text = (value or "").strip()
+    if text:
+        path = Path(text).expanduser().resolve()
+        return path if path.exists() else None
+    return DEFAULT_INPUT.resolve() if DEFAULT_INPUT.exists() else None
+
+
+def safe_float(value: Any) -> Optional[float]:
+    try:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        return float(text.replace(",", ""))
+    except Exception:
+        return None
+
+
+def read_seed_rows(path: Path | None) -> dict[str, dict[str, str]]:
+    if path is None or not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        return {
+            (row.get("trade_date") or "").strip(): row
+            for row in csv.DictReader(f)
+            if (row.get("trade_date") or "").strip()
+        }
+
+
+def build_market_rows(
+    trade_rows: list[dict[str, object]],
+    benchmark: str,
+    timeout_sec: float,
+    seed_rows: dict[str, dict[str, str]] | None = None,
+) -> list[dict[str, str]]:
+    seed_rows = seed_rows or {}
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
     for row in trade_rows:
         grouped[str(row["trade_date"])].append(row)
@@ -119,6 +164,7 @@ def build_market_rows(trade_rows: list[dict[str, object]], benchmark: str, timeo
             pct = row.get("pct_chg")
             close = row.get("close")
             volume = row.get("volume")
+            amount = row.get("amount")
             industry = str(row.get("industry_l1") or "其他").strip() or "其他"
             if pct is not None:
                 try:
@@ -129,9 +175,13 @@ def build_market_rows(trade_rows: list[dict[str, object]], benchmark: str, timeo
                         up_count += 1
                     elif ret < 0:
                         down_count += 1
-                    if ret >= 0.095:
+                    if row.get("is_limit_up") is True:
                         limit_up_count += 1
-                    if ret <= -0.095:
+                    elif ret >= 0.095:
+                        limit_up_count += 1
+                    if row.get("is_limit_down") is True:
+                        limit_down_count += 1
+                    elif ret <= -0.095:
                         limit_down_count += 1
                 except Exception:
                     pass
@@ -140,6 +190,12 @@ def build_market_rows(trade_rows: list[dict[str, object]], benchmark: str, timeo
                     close_val = float(close)
                     if close_val > 0:
                         returns.append(0.0)
+                except Exception:
+                    pass
+            if amount is not None:
+                try:
+                    volume_proxy += float(amount)
+                    continue
                 except Exception:
                     pass
             if volume is not None and close is not None:
@@ -176,11 +232,16 @@ def build_market_rows(trade_rows: list[dict[str, object]], benchmark: str, timeo
             risk_on_off = 50.0 + 50.0 * ((up_count - down_count) / total)
             risk_on_off = max(0.0, min(100.0, risk_on_off))
 
+        seed_row = seed_rows.get(trade_date, {})
+        benchmark_code = (seed_row.get("benchmark_code") or "").strip() or "000300.SH"
+        benchmark_name = (seed_row.get("benchmark_name") or "").strip() or "沪深300"
+        northbound_net_flow = safe_float(seed_row.get("northbound_net_flow"))
+
         output_rows.append(
             {
                 "trade_date": trade_date,
-                "benchmark_code": "000300.SH",
-                "benchmark_name": "沪深300",
+                "benchmark_code": benchmark_code,
+                "benchmark_name": benchmark_name,
                 "index_return_1d": "" if benchmark_ret_1d is None else f"{benchmark_ret_1d:.6f}",
                 "index_return_5d": "" if benchmark_ret_5d is None else f"{benchmark_ret_5d:.6f}",
                 "index_volatility_20d": "" if benchmark_vol_20d is None else f"{benchmark_vol_20d:.6f}",
@@ -189,7 +250,7 @@ def build_market_rows(trade_rows: list[dict[str, object]], benchmark: str, timeo
                 "down_count": str(down_count),
                 "limit_up_count": str(limit_up_count),
                 "limit_down_count": str(limit_down_count),
-                "northbound_net_flow": "",
+                "northbound_net_flow": "" if northbound_net_flow is None else f"{northbound_net_flow:.4f}",
                 "sector_hotness": json.dumps(sector_hotness, ensure_ascii=False),
                 "cross_market_count": str(len(sector_hotness)),
                 "risk_on_off_score": "" if risk_on_off is None else f"{risk_on_off:.6f}",
@@ -201,6 +262,8 @@ def build_market_rows(trade_rows: list[dict[str, object]], benchmark: str, timeo
 
 def main() -> None:
     args = parse_args()
+    seed_path = resolve_input_path(args.input)
+    seed_rows = read_seed_rows(seed_path)
 
     with write_guard(
         db_name=args.db,
@@ -208,7 +271,12 @@ def main() -> None:
         lock_timeout_sec=args.lock_timeout_sec,
     ) as conn:
         trade_rows = get_trade_rows(conn)
-        market_rows = build_market_rows(trade_rows, benchmark=args.benchmark, timeout_sec=args.timeout_sec)
+        market_rows = build_market_rows(
+            trade_rows,
+            benchmark=args.benchmark,
+            timeout_sec=args.timeout_sec,
+            seed_rows=seed_rows,
+        )
         with conn.cursor() as cur:
             cur.execute("TRUNCATE TABLE market_environment_daily RESTART IDENTITY CASCADE;")
             for row in market_rows:
@@ -264,7 +332,8 @@ def main() -> None:
                 )
         conn.commit()
 
-    print(f"Loaded market_environment_daily rows into {args.db}: {len(market_rows)}")
+    seed_text = str(seed_path) if seed_path else "none"
+    print(f"Loaded market_environment_daily rows into {args.db}: {len(market_rows)} (seed={seed_text})")
 
 
 if __name__ == "__main__":

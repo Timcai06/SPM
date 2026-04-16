@@ -18,12 +18,14 @@ if str(SRC_ROOT) not in sys.path:
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = ROOT / "output" / "seeds" / "company_stats.csv"
+DEFAULT_QUOTES_OUTPUT = ROOT / "output" / "seeds" / "stock_daily_quotes.csv"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import company stats from local CSV.")
     parser.add_argument("--input", required=True, help="Local CSV with daily price data.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
+    parser.add_argument("--quotes-output", default=str(DEFAULT_QUOTES_OUTPUT))
     return parser.parse_args()
 
 
@@ -70,10 +72,22 @@ def volatility(values: list[Optional[float]]) -> Optional[float]:
     return var ** 0.5
 
 
+def normalize_bool(value) -> Optional[bool]:
+    text = str(value or "").strip().lower()
+    if not text:
+        return None
+    if text in {"1", "true", "t", "yes", "y", "是"}:
+        return True
+    if text in {"0", "false", "f", "no", "n", "否"}:
+        return False
+    return None
+
+
 def main() -> None:
     args = parse_args()
     input_path = Path(args.input).resolve()
     output_path = Path(args.output).resolve()
+    quotes_output_path = Path(args.quotes_output).resolve()
     rows = []
     with input_path.open("r", encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
@@ -91,6 +105,16 @@ def main() -> None:
                     "turnover_rate": safe_float(row.get("turnover_rate")),
                     "volume_ratio": safe_float(row.get("volume_ratio")),
                     "volume": safe_float(row.get("volume")),
+                    "amount": safe_float(row.get("amount")),
+                    "open": safe_float(row.get("open")),
+                    "high": safe_float(row.get("high")),
+                    "low": safe_float(row.get("low")),
+                    "pre_close": safe_float(row.get("pre_close")),
+                    "adj_factor": safe_float(row.get("adj_factor")),
+                    "is_suspended": normalize_bool(row.get("is_suspended")),
+                    "is_st": normalize_bool(row.get("is_st")),
+                    "is_limit_up": normalize_bool(row.get("is_limit_up")),
+                    "is_limit_down": normalize_bool(row.get("is_limit_down")),
                     "total_mv": safe_float(row.get("total_mv")),
                     "circ_mv": safe_float(row.get("circ_mv")),
                     "pe_ttm": safe_float(row.get("pe_ttm")),
@@ -105,6 +129,7 @@ def main() -> None:
         items.sort(key=lambda r: r["trade_date"])
 
     output_rows: list[dict[str, str]] = []
+    quote_rows: list[dict[str, str]] = []
     for ts_code, items in grouped.items():
         prev_close: Optional[float] = None
         computed_returns: list[Optional[float]] = []
@@ -169,6 +194,37 @@ def main() -> None:
                     "data_source": "local_csv",
                 }
             )
+            close_value = row["close"]
+            pre_close = row["pre_close"]
+            if pre_close is None and idx > 0:
+                pre_close = items[idx - 1]["close"]
+            pct_chg = row["pct_chg"]
+            if pct_chg is None and daily_return is not None:
+                pct_chg = daily_return * 100.0
+            open_price = row["open"] if row["open"] is not None else close_value
+            high_price = row["high"] if row["high"] is not None else close_value
+            low_price = row["low"] if row["low"] is not None else close_value
+            quote_rows.append(
+                {
+                    "ts_code": ts_code,
+                    "trade_date": row["trade_date"],
+                    "open": "" if open_price is None else f"{open_price:.4f}",
+                    "high": "" if high_price is None else f"{high_price:.4f}",
+                    "low": "" if low_price is None else f"{low_price:.4f}",
+                    "close": "" if close_value is None else f"{close_value:.4f}",
+                    "pre_close": "" if pre_close is None else f"{pre_close:.4f}",
+                    "pct_chg": "" if pct_chg is None else f"{pct_chg:.6f}",
+                    "volume": "" if row["volume"] is None else f"{row['volume']:.4f}",
+                    "amount": "" if row["amount"] is None else f"{row['amount']:.4f}",
+                    "turnover_rate": "" if row["turnover_rate"] is None else f"{row['turnover_rate']:.6f}",
+                    "adj_factor": "" if row["adj_factor"] is None else f"{row['adj_factor']:.6f}",
+                    "is_suspended": "true" if row["is_suspended"] else "false",
+                    "is_st": "true" if row["is_st"] else "false",
+                    "is_limit_up": "true" if row["is_limit_up"] else "false",
+                    "is_limit_down": "true" if row["is_limit_down"] else "false",
+                    "data_source": "local_csv",
+                }
+            )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="") as f:
@@ -197,7 +253,32 @@ def main() -> None:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(output_rows)
+    quotes_output_path.parent.mkdir(parents=True, exist_ok=True)
+    with quotes_output_path.open("w", encoding="utf-8", newline="") as f:
+        fieldnames = [
+            "ts_code",
+            "trade_date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "pre_close",
+            "pct_chg",
+            "volume",
+            "amount",
+            "turnover_rate",
+            "adj_factor",
+            "is_suspended",
+            "is_st",
+            "is_limit_up",
+            "is_limit_down",
+            "data_source",
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(quote_rows)
     print(f"Wrote {len(output_rows)} company stat rows to {output_path}")
+    print(f"Wrote {len(quote_rows)} stock quote rows to {quotes_output_path}")
 
 
 if __name__ == "__main__":
