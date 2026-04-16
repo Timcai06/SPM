@@ -32,9 +32,10 @@ endif
 	profiles \
 	market-env \
 	sentiment \
+	delivery-status \
 	full full-with-stats backfill \
 	text market llm trial \
-	go r q c l f t s qa si sl n bf
+	go r q c l f t s qa ds si sl n bf
 
 help:
 	@echo "推荐入口："
@@ -45,19 +46,21 @@ help:
 	@echo "  make go              # 跑一轮核心数据链（collect+link+feature+train+status）"
 	@echo "  make text            # 只扩文本事件链（等价于 make go）"
 	@echo "  make market          # 只扩市场/公司特征（默认用 Sina）"
+	@echo "  make profiles-import # 用公开源生成公司画像 seed"
 	@echo "  make profiles        # 生成公司画像快照"
 	@echo "  make market-env      # 生成市场环境日表"
 	@echo "  make sentiment       # 生成舆情传播日表"
+	@echo "  make delivery-status # 查看正式交付表完整率与阻塞项"
 	@echo "  make llm             # 用本地 Ollama 做小批量事件结构化试点"
 	@echo "  make trial           # 文本+市场一键试跑（适合日常）"
 	@echo "  make r               # 完整训练底座（go + stats-import + stats-load + negatives + status）"
 	@echo "  make q               # 快速采集（collect + status）"
 	@echo ""
 	@echo "完整命令："
-	@echo "  make collect | link | feature | train | status | qa | backfill"
+	@echo "  make collect | link | feature | train | status | qa | delivery-status | backfill"
 	@echo "  make stats-import | stats-load | negatives | full | full-with-stats"
 	@echo ""
-	@echo "短别名：c l f t s qa si sl n bf"
+	@echo "短别名：c l f t s qa ds si sl n bf"
 
 collect:
 	$(PY) src/cli/task1.py run --limit $(LIMIT) --skip-validate --db $(DB)
@@ -80,6 +83,9 @@ status:
 qa:
 	$(PY) src/cli/task1.py qa --db $(DB)
 
+delivery-status:
+	$(PY) src/cli/task1.py delivery-status --db $(DB)
+
 stats-import:
 	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(DAYS) --max-symbols $(STATS_MAX_SYMBOLS) --max-rows $(STATS_MAX_ROWS) --tushare-token-file $(TOKEN_FILE)
 
@@ -94,6 +100,9 @@ full: collect link sentiment feature train status
 full-with-stats: full stats-import stats-load profiles market-env negatives status
 
 text: full
+
+profiles-import:
+	$(PY) src/cli/task2.py import-company-profiles --db $(DB)
 
 profiles:
 	$(PY) src/cli/task2.py load-company-profiles --db $(DB)
@@ -136,6 +145,7 @@ l: link
 f: feature
 t: train
 s: status
+ds: delivery-status
 si: stats-import
 sl: stats-load
 n: negatives

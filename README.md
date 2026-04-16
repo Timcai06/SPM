@@ -112,6 +112,65 @@ python3 src/cli/task2.py load-company-stats --db stock_event_mining
 python3 src/cli/task2.py build-negative-samples --db stock_event_mining --max-per-day 100
 ```
 
+如果没有 Tushare token，可直接改走 AKShare：
+
+```bash
+python3 src/cli/task2.py import-company-stats --db stock_event_mining --source auto --days 120 --max-symbols 300
+python3 src/cli/task2.py load-company-stats --db stock_event_mining
+```
+
+说明：
+- `source auto` 现在会按 `Tushare -> AKShare -> Sina` 自动回退。
+- 无 token 环境下，通常会落到 `AKShare` 或 `Sina`。
+- 这条路线会同时生成：
+  - `output/seeds/company_stats.csv`
+  - `output/seeds/stock_daily_quotes.csv`
+- 完整的无 Tushare 流程参考：`docs/no_tushare_workflow.md`
+- 如果你本地已有终端导出的完整行情 CSV，也可以直接：
+
+```bash
+python3 src/cli/task2.py import-company-stats-local --input docs/local_market_prices_template.csv
+python3 src/cli/task2.py load-company-stats --db stock_event_mining
+```
+
+注意：
+- 本地 CSV 中的 `ts_code` 需要已存在于 `companies` 表中。
+
+导入公司画像快照（优先覆盖上市日期、地区、国企标签、员工、股本等字段）：
+
+```bash
+python3 src/cli/task2.py import-companies --output output/seeds/companies_a_share.csv --tushare-token-file .secrets/tushare_token.txt
+python3 src/cli/task2.py load-company-profiles --db stock_event_mining --input output/seeds/companies_a_share.csv
+```
+
+无 Tushare token 时，可用公开源补画像 seed：
+
+```bash
+python3 src/cli/task2.py import-company-profiles --db stock_event_mining
+python3 src/cli/task2.py load-company-profiles --db stock_event_mining --input output/seeds/company_profiles_seed.csv
+```
+
+说明：
+- `load-company-profiles` 会优先读取你传入的画像 seed CSV。
+- 若未传 `--input`，会自动尝试读取：
+  - `output/seeds/company_profiles_seed.csv`
+  - `output/seeds/companies_a_share.csv`
+  - `output/seeds/companies_public.csv`
+  - `output/seeds/companies_seed.csv`
+- 手工补录可参考模板：`docs/company_profiles_seed_template.md`
+
+生成市场环境日表，并可用 seed 覆盖北向资金/基准信息：
+
+```bash
+python3 src/cli/task2.py load-market-environment --db stock_event_mining
+python3 src/cli/task2.py load-market-environment --db stock_event_mining --input output/seeds/market_environment_seed.csv
+```
+
+说明：
+- 若 `stock_daily_quotes.amount` 已存在，`market_turnover` 优先使用真实成交额。
+- 若传入 seed，可覆盖 `northbound_net_flow`、`benchmark_code`、`benchmark_name`。
+- 手工补录可参考模板：`docs/market_environment_seed_template.md`
+
 任务 3 准备闭环：
 
 ```bash
@@ -122,6 +181,17 @@ python3 src/cli/task3.py run --db stock_event_mining --input output/seeds/compan
 - 把公司关系边导入 `company_relations`
 - 优先基于标准事件簇聚合后的 `event_company_links` 构造一跳传播结果
 - 把传播结果写入 `event_propagation_links`
+
+单独导入公司关系边：
+
+```bash
+python3 src/cli/task3.py load-relations --db stock_event_mining --input output/seeds/company_relations_seed.csv
+```
+
+说明：
+- seed 除了 `source_ts_code/target_ts_code/relation_type/relation_strength/direction` 外，
+  还支持把 `data_source`、`confidence`、`effective_date` 等额外列写入 `evidence` JSON。
+- 手工补录可参考模板：`docs/company_relations_seed_template.md`
 
 默认情况下，`task1 classify` 在写出 CSV 后会继续把结果直接写入 PostgreSQL 的 `stock_event_mining` 数据库。
 
@@ -203,14 +273,29 @@ psql -d stock_event_mining
 
 推荐直接使用 `pgAdmin4` 查看以下主表：
 
+- `raw_documents`
 - `structured_events`
-- `canonical_events`
+- `label_dictionary`
 - `companies`
+- `company_profiles`
+- `stock_daily_quotes`
+- `market_environment_daily`
+- `sentiment_propagation_daily`
 - `event_company_links`
 - `company_relations`
-- `event_propagation_links`
 - `model_event_samples`
-- `model_non_event_samples`
+
+正式交付表状态检查：
+
+```bash
+python3 src/cli/task1.py delivery-status --db stock_event_mining
+make delivery-status
+```
+
+说明：
+- `delivery-status` 只读数据库，不写入、不清理数据。
+- 输出中的 `BLOCK` 是当前正式交付表补数优先级。
+- 所有 `int_` 开头的表属于内部加工层，不作为最终交付契约。
 
 增加“易读表名层”（推荐）：
 
