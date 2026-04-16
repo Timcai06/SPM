@@ -34,9 +34,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--quotes-output", default=str(DEFAULT_QUOTES_OUTPUT))
     parser.add_argument("--days", type=int, default=30, help="Recent trading-day span target.")
     parser.add_argument("--max-symbols", type=int, default=300, help="Max stock symbols to fetch.")
+    parser.add_argument("--offset", type=int, default=0, help="Offset into the sorted company symbol list.")
     parser.add_argument("--sleep-sec", type=float, default=0.05, help="Sleep between symbol requests.")
     parser.add_argument("--progress-every", type=int, default=20, help="Print progress every N symbols.")
     parser.add_argument("--timeout-sec", type=float, default=12.0, help="Timeout for each symbol request.")
+    parser.add_argument("--retries", type=int, default=2, help="Retries per symbol on transient failures.")
+    parser.add_argument("--failure-backoff-sec", type=float, default=0.8, help="Base backoff seconds after a failed symbol fetch.")
+    parser.add_argument("--resume-existing", action="store_true", help="Skip ts_codes that already exist in output/quotes-output.")
     parser.add_argument("--db", default="stock_event_mining", help="Database used to load symbols from companies table.")
     return parser.parse_args()
 
@@ -158,17 +162,50 @@ def fetch_hist(symbol: str, start_date: str, end_date: str, timeout_sec: float):
     )
 
 
+def read_existing_rows(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def existing_ts_codes(stats_path: Path, quotes_path: Path) -> set[str]:
+    codes: set[str] = set()
+    for path in (stats_path, quotes_path):
+        for row in read_existing_rows(path):
+            ts_code = str(row.get("ts_code") or "").strip().upper()
+            if ts_code:
+                codes.add(ts_code)
+    return codes
+
+
+def dedupe_rows(rows: list[dict[str, str]], key_fields: tuple[str, ...]) -> list[dict[str, str]]:
+    deduped: dict[tuple[str, ...], dict[str, str]] = {}
+    for row in rows:
+        key = tuple(str(row.get(field) or "") for field in key_fields)
+        deduped[key] = row
+    return sorted(deduped.values(), key=lambda item: tuple(str(item.get(field) or "") for field in key_fields))
+
+
 def build_rows(
     days: int,
     max_symbols: int,
+    offset: int,
     sleep_sec: float,
     progress_every: int,
     db_name: str,
     timeout_sec: float,
+    retries: int,
+    failure_backoff_sec: float,
+    skip_ts_codes: set[str] | None = None,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     target_start = (datetime.now().date() - timedelta(days=days * 3)).strftime("%Y%m%d")
     target_end = datetime.now().date().strftime("%Y%m%d")
-    symbols = get_symbols_from_db(db_name=db_name, max_symbols=max_symbols)
+    symbols = get_symbols_from_db(db_name=db_name, max_symbols=max_symbols + max(offset, 0))
+    if offset > 0:
+        symbols = symbols[offset:]
+    symbols = symbols[:max_symbols]
+    skip_ts_codes = skip_ts_codes or set()
     if symbols:
         print(f"[akshare-stats] loaded {len(symbols)} symbols from database companies")
     else:
@@ -184,15 +221,26 @@ def build_rows(
         ts_code = symbol_to_ts_code(symbol)
         if not ts_code:
             continue
-        try:
-            hist = fetch_hist(symbol=symbol, start_date=target_start, end_date=target_end, timeout_sec=timeout_sec)
-        except TimeoutError:
-            fail_count += 1
-            time.sleep(sleep_sec)
+        if ts_code in skip_ts_codes:
             continue
-        except Exception:
+        hist = None
+        last_error: Exception | None = None
+        for attempt in range(retries + 1):
+            try:
+                hist = fetch_hist(symbol=symbol, start_date=target_start, end_date=target_end, timeout_sec=timeout_sec)
+                break
+            except TimeoutError as exc:
+                last_error = exc
+            except Exception as exc:
+                last_error = exc
+            if attempt < retries:
+                time.sleep(failure_backoff_sec * (attempt + 1))
+        if hist is None:
             fail_count += 1
-            time.sleep(sleep_sec)
+            if progress_every > 0 and (idx == 1 or idx % progress_every == 0):
+                reason = type(last_error).__name__ if last_error else "unknown"
+                print(f"[akshare-stats] fail {idx}/{total_symbols} {ts_code} reason={reason}")
+            time.sleep(max(sleep_sec, failure_backoff_sec))
             continue
         if hist is None or hist.empty:
             time.sleep(sleep_sec)
@@ -387,21 +435,31 @@ _QUOTES_FIELDS = [
 
 def main() -> None:
     args = parse_args()
+    output_path = Path(args.output).resolve()
+    quotes_output_path = Path(args.quotes_output).resolve()
+    skip_ts_codes = existing_ts_codes(output_path, quotes_output_path) if args.resume_existing else set()
+    if skip_ts_codes:
+        print(f"[akshare-stats] resume-existing enabled, skipping {len(skip_ts_codes)} ts_codes already present in seed outputs")
     rows, quote_rows = build_rows(
         days=args.days,
         max_symbols=args.max_symbols,
+        offset=args.offset,
         sleep_sec=args.sleep_sec,
         progress_every=args.progress_every,
         db_name=args.db,
         timeout_sec=args.timeout_sec,
+        retries=args.retries,
+        failure_backoff_sec=args.failure_backoff_sec,
+        skip_ts_codes=skip_ts_codes,
     )
     if not rows and not quote_rows:
         raise RuntimeError(
             "AKShare returned zero company stat rows and zero stock quote rows. "
             "Upstream may be unavailable or rejecting requests; retry later or fall back to Sina/local CSV."
         )
-    output_path = Path(args.output).resolve()
-    quotes_output_path = Path(args.quotes_output).resolve()
+    if args.resume_existing:
+        rows = dedupe_rows(read_existing_rows(output_path) + rows, ("ts_code", "trade_date"))
+        quote_rows = dedupe_rows(read_existing_rows(quotes_output_path) + quote_rows, ("ts_code", "trade_date"))
     write_csv(output_path, rows, _STATS_FIELDS)
     write_csv(quotes_output_path, quote_rows, _QUOTES_FIELDS)
     print(f"Wrote {len(rows)} company stat rows to {output_path}")

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import statistics
 import sys
 from collections import defaultdict
@@ -111,7 +112,10 @@ def safe_float(value: Any) -> Optional[float]:
         text = str(value or "").strip()
         if not text:
             return None
-        return float(text.replace(",", ""))
+        number = float(text.replace(",", ""))
+        if math.isnan(number):
+            return None
+        return number
     except Exception:
         return None
 
