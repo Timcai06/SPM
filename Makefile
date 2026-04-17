@@ -7,6 +7,7 @@ TIME_BUDGET ?= 180
 MAX_ROWS ?= 200
 API_TIMEOUT ?= 10
 PROGRESS_EVERY ?= 5
+LINK_PROGRESS_EVERY ?= 250
 TOKEN_FILE ?= .secrets/tushare_token.txt
 USE_TUSHARE ?= 0
 STATS_SOURCE ?= sina
@@ -19,6 +20,24 @@ BACKFILL_LIMIT ?= 60
 BACKFILL_MAX_ROWS ?= 300
 BACKFILL_DAYS ?= 120
 BACKFILL_STATS_MAX_SYMBOLS ?= 200
+HISTORY_SOURCE ?= cninfo-disclosure
+HISTORY_SYMBOL_SOURCE ?= db
+HISTORY_START ?= 2023-01-01
+HISTORY_END ?= 2025-12-31
+HISTORY_MAX_SYMBOLS ?= 200
+HISTORY_OFFSET ?= 0
+HISTORY_LIMIT_PER_SYMBOL ?= 100
+HISTORY_WORKERS ?= 4
+HISTORY_RETRIES ?= 2
+HISTORY_SLEEP ?= 0.1
+CLASSIFY_BATCH_SIZE ?= 3000
+CLASSIFY_MAX_BATCHES ?= 20
+RECLASSIFY_SOURCE ?= 巨潮资讯网/历史公告
+RECLASSIFY_BATCH_SIZE ?= 5000
+RECLASSIFY_MAX_BATCHES ?= 10
+INDUSTRY_MAX ?= 100
+INDUSTRY_OFFSET ?= 0
+INDUSTRY_SLEEP ?= 0.05
 
 FEATURE_TOKEN_ARG :=
 ifeq ($(USE_TUSHARE),1)
@@ -28,6 +47,7 @@ FEATURE_TOKEN_ARG := --disable-tushare
 endif
 
 .PHONY: help \
+	companies-all industries history classify-pending reclassify-source relink core-status core-pipeline \
 	collect link feature train status qa stats-import stats-load negatives \
 	profiles \
 	market-env \
@@ -39,34 +59,80 @@ endif
 
 help:
 	@echo "推荐入口："
-	@echo "  ./atk go             # 与 make go 等价（建议以后优先用 atk）"
-	@echo "  ./atk bf             # 历史补报模式（多轮采集 + 扩公司统计特征）"
+	@echo "  make core-pipeline       # 四张核心表流水线：采历史 -> 分类 -> 链接 -> 状态"
+	@echo "  make companies-all       # 扩 companies 到全A公司池"
+	@echo "  make industries          # 补 companies 行业字段（可分批）"
+	@echo "  make history             # 历史采集 raw_documents（默认巨潮公告）"
+	@echo "  make classify-pending    # 分类未处理 raw_documents"
+	@echo "  make reclassify-source   # 重跑某个来源的分类规则"
+	@echo "  make relink              # 重跑 event_company_links，带进度"
+	@echo "  make core-status         # 查看四张核心表规模与质量摘要"
 	@echo ""
-	@echo "最常用："
-	@echo "  make go              # 跑一轮核心数据链（collect+link+feature+train+status）"
-	@echo "  make text            # 只扩文本事件链（等价于 make go）"
-	@echo "  make market          # 只扩市场/公司特征（默认用 Sina）"
-	@echo "  make profiles-import # 用公开源生成公司画像 seed"
-	@echo "  make profiles        # 生成公司画像快照"
-	@echo "  make market-env      # 生成市场环境日表"
-	@echo "  make sentiment       # 生成舆情传播日表"
-	@echo "  make delivery-status # 查看正式交付表完整率与阻塞项"
-	@echo "  make llm             # 用本地 Ollama 做小批量事件结构化试点"
-	@echo "  make trial           # 文本+市场一键试跑（适合日常）"
-	@echo "  make r               # 完整训练底座（go + stats-import + stats-load + negatives + status）"
-	@echo "  make q               # 快速采集（collect + status）"
+	@echo "常用参数："
+	@echo "  make history HISTORY_SOURCE=akshare-news HISTORY_MAX_SYMBOLS=1000 HISTORY_OFFSET=0 HISTORY_LIMIT_PER_SYMBOL=20 HISTORY_WORKERS=12"
+	@echo "  make industries INDUSTRY_MAX=100 INDUSTRY_OFFSET=100"
+	@echo "  make reclassify-source RECLASSIFY_SOURCE='巨潮资讯网/历史公告'"
 	@echo ""
-	@echo "完整命令："
-	@echo "  make collect | link | feature | train | status | qa | delivery-status | backfill"
-	@echo "  make stats-import | stats-load | negatives | full | full-with-stats"
+	@echo "旧目标仍可用：collect link feature train status qa delivery-status stats-import stats-load market-env sentiment"
 	@echo ""
-	@echo "短别名：c l f t s qa ds si sl n bf"
+	@echo "短别名：s=status ds=delivery-status l=relink"
+
+companies-all:
+	$(PY) src/cli/task2.py import-companies-all-a --db $(DB)
+
+industries:
+	$(PY) src/cli/task2.py import-company-industries \
+		--db $(DB) \
+		--max-industries $(INDUSTRY_MAX) \
+		--offset $(INDUSTRY_OFFSET) \
+		--sleep-sec $(INDUSTRY_SLEEP) \
+		--progress-every 20
+
+history:
+	$(PY) src/cli/task1.py collect-history \
+		--db $(DB) \
+		--source $(HISTORY_SOURCE) \
+		--symbol-source $(HISTORY_SYMBOL_SOURCE) \
+		--start-date $(HISTORY_START) \
+		--end-date $(HISTORY_END) \
+		--max-symbols $(HISTORY_MAX_SYMBOLS) \
+		--offset $(HISTORY_OFFSET) \
+		--limit-per-symbol $(HISTORY_LIMIT_PER_SYMBOL) \
+		--workers $(HISTORY_WORKERS) \
+		--retries $(HISTORY_RETRIES) \
+		--sleep-sec $(HISTORY_SLEEP)
+
+classify-pending:
+	$(PY) src/cli/task1.py classify-pending \
+		--db $(DB) \
+		--batch-size $(CLASSIFY_BATCH_SIZE) \
+		--max-batches $(CLASSIFY_MAX_BATCHES)
+
+reclassify-source:
+	$(PY) src/cli/task1.py reclassify-source \
+		--db $(DB) \
+		--source '$(RECLASSIFY_SOURCE)' \
+		--batch-size $(RECLASSIFY_BATCH_SIZE) \
+		--max-batches $(RECLASSIFY_MAX_BATCHES)
+
+relink:
+	$(PY) src/cli/task2.py link-events \
+		--db $(DB) \
+		--top-k $(TOP_K) \
+		--min-score $(MIN_SCORE) \
+		--progress-every $(LINK_PROGRESS_EVERY)
+
+core-status:
+	psql -d $(DB) -c "select 'companies' as table_name, count(*) as rows from companies union all select 'raw_documents', count(*) from raw_documents union all select 'structured_events', count(*) from structured_events union all select 'event_company_links', count(*) from event_company_links order by table_name;"
+	psql -d $(DB) -c "select count(*) as events, count(*) filter (where event_subject_subtype='未细分') as unrefined_subtype, count(*) filter (where subject_entities='[]'::jsonb) as empty_entities from structured_events;"
+	psql -d $(DB) -c "select count(*) as links, count(distinct structured_event_id) as linked_events, count(distinct company_id) as linked_companies, count(*) filter (where link_type='direct_match') as direct_links, count(*) filter (where link_type='industry_match') as industry_links, round(avg(final_link_score)::numeric, 4) as avg_score from event_company_links;"
+
+core-pipeline: history classify-pending relink core-status
 
 collect:
 	$(PY) src/cli/task1.py run --limit $(LIMIT) --skip-validate --db $(DB)
 
-link:
-	$(PY) src/cli/task2.py run --db $(DB) --top-k $(TOP_K) --min-score $(MIN_SCORE)
+link: relink
 
 feature:
 	$(PY) src/cli/task1.py feature --db $(DB) --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --time-budget-sec $(TIME_BUDGET) --max-rows $(MAX_ROWS) --api-timeout-sec $(API_TIMEOUT) --progress-every $(PROGRESS_EVERY) $(FEATURE_TOKEN_ARG)
