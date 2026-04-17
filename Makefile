@@ -38,6 +38,9 @@ RECLASSIFY_MAX_BATCHES ?= 10
 INDUSTRY_MAX ?= 100
 INDUSTRY_OFFSET ?= 0
 INDUSTRY_SLEEP ?= 0.05
+STANDARD_INDUSTRY_MAX ?= 200
+STANDARD_INDUSTRY_OFFSET ?= 0
+STANDARD_INDUSTRY_SLEEP ?= 0.05
 
 FEATURE_TOKEN_ARG :=
 ifeq ($(USE_TUSHARE),1)
@@ -47,7 +50,7 @@ FEATURE_TOKEN_ARG := --disable-tushare
 endif
 
 .PHONY: help \
-	companies-all industries history classify-pending reclassify-source relink core-status core-pipeline \
+	companies-all standard-industries industries history classify-pending reclassify-source relink core-status core-pipeline \
 	collect link feature train status qa stats-import stats-load negatives \
 	profiles \
 	market-env \
@@ -61,7 +64,8 @@ help:
 	@echo "推荐入口："
 	@echo "  make core-pipeline       # 四张核心表流水线：采历史 -> 分类 -> 链接 -> 状态"
 	@echo "  make companies-all       # 扩 companies 到全A公司池"
-	@echo "  make industries          # 补 companies 行业字段（可分批）"
+	@echo "  make standard-industries # 补 companies 一级标准行业（CNInfo/证监会口径）"
+	@echo "  make industries          # 补 companies 二级行业/概念标签（东方财富板块）"
 	@echo "  make history             # 历史采集 raw_documents（默认巨潮公告）"
 	@echo "  make classify-pending    # 分类未处理 raw_documents"
 	@echo "  make reclassify-source   # 重跑某个来源的分类规则"
@@ -70,6 +74,7 @@ help:
 	@echo ""
 	@echo "常用参数："
 	@echo "  make history HISTORY_SOURCE=akshare-news HISTORY_MAX_SYMBOLS=1000 HISTORY_OFFSET=0 HISTORY_LIMIT_PER_SYMBOL=20 HISTORY_WORKERS=12"
+	@echo "  make standard-industries STANDARD_INDUSTRY_MAX=200 STANDARD_INDUSTRY_OFFSET=0"
 	@echo "  make industries INDUSTRY_MAX=100 INDUSTRY_OFFSET=100"
 	@echo "  make reclassify-source RECLASSIFY_SOURCE='巨潮资讯网/历史公告'"
 	@echo ""
@@ -79,6 +84,14 @@ help:
 
 companies-all:
 	$(PY) src/cli/task2.py import-companies-all-a --db $(DB)
+
+standard-industries:
+	$(PY) src/cli/task2.py import-company-standard-industries \
+		--db $(DB) \
+		--max-symbols $(STANDARD_INDUSTRY_MAX) \
+		--offset $(STANDARD_INDUSTRY_OFFSET) \
+		--sleep-sec $(STANDARD_INDUSTRY_SLEEP) \
+		--progress-every 20
 
 industries:
 	$(PY) src/cli/task2.py import-company-industries \

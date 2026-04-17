@@ -20,6 +20,7 @@ from capabilities.storage import (
     import_companies_tushare,
     import_company_industries_akshare,
     import_company_profiles_akshare,
+    import_company_standard_industries_akshare,
     import_company_stats_akshare,
     import_company_stats_local,
     import_company_stats_sina,
@@ -75,6 +76,19 @@ def parse_args() -> argparse.Namespace:
     import_industries_parser.add_argument("--sleep-sec", type=float, default=0.05)
     import_industries_parser.add_argument("--progress-every", type=int, default=20)
     import_industries_parser.add_argument("--lock-timeout-sec", type=int, default=120)
+
+    import_standard_industries_parser = sub.add_parser(
+        "import-company-standard-industries",
+        help="backfill standard company industry_l1 from CNInfo classification",
+    )
+    import_standard_industries_parser.add_argument("--db", default="stock_event_mining")
+    import_standard_industries_parser.add_argument("--max-symbols", type=int, default=200)
+    import_standard_industries_parser.add_argument("--offset", type=int, default=0)
+    import_standard_industries_parser.add_argument("--start-date", default="20230101")
+    import_standard_industries_parser.add_argument("--end-date", default="20251231")
+    import_standard_industries_parser.add_argument("--sleep-sec", type=float, default=0.05)
+    import_standard_industries_parser.add_argument("--progress-every", type=int, default=20)
+    import_standard_industries_parser.add_argument("--lock-timeout-sec", type=int, default=120)
 
     import_public_parser = sub.add_parser("import-companies-public", help="build company seed from collected public sources")
     import_public_parser.add_argument("--output", default="output/seeds/companies_public.csv")
@@ -221,6 +235,31 @@ def main() -> None:
             ]
         ):
             import_company_industries_akshare.main()
+        return
+
+    if args.command == "import-company-standard-industries":
+        with patched_argv(
+            [
+                "import_company_standard_industries_akshare.py",
+                "--db",
+                args.db,
+                "--max-symbols",
+                str(args.max_symbols),
+                "--offset",
+                str(args.offset),
+                "--start-date",
+                args.start_date,
+                "--end-date",
+                args.end_date,
+                "--sleep-sec",
+                str(args.sleep_sec),
+                "--progress-every",
+                str(args.progress_every),
+                "--lock-timeout-sec",
+                str(args.lock_timeout_sec),
+            ]
+        ):
+            import_company_standard_industries_akshare.main()
         return
 
     if args.command == "import-companies-public":
