@@ -139,8 +139,27 @@ STRUCTURED_EVENT_FIELDS = [
     "classification_evidence",
 ]
 
-ENTITY_PATTERN = re.compile(r"[0-9]{6}\.(?:SZ|SH)|印巴|克什米尔|歼\-?10CE|中航成飞|储能|机器人")
+ENTITY_PATTERN = re.compile(
+    r"[0-9]{6}\.(?:SZ|SH|BJ)|"
+    r"[0-9]{6}|"
+    r"[\u4e00-\u9fa5A-Za-z0-9\*]{2,20}(?:股份有限公司|集团股份有限公司|集团有限公司|有限公司|集团|银行|证券|保险|医药|科技|电力|动力|航空|生物|智农|制药|能源)|"
+    r"印巴|克什米尔|歼\-?10CE|中航成飞|霍尔木兹|中东"
+)
 GENERIC_EVENT_HITS = {"公告"}
+GENERIC_ENTITY_PREFIXES = {
+    "关于",
+    "公司",
+    "行业",
+    "本次",
+    "有关",
+    "今日",
+    "今年",
+    "一季度",
+    "二季度",
+    "三季度",
+    "四季度",
+    "年度",
+}
 LLM_SUBJECT_MAP = {
     "macro": "宏观类",
     "policy": "政策类",
@@ -192,11 +211,12 @@ SUBTYPE_RULES = {
     "业绩公告": ("业绩", "营收", "净利润", "利润", "财报", "预告"),
     "重大合同": ("合同", "订单", "中标", "采购"),
     "产能投产": ("投产", "扩产", "产能", "开工", "竣工"),
-    "产品发布": ("产品发布", "新品", "发布会"),
-    "股权变动": ("股权", "增持", "减持", "回购", "并购", "重组"),
+    "产品发布": ("产品发布", "新品", "发布会", "临床试验批准", "临床试验申请", "上市许可申请", "获受理", "获批"),
+    "股权变动": ("股权", "增持", "减持", "回购", "并购", "重组", "定增", "递表", "IPO", "辅导验收", "发行H股", "赴港IPO", "股份冻结", "股份转让"),
     "诉讼仲裁": ("诉讼", "仲裁", "法院裁定", "处罚", "监管措施"),
+    "高管变动": ("聘任", "辞职", "辞任", "财务总监", "董秘", "总裁", "董事长", "高管"),
     "技术标准": ("技术标准", "行业标准", "标准发布"),
-    "供需价格": ("价格", "涨价", "降价", "库存", "供需"),
+    "供需价格": ("价格", "涨价", "降价", "库存", "供需", "资金流入", "资金流出", "两融余额", "股息率", "成交额突破", "净流入", "净流出", "杠杆资金", "排行榜", "新建仓"),
     "宏观数据": ("GDP", "CPI", "PPI", "PMI", "社融", "失业率", "增加值"),
     "贸易摩擦": ("贸易摩擦", "关税", "制裁", "出口管制"),
     "区域冲突": ("冲突", "战事", "空战", "停火", "中东", "霍尔木兹", "印巴"),
@@ -651,13 +671,32 @@ def compute_event_code(
     return "-".join(part.replace("/", "") for part in parts if part)
 
 
-def extract_subject_entities(text: str) -> List[str]:
+def normalize_entity_candidate(text: str) -> str:
+    candidate = re.sub(r"\s+", "", text.strip())
+    candidate = candidate.strip("：:，。；;（）()[]【】")
+    if not candidate or candidate in GENERIC_ENTITY_TOKENS:
+        return ""
+    if any(candidate.startswith(prefix) for prefix in GENERIC_ENTITY_PREFIXES):
+        return ""
+    if len(candidate) < 2 or len(candidate) > 24:
+        return ""
+    return candidate
+
+
+def extract_subject_entities(text: str, symbol_or_subject: str = "", title: str = "") -> List[str]:
     seen = []
+    if title:
+        title_prefix = re.split(r"[：:]", title, maxsplit=1)[0]
+        prefix_candidate = normalize_entity_candidate(title_prefix)
+        if prefix_candidate and prefix_candidate not in seen:
+            seen.append(prefix_candidate)
+    symbol_candidate = normalize_entity_candidate(symbol_or_subject)
+    if symbol_candidate and symbol_candidate not in seen:
+        seen.append(symbol_candidate)
     for match in ENTITY_PATTERN.findall(text):
-        if match in GENERIC_ENTITY_TOKENS:
-            continue
-        if match not in seen:
-            seen.append(match)
+        candidate = normalize_entity_candidate(match)
+        if candidate and candidate not in seen:
+            seen.append(candidate)
     return seen
 
 
@@ -781,7 +820,7 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
     industry_type = freeze_enum(industry_type, INDUSTRY_ENUM, INDUSTRY_DEFAULT)
     predictability_type = freeze_enum(predictability_type, PREDICTABILITY_ENUM, PREDICTABILITY_DEFAULT)
     duration_type = freeze_enum(duration_type, DURATION_ENUM, DURATION_DEFAULT)
-    subject_entities = extract_subject_entities(full_text)
+    subject_entities = extract_subject_entities(full_text, row.get("symbol_or_subject", ""), row.get("title", ""))
     sentiment = compute_sentiment(full_text)
     heat_score = compute_heat_score(row["title"], row["source"], result.duplicate_group_size)
     intensity_score = compute_intensity_score(full_text, subject_type, predictability_type)

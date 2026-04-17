@@ -130,6 +130,7 @@ def parse_args() -> argparse.Namespace:
     link_parser.add_argument("--top-k", type=int, default=3)
     link_parser.add_argument("--min-score", type=float, default=0.35)
     link_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
+    link_parser.add_argument("--progress-every", type=int, default=250)
 
     negative_parser = sub.add_parser("build-negative-samples", help="build non-event training samples")
     negative_parser.add_argument("--db", default="stock_event_mining")
@@ -426,6 +427,8 @@ def main() -> None:
                 str(args.min_score),
                 "--canonical-map",
                 args.canonical_map,
+                "--progress-every",
+                str(args.progress_every),
             ]
         ):
             link_events.main()

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from decimal import Decimal
 from pathlib import Path
 
@@ -77,6 +78,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-score", type=float, default=0.35)
     parser.add_argument("--lock-timeout-sec", type=int, default=120, help="Max seconds to wait for DB write lock.")
     parser.add_argument("--canonical-map", default=str(CANONICAL_MAP_PATH), help="Optional event canonical map CSV.")
+    parser.add_argument("--progress-every", type=int, default=250, help="Print progress every N clustered events.")
     return parser.parse_args()
 
 
@@ -262,11 +264,19 @@ def main() -> None:
                     """
                 )
                 companies = cur.fetchall()
+                total_events = len(cluster_events)
+                total_companies = len(companies)
+                started_at = time.time()
+                print(
+                    f"[link-events] start clustered_events={total_events}, companies={total_companies}, "
+                    f"top_k={args.top_k}, min_score={args.min_score}",
+                    flush=True,
+                )
 
                 upserted = 0
                 touched_structured_event_ids: set[int] = set()
                 current_keys: list[tuple[int, int, str]] = []
-                for event in cluster_events:
+                for event_idx, event in enumerate(cluster_events, start=1):
                     scored = []
                     for company in companies:
                         final_score, details = score_link(event, company)
@@ -326,6 +336,14 @@ def main() -> None:
                             upserted += 1
                             touched_structured_event_ids.add(sid)
                             current_keys.append((sid, int(company["id"]), str(link_type)))
+                    if args.progress_every > 0 and (event_idx == 1 or event_idx % args.progress_every == 0 or event_idx == total_events):
+                        elapsed = int(time.time() - started_at)
+                        print(
+                            f"[link-events] progress {event_idx}/{total_events}, "
+                            f"candidate_links={upserted}, touched_events={len(touched_structured_event_ids)}, "
+                            f"elapsed={elapsed}s",
+                            flush=True,
+                        )
 
                 stale_deleted = 0
                 if touched_structured_event_ids:
