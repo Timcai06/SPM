@@ -47,6 +47,8 @@ STANDARD_INDUSTRY_RETRIES ?= 2
 STANDARD_INDUSTRY_BACKOFF ?= 0.8
 STANDARD_INDUSTRY_ONLY_DIRTY ?=
 STANDARD_INDUSTRY_SKIP_LEGACY ?=
+DELIVERY_DIR ?= output/delivery
+MAX_EXPORT_MB ?= 400
 
 FEATURE_TOKEN_ARG :=
 ifeq ($(USE_TUSHARE),1)
@@ -57,6 +59,7 @@ endif
 
 .PHONY: help \
 	companies-all standard-industries industries history classify-pending reclassify-source relink core-status core-pipeline \
+	cluster-stats backfill-structured-features export-yearly check-export-size \
 	collect link feature train status qa stats-import stats-load negatives \
 	profiles \
 	market-env \
@@ -76,6 +79,9 @@ help:
 	@echo "  make classify-pending    # 分类未处理 raw_documents"
 	@echo "  make reclassify-source   # 重跑某个来源的分类规则"
 	@echo "  make relink              # 重跑 event_company_links，带进度"
+	@echo "  make cluster-stats       # 回填事件簇统计特征（报道量/分歧度等）"
+	@echo "  make backfill-structured-features # 回填结构化事件新增特征列"
+	@echo "  make export-yearly       # 按年导出 structured_events / event_company_links"
 	@echo "  make core-status         # 查看四张核心表规模与质量摘要"
 	@echo ""
 	@echo "常用参数："
@@ -146,6 +152,34 @@ relink:
 		--top-k $(TOP_K) \
 		--min-score $(MIN_SCORE) \
 		--progress-every $(LINK_PROGRESS_EVERY)
+
+cluster-stats:
+	$(PY) src/capabilities/jobs/events/cluster_stats_job.py --db $(DB)
+
+backfill-structured-features:
+	$(PY) src/capabilities/jobs/events/backfill_structured_features_job.py --db $(DB) --batch-size 5000 --max-batches 0
+
+export-yearly:
+	mkdir -p $(DELIVERY_DIR)
+	psql -d $(DB) -c "\copy (select * from structured_events where event_date >= date '2023-01-01' and event_date < date '2024-01-01') to '$(DELIVERY_DIR)/structured_events_2023.csv' csv header"
+	psql -d $(DB) -c "\copy (select * from structured_events where event_date >= date '2024-01-01' and event_date < date '2025-01-01') to '$(DELIVERY_DIR)/structured_events_2024.csv' csv header"
+	psql -d $(DB) -c "\copy (select * from structured_events where event_date >= date '2025-01-01' and event_date < date '2026-01-01') to '$(DELIVERY_DIR)/structured_events_2025.csv' csv header"
+	psql -d $(DB) -c "\copy (select l.* from event_company_links l join structured_events se on se.id=l.structured_event_id where se.event_date >= date '2023-01-01' and se.event_date < date '2024-01-01') to '$(DELIVERY_DIR)/event_company_links_2023.csv' csv header"
+	psql -d $(DB) -c "\copy (select l.* from event_company_links l join structured_events se on se.id=l.structured_event_id where se.event_date >= date '2024-01-01' and se.event_date < date '2025-01-01') to '$(DELIVERY_DIR)/event_company_links_2024.csv' csv header"
+	psql -d $(DB) -c "\copy (select l.* from event_company_links l join structured_events se on se.id=l.structured_event_id where se.event_date >= date '2025-01-01' and se.event_date < date '2026-01-01') to '$(DELIVERY_DIR)/event_company_links_2025.csv' csv header"
+	$(MAKE) check-export-size
+
+check-export-size:
+	@echo "[check-export-size] max_mb=$(MAX_EXPORT_MB)"
+	@for f in $(DELIVERY_DIR)/*.csv; do \
+		bytes=$$(wc -c < $$f); \
+		mb=$$((bytes / 1024 / 1024)); \
+		echo "$$f => $${mb}MB"; \
+		if [ $$mb -gt $(MAX_EXPORT_MB) ]; then \
+			echo "ERROR: $$f exceeds $(MAX_EXPORT_MB)MB"; \
+			exit 1; \
+		fi; \
+	done
 
 core-status:
 	psql -d $(DB) -c "select 'companies' as table_name, count(*) as rows from companies union all select 'raw_documents', count(*) from raw_documents union all select 'structured_events', count(*) from structured_events union all select 'event_company_links', count(*) from event_company_links order by table_name;"

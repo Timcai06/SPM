@@ -32,7 +32,26 @@ CREATE TABLE IF NOT EXISTS int_structured_events_stage (
     uncertainty_score TEXT,
     novelty_score TEXT,
     amount_scale TEXT,
+    amount_max_rmb TEXT,
+    amount_log_rmb TEXT,
     event_code TEXT,
+    sw_l1_industry TEXT,
+    sw_l1_industry_code TEXT,
+    sentiment_score_0_100 TEXT,
+    source_credibility_type TEXT,
+    company_count TEXT,
+    industry_count TEXT,
+    province_count TEXT,
+    city_count TEXT,
+    country_count TEXT,
+    chain_stage_count TEXT,
+    chain_stages TEXT,
+    report_count TEXT,
+    media_coverage_count TEXT,
+    heat_growth_rate TEXT,
+    heat_duration_days TEXT,
+    disagreement_score TEXT,
+    classification_confidence TEXT,
     heat_score TEXT NOT NULL,
     intensity_score TEXT NOT NULL,
     impact_scope TEXT NOT NULL,
@@ -54,4 +73,23 @@ ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS explicitness_sc
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS uncertainty_score TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS novelty_score TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS amount_scale TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS amount_max_rmb TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS amount_log_rmb TEXT;
 ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS event_code TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS sw_l1_industry TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS sw_l1_industry_code TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS sentiment_score_0_100 TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS source_credibility_type TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS company_count TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS industry_count TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS province_count TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS city_count TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS country_count TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS chain_stage_count TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS chain_stages TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS report_count TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS media_coverage_count TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS heat_growth_rate TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS heat_duration_days TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS disagreement_score TEXT;
+ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS classification_confidence TEXT;

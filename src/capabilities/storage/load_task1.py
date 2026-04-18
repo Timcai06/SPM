@@ -20,6 +20,10 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.storage.db_guard import dsn_for, write_guard
+from capabilities.adapters.task1.stage_builders import (
+    build_candidate_stage_rows,
+    build_structured_stage_rows,
+)
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -68,7 +72,26 @@ STRUCTURED_STAGE_FIELDS = [
     "uncertainty_score",
     "novelty_score",
     "amount_scale",
+    "amount_max_rmb",
+    "amount_log_rmb",
     "event_code",
+    "sw_l1_industry",
+    "sw_l1_industry_code",
+    "sentiment_score_0_100",
+    "source_credibility_type",
+    "company_count",
+    "industry_count",
+    "province_count",
+    "city_count",
+    "country_count",
+    "chain_stage_count",
+    "chain_stages",
+    "report_count",
+    "media_coverage_count",
+    "heat_growth_rate",
+    "heat_duration_days",
+    "disagreement_score",
+    "classification_confidence",
     "heat_score",
     "intensity_score",
     "impact_scope",
@@ -230,69 +253,12 @@ def upsert_raw_documents(db: str, rows: list[dict[str, str]]) -> None:
         conn.commit()
 
 
-def build_candidate_stage_rows(raw_candidates: list[dict[str, str]], raw_documents: list[dict[str, str]]) -> list[dict[str, str]]:
-    stage_rows = []
-    for row in raw_candidates:
-        stage_rows.append(
-            {
-                "raw_document_url": row["url"],
-                "dedup_key": row["dedup_key"],
-                "duplicate_group_size": row["duplicate_group_size"],
-                "is_event": row["is_event"],
-                "filter_reason": row["filter_reason"],
-                "evidence": row["evidence"],
-                "score_hint": row["score_hint"] or "",
-            }
-        )
-    return stage_rows
-
-
-def build_structured_stage_rows(structured_events: list[dict[str, str]]) -> list[dict[str, str]]:
-    stage_rows = []
-    for row in structured_events:
-        stage_rows.append(
-            {
-                "event_id": row["event_id"],
-                "raw_text_ref": row["raw_text_ref"],
-                "event_name": row["event_name"],
-                "event_date": row["event_date"],
-                "source": row["source"],
-                "source_type": row.get("source_type", "其他来源"),
-                "authority_level": row.get("authority_level", "general_media"),
-                "source_credibility_score": row.get("source_credibility_score", "1"),
-                "event_subject_type": row["event_subject_type"],
-                "event_subject_subtype": row.get("event_subject_subtype", "未细分"),
-                "duration_type": row["duration_type"],
-                "predictability_type": row["predictability_type"],
-                "industry_type": row["industry_type"],
-                "sentiment": row["sentiment"],
-                "time_orientation": row.get("time_orientation", "current_confirmed"),
-                "event_stage": row.get("event_stage", "确认"),
-                "shock_source_type": row.get("shock_source_type", "其他"),
-                "region_scope": row.get("region_scope", "domestic"),
-                "trigger_word_score": row.get("trigger_word_score", "0"),
-                "explicitness_score": row.get("explicitness_score", "0"),
-                "uncertainty_score": row.get("uncertainty_score", "0"),
-                "novelty_score": row.get("novelty_score", "50"),
-                "amount_scale": row.get("amount_scale", "none"),
-                "event_code": row.get("event_code", ""),
-                "heat_score": row["heat_score"],
-                "intensity_score": row["intensity_score"],
-                "impact_scope": row["impact_scope"],
-                "event_summary": row["event_summary"],
-                "subject_entities": row["subject_entities"] or "[]",
-                "classification_evidence": row.get("classification_evidence", ""),
-            }
-        )
-    return stage_rows
-
-
 def load_stage_tables(db: str, raw_documents: list[dict[str, str]], raw_candidates: list[dict[str, str]], structured_events: list[dict[str, str]]) -> None:
     ensure_task1_schema(db)
     upsert_raw_documents(db, raw_documents)
     copy_csv_to_table(
         db,
-        build_candidate_stage_rows(raw_candidates, raw_documents),
+        build_candidate_stage_rows(raw_candidates),
         CANDIDATE_STAGE_FIELDS,
         "int_event_candidates_stage",
         truncate=True,
@@ -338,7 +304,11 @@ def insert_final_tables(db: str) -> None:
             source_type, authority_level, source_credibility_score, event_subject_type, event_subject_subtype,
             duration_type, predictability_type, industry_type, sentiment,
             time_orientation, event_stage, shock_source_type, region_scope, trigger_word_score, explicitness_score,
-            uncertainty_score, novelty_score, amount_scale, event_code, heat_score, intensity_score,
+            uncertainty_score, novelty_score, amount_scale, amount_max_rmb, amount_log_rmb, event_code,
+            sw_l1_industry, sw_l1_industry_code, sentiment_score_0_100, source_credibility_type,
+            company_count, industry_count, province_count, city_count, country_count, chain_stage_count,
+            chain_stages, report_count, media_coverage_count, heat_growth_rate, heat_duration_days,
+            disagreement_score, classification_confidence, heat_score, intensity_score,
             impact_scope, event_summary, subject_entities, raw_text_ref,
             classification_evidence
         )
@@ -365,7 +335,26 @@ def insert_final_tables(db: str) -> None:
                COALESCE(NULLIF(s.uncertainty_score, '')::integer, 0),
                COALESCE(NULLIF(s.novelty_score, '')::integer, 50),
                COALESCE(NULLIF(s.amount_scale, ''), 'none'),
+               NULLIF(s.amount_max_rmb, '')::numeric,
+               NULLIF(s.amount_log_rmb, '')::numeric,
                COALESCE(s.event_code, ''),
+               COALESCE(NULLIF(s.sw_l1_industry, ''), '其他'),
+               COALESCE(NULLIF(s.sw_l1_industry_code, ''), ''),
+               COALESCE(NULLIF(s.sentiment_score_0_100, '')::integer, 50),
+               COALESCE(NULLIF(s.source_credibility_type, ''), '单一媒体'),
+               COALESCE(NULLIF(s.company_count, '')::integer, 0),
+               COALESCE(NULLIF(s.industry_count, '')::integer, 0),
+               COALESCE(NULLIF(s.province_count, '')::integer, 0),
+               COALESCE(NULLIF(s.city_count, '')::integer, 0),
+               COALESCE(NULLIF(s.country_count, '')::integer, 0),
+               COALESCE(NULLIF(s.chain_stage_count, '')::integer, 0),
+               COALESCE(NULLIF(s.chain_stages, '')::jsonb, '[]'::jsonb),
+               COALESCE(NULLIF(s.report_count, '')::integer, 0),
+               COALESCE(NULLIF(s.media_coverage_count, '')::integer, 0),
+               COALESCE(NULLIF(s.heat_growth_rate, '')::numeric, 0),
+               COALESCE(NULLIF(s.heat_duration_days, '')::integer, 0),
+               COALESCE(NULLIF(s.disagreement_score, '')::numeric, 0),
+               COALESCE(NULLIF(s.classification_confidence, '')::numeric, 0.5),
                s.heat_score::integer,
                s.intensity_score::integer,
                s.impact_scope,
@@ -400,7 +389,26 @@ def insert_final_tables(db: str) -> None:
             uncertainty_score = EXCLUDED.uncertainty_score,
             novelty_score = EXCLUDED.novelty_score,
             amount_scale = EXCLUDED.amount_scale,
+            amount_max_rmb = EXCLUDED.amount_max_rmb,
+            amount_log_rmb = EXCLUDED.amount_log_rmb,
             event_code = EXCLUDED.event_code,
+            sw_l1_industry = EXCLUDED.sw_l1_industry,
+            sw_l1_industry_code = EXCLUDED.sw_l1_industry_code,
+            sentiment_score_0_100 = EXCLUDED.sentiment_score_0_100,
+            source_credibility_type = EXCLUDED.source_credibility_type,
+            company_count = EXCLUDED.company_count,
+            industry_count = EXCLUDED.industry_count,
+            province_count = EXCLUDED.province_count,
+            city_count = EXCLUDED.city_count,
+            country_count = EXCLUDED.country_count,
+            chain_stage_count = EXCLUDED.chain_stage_count,
+            chain_stages = EXCLUDED.chain_stages,
+            report_count = EXCLUDED.report_count,
+            media_coverage_count = EXCLUDED.media_coverage_count,
+            heat_growth_rate = EXCLUDED.heat_growth_rate,
+            heat_duration_days = EXCLUDED.heat_duration_days,
+            disagreement_score = EXCLUDED.disagreement_score,
+            classification_confidence = EXCLUDED.classification_confidence,
             heat_score = EXCLUDED.heat_score,
             intensity_score = EXCLUDED.intensity_score,
             impact_scope = EXCLUDED.impact_scope,

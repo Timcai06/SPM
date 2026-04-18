@@ -71,7 +71,26 @@ CREATE TABLE IF NOT EXISTS structured_events (
     uncertainty_score INTEGER NOT NULL DEFAULT 0,
     novelty_score INTEGER NOT NULL DEFAULT 50,
     amount_scale TEXT NOT NULL DEFAULT 'none',
+    amount_max_rmb NUMERIC,
+    amount_log_rmb NUMERIC,
     event_code TEXT NOT NULL DEFAULT '',
+    sw_l1_industry TEXT NOT NULL DEFAULT '其他',
+    sw_l1_industry_code TEXT NOT NULL DEFAULT '',
+    sentiment_score_0_100 INTEGER NOT NULL DEFAULT 50,
+    source_credibility_type TEXT NOT NULL DEFAULT '单一媒体',
+    company_count INTEGER NOT NULL DEFAULT 0,
+    industry_count INTEGER NOT NULL DEFAULT 0,
+    province_count INTEGER NOT NULL DEFAULT 0,
+    city_count INTEGER NOT NULL DEFAULT 0,
+    country_count INTEGER NOT NULL DEFAULT 0,
+    chain_stage_count INTEGER NOT NULL DEFAULT 0,
+    chain_stages JSONB NOT NULL DEFAULT '[]'::jsonb,
+    report_count INTEGER NOT NULL DEFAULT 0,
+    media_coverage_count INTEGER NOT NULL DEFAULT 0,
+    heat_growth_rate NUMERIC(10,6) NOT NULL DEFAULT 0,
+    heat_duration_days INTEGER NOT NULL DEFAULT 0,
+    disagreement_score NUMERIC(10,6) NOT NULL DEFAULT 0,
+    classification_confidence NUMERIC(5,4) NOT NULL DEFAULT 0.5,
     heat_score INTEGER NOT NULL,
     intensity_score INTEGER NOT NULL,
     impact_scope TEXT NOT NULL,
@@ -111,7 +130,30 @@ ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS explicitness_score INTEGE
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS uncertainty_score INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS novelty_score INTEGER NOT NULL DEFAULT 50;
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS amount_scale TEXT NOT NULL DEFAULT 'none';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS amount_max_rmb NUMERIC;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS amount_log_rmb NUMERIC;
 ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS event_code TEXT NOT NULL DEFAULT '';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS sw_l1_industry TEXT NOT NULL DEFAULT '其他';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS sw_l1_industry_code TEXT NOT NULL DEFAULT '';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS sentiment_score_0_100 INTEGER NOT NULL DEFAULT 50;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS source_credibility_type TEXT NOT NULL DEFAULT '单一媒体';
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS company_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS industry_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS province_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS city_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS country_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS chain_stage_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS chain_stages JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS report_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS media_coverage_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS heat_growth_rate NUMERIC(10,6) NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS heat_duration_days INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS disagreement_score NUMERIC(10,6) NOT NULL DEFAULT 0;
+ALTER TABLE structured_events ADD COLUMN IF NOT EXISTS classification_confidence NUMERIC(5,4) NOT NULL DEFAULT 0.5;
+CREATE INDEX IF NOT EXISTS idx_structured_events_sw_l1_industry
+    ON structured_events (sw_l1_industry);
+CREATE INDEX IF NOT EXISTS idx_structured_events_sentiment_score
+    ON structured_events (sentiment_score_0_100);
 ALTER TABLE structured_events DROP CONSTRAINT IF EXISTS structured_events_event_id_key;
 CREATE INDEX IF NOT EXISTS idx_structured_events_event_id
     ON structured_events (event_id);
@@ -166,6 +208,7 @@ INSERT INTO label_dictionary (label_group, label_value, description) VALUES
     ('duration_type', '长尾型', '影响长期存在'),
     ('predictability_type', '突发型', '事前较难预测'),
     ('predictability_type', '预披露型', '可从公告或安排提前获知'),
+    ('predictability_type', '渐进演化型', '事件非单点爆发而是逐步演化'),
     ('industry_type', '军工', '军工产业链'),
     ('industry_type', '新能源', '新能源与储能'),
     ('industry_type', '科技', '科技、AI、机器人、芯片'),
@@ -201,13 +244,24 @@ INSERT INTO label_dictionary (label_group, label_value, description) VALUES
     ('shock_source_type', '安全事故', '事故、爆炸、停产等安全冲击'),
     ('shock_source_type', '地缘政治', '战争、冲突、国际政治摩擦'),
     ('shock_source_type', '政策制度', '政策、制度、监管变化'),
+    ('shock_source_type', '金融事件', '金融体系或资本市场冲击'),
+    ('shock_source_type', '供应链冲击', '供应链中断、物流阻塞等冲击'),
+    ('shock_source_type', '技术革新', '技术创新或替代带来的冲击'),
     ('shock_source_type', '技术系统冲击', '系统故障、网络攻击、技术事故'),
     ('shock_source_type', '其他', '未归入既有冲击源'),
     ('region_scope', 'domestic', '主要影响中国大陆市场'),
     ('region_scope', 'regional', '主要影响国内局部区域或集群'),
     ('region_scope', 'overseas', '主要影响境外区域市场'),
     ('region_scope', 'global', '影响全球或跨主要市场'),
-    ('impact_scope', '个股链条', '影响单一公司或单条产业链'),
-    ('impact_scope', '行业', '影响单一行业或主题板块'),
-    ('impact_scope', '全市场', '影响全市场或大类资产情绪')
+    ('impact_scope', '个股链条', '兼容旧值：影响单一公司或单条产业链'),
+    ('impact_scope', '行业', '兼容旧值：影响单一行业或主题板块'),
+    ('impact_scope', '全市场', '兼容旧值：影响全市场或大类资产情绪'),
+    ('impact_scope', '单主体', '影响单公司/单机构/单项目'),
+    ('impact_scope', '多主体', '影响多公司或多机构'),
+    ('impact_scope', '产业链面', '影响产业链上下游多个环节'),
+    ('impact_scope', '行业面', '影响单一行业'),
+    ('impact_scope', '跨行业面', '影响两个及以上行业'),
+    ('impact_scope', '区域面', '影响省市或城市群'),
+    ('impact_scope', '全国面', '影响全国市场'),
+    ('impact_scope', '全球面', '影响全球或跨国市场')
 ON CONFLICT (label_group, label_value) DO NOTHING;
