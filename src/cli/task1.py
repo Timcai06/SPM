@@ -16,16 +16,15 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.analysis import build_model_samples, feature_return
-from capabilities.collectors import run as collector_run
-from capabilities.collectors import history as history_collector
+from modules.analysis.jobs import feature_return_job, train_samples_job
+from modules.collectors.jobs import collect_job, history_job
 from modules.events.jobs import (
     canonicalize_job,
     classify_job,
     classify_pending_job,
     reclassify_source_job,
 )
-from capabilities.quality import check, delivery_status, quality_report
+from modules.quality.jobs import check_job, delivery_status_job, quality_report_job
 from capabilities.storage import load_task1_canonical
 from capabilities.storage.db_guard import dsn_for
 from pipelines import task1 as task1_pipeline
@@ -378,7 +377,7 @@ def main() -> None:
         if args.include_non_keyword:
             argv.append("--include-non-keyword")
         with patched_argv(argv):
-            collector_run.main()
+            collect_job.main()
         return
 
     if args.command == "collect-history":
@@ -414,7 +413,7 @@ def main() -> None:
         if args.skip_db_load:
             argv.append("--skip-db-load")
         with patched_argv(argv):
-            history_collector.main()
+            history_job.main()
         return
 
     if args.command == "classify":
@@ -466,7 +465,7 @@ def main() -> None:
 
     if args.command == "check":
         with patched_argv(["check.py"]):
-            check.main()
+            check_job.main()
         return
 
     if args.command == "canonicalize":
@@ -494,7 +493,7 @@ def main() -> None:
         if args.run_id:
             argv.extend(["--run-id", args.run_id])
         with patched_argv(argv):
-            quality_report.main()
+            quality_report_job.main()
         return
 
     if args.command == "feature":
@@ -536,7 +535,7 @@ def main() -> None:
         if args.run_id:
             argv.extend(["--run-id", args.run_id])
         with patched_argv(argv):
-            feature_return.main()
+            feature_return_job.main()
         return
 
     if args.command == "train-samples":
@@ -552,7 +551,7 @@ def main() -> None:
         if args.run_id:
             argv.extend(["--run-id", args.run_id])
         with patched_argv(argv):
-            build_model_samples.main()
+            train_samples_job.main()
         return
 
     if args.command == "db-status":
@@ -575,7 +574,7 @@ def main() -> None:
         if args.fail_on_blockers:
             argv.append("--fail-on-blockers")
         with patched_argv(argv):
-            delivery_status.main()
+            delivery_status_job.main()
         return
 
 if __name__ == "__main__":

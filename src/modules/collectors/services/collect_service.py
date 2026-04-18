@@ -12,13 +12,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-SRC_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 import asyncio
 import logging
-from capabilities.collectors import (
+from modules.collectors.adapters import (
     caixin,
     cninfo,
     csrc,
@@ -33,7 +33,7 @@ from capabilities.collectors import (
     yicai,
     akshare_api,
 )
-from capabilities.collectors.catalog import write_source_catalog
+from modules.collectors.domain.catalog import write_source_catalog
 from capabilities.storage.load_task1 import upsert_raw_documents
 
 # Configure logging

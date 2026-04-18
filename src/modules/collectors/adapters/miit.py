@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from typing import Dict, List
 
-from .common import fetch_text_async, strip_tags
+from modules.collectors.domain.common import fetch_text_async, strip_tags
 
 
 MIIT_HOME_URL = "https://www.miit.gov.cn/"

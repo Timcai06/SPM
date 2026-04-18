@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Dict, List
 
-from .common import fetch_json_post, strip_tags
+from modules.collectors.domain.common import fetch_json_post, strip_tags
 
 
 CNINFO_LIST_URL = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
@@ -13,7 +13,7 @@ async def collect(limit: int = 20, lookback_days: int = 5) -> List[Dict[str, str
     import aiohttp
     
     async with aiohttp.ClientSession() as session:
-        from .common import fetch_json_post_async
+        from modules.collectors.domain.common import fetch_json_post_async
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=lookback_days)
         payload = await fetch_json_post_async(

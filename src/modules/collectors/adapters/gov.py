@@ -4,7 +4,7 @@ import json
 import re
 from typing import Dict, List, Optional
 
-from .common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
 
 
 GOV_LIST_URL = "https://www.gov.cn/yaowen/liebiao/YAOWENLIEBIAO.json"

@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Dict, List
 
-from .common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
 
 
 YICAI_NEWS_URL = "https://www.yicai.com/news/"

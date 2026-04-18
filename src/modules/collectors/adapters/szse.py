@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Dict, List
 
-from .common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
 
 
 SZSE_LIST_URL = "https://www.szse.cn/api/disc/announcement/detailinfo"

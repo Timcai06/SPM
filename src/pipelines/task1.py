@@ -42,13 +42,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-max-rows", type=int, default=20, help="Max rows to enrich with LLM in one run.")
     return parser.parse_args()
 
-from capabilities.collectors.run import collect_all_async
+from modules.collectors.services.collect_service import collect_all_async
 from modules.events.jobs.classify_job import run_classification_pipeline
 from modules.events.jobs.canonicalize_job import run_canonicalization_pipeline
-from capabilities.quality.check import run_validation_pipeline
+from modules.quality.services.validation_service import run_validation_pipeline
 from capabilities.storage.load_task1_canonical import run_loading_pipeline
 from capabilities.storage.load_task1 import upsert_raw_documents
-from capabilities.analysis.feature_return import main as analysis_main
+from modules.analysis.jobs.feature_return_job import main as analysis_main
 
 
 def main() -> None:

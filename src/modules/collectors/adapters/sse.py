@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Dict, List
 
-from .common import fetch_text, fetch_text_async, strip_tags, fetch_text_async, strip_tags
+from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags, fetch_text_async, strip_tags
 
 
 SSE_LIST_URL = "https://www.sse.com.cn/disclosure/listedinfo/announcement/json/stock_bulletin_publish_order.json"

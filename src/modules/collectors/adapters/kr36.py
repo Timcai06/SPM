@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from .common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
 
 
 KR36_FLASH_STOCK_URL = "https://www.36kr.com/newsflashes/catalog/2"

@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from .common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
 
 
 EASTMONEY_INDUSTRY_URL = "https://finance.eastmoney.com/a/cywjh.html"
