@@ -76,7 +76,7 @@ def infer_industry_l1(text: str) -> str:
         return "新能源"
     if any(x in clean_text for x in ["人工智能", "AI", "算力", "芯片", "机器人", "软件", "数字"]):
         return "科技"
-    if any(x in clean_text for x in ["消费", "旅游", "酒店", "饮料", "食品", "保险"]):
+    if any(x in clean_text for x in ["消费", "旅游", "酒店", "饮料", "食品"]):
         return "消费"
     if any(x in clean_text for x in ["银行", "保险", "金融"]):
         return "金融"

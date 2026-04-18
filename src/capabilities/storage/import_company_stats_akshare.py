@@ -156,7 +156,7 @@ def fetch_hist(symbol: str, start_date: str, end_date: str, timeout_sec: float):
             period="daily",
             start_date=start_date,
             end_date=end_date,
-            adjust="",
+            adjust="qfq",
         ),
         timeout_seconds=timeout_sec,
     )

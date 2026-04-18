@@ -71,6 +71,8 @@ def ts_code_to_sina_symbol(ts_code: str) -> Optional[str]:
         return f"sz{code}"
     if exch == "SH":
         return f"sh{code}"
+    if exch == "BJ":
+        return f"bj{code}"
     return None
 
 
@@ -168,9 +170,15 @@ def build_rows(
             volume = safe_float(row.get("volume"))
             if not trade_date or close is None:
                 continue
+            open_price = safe_float(row.get("open"))
+            high_price = safe_float(row.get("high"))
+            low_price = safe_float(row.get("low"))
             parsed.append(
                 {
                     "trade_date": trade_date,
+                    "open": open_price,
+                    "high": high_price,
+                    "low": low_price,
                     "close": close,
                     "volume": volume,
                 }
@@ -223,16 +231,17 @@ def build_rows(
             daily_ret = returns[j]
             prev_close = parsed[j - 1]["close"] if j > 0 else None
             pct_chg = daily_ret
+            open_val = item.get("open") if item.get("open") is not None else prev_close
             quote_rows.append(
                 {
                     "ts_code": ts_code,
                     "trade_date": item["trade_date"],
-                    "open": "" if prev_close is None else f"{prev_close:.4f}",
-                    "high": f"{item['close']:.4f}",
-                    "low": f"{item['close']:.4f}",
+                    "open": "" if open_val is None else f"{open_val:.4f}",
+                    "high": "" if item.get("high") is None else f"{item['high']:.4f}",
+                    "low": "" if item.get("low") is None else f"{item['low']:.4f}",
                     "close": f"{item['close']:.4f}",
                     "pre_close": "" if prev_close is None else f"{prev_close:.4f}",
-                    "pct_chg": "" if pct_chg is None else f"{pct_chg:.6f}",
+                    "pct_chg": "" if pct_chg is None else f"{pct_chg * 100:.4f}",
                     "volume": "" if item["volume"] is None else f"{item['volume']:.4f}",
                     "amount": "",
                     "turnover_rate": "",

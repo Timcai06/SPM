@@ -174,7 +174,16 @@ LLM_SENTIMENT_MAP = {
     "negative": "利空",
     "neutral": "中性",
 }
-LLM_HIGH_VALUE_SOURCE_TOKENS = ("中国政府网", "国家发展改革委", "中国证监会", "上交所", "深交所", "巨潮资讯网", "财新", "第一财经")
+LLM_HIGH_VALUE_SOURCE_TOKENS = (
+    "中国政府网",
+    "国家发展改革委",
+    "中国证监会",
+    "上交所",
+    "深交所",
+    "巨潮资讯网",
+    "财新",
+    "第一财经",
+)
 LLM_NO_OVERRIDE_REASONS = {
     "non_financial_noise",
     "routine_disclosure_without_signal",
@@ -184,45 +193,217 @@ LLM_NO_OVERRIDE_REASONS = {
     "government_narrative_without_action",
     "csrc_routine_without_policy_action",
 }
-GEO_SUBJECT_ANCHOR_KEYWORDS = ("中东", "霍尔木兹", "战事", "停火", "冲突", "空战", "印巴", "克什米尔")
+GEO_SUBJECT_ANCHOR_KEYWORDS = (
+    "中东",
+    "霍尔木兹",
+    "战事",
+    "停火",
+    "冲突",
+    "空战",
+    "印巴",
+    "克什米尔",
+)
 INDUSTRY_ANCHOR_RULES = {
-    "消费": ("轻工业", "零售", "餐饮", "文旅", "旅游", "消费"),
-    "科技": ("无线电", "卫星", "通信", "物联网", "人工智能", "具身智能"),
+    "军工": (
+        "军工",
+        "战机",
+        "导弹",
+        "无人机",
+        "国防",
+        "军品",
+        "装备",
+        "高超音速",
+        "舰船",
+        "雷达",
+    ),
+    "新能源": (
+        "新能源",
+        "储能",
+        "光伏",
+        "锂电",
+        "电池",
+        "风电",
+        "充电桩",
+        "逆变器",
+        "碳中和",
+        "绿电",
+    ),
+    "消费": (
+        "轻工业",
+        "零售",
+        "餐饮",
+        "文旅",
+        "旅游",
+        "消费",
+        "医药",
+        "药",
+        "房产",
+        "地产",
+        "银行",
+        "金融",
+        "白酒",
+        "食品",
+    ),
+    "科技": (
+        "无线电",
+        "卫星",
+        "通信",
+        "物联网",
+        "人工智能",
+        "具身智能",
+        "半导体",
+        "芯片",
+        "算力",
+        "5G",
+        "信创",
+        "低空经济",
+        "数字人民币",
+    ),
 }
 SOURCE_TYPE_RULES = (
-    ("官方文件", ("中国政府网", "国务院", "国家发展改革委", "发改委", "工信部", "商务部", "财政部", "央行")),
+    (
+        "官方文件",
+        (
+            "中国政府网",
+            "国务院",
+            "国家发展改革委",
+            "发改委",
+            "工信部",
+            "商务部",
+            "财政部",
+            "央行",
+        ),
+    ),
     ("监管/交易所", ("中国证监会", "证监会", "上交所", "深交所", "北交所")),
     ("公司公告", ("巨潮资讯网", "公司公告", "公告")),
-    ("主流财经媒体", ("财新", "第一财经", "东方财富", "36氪", "证券时报", "中国证券报")),
+    (
+        "主流财经媒体",
+        ("财新", "第一财经", "东方财富", "36氪", "证券时报", "中国证券报"),
+    ),
     ("行业协会/机构", ("协会", "商会", "联盟", "研究院")),
 )
 AUTHORITY_LEVEL_RULES = (
     ("central", ("中国政府网", "国务院", "新华社", "人民日报", "央视财经")),
-    ("ministry", ("国家发展改革委", "发改委", "工信部", "财政部", "央行", "商务部", "国家统计局", "海关总署")),
+    (
+        "ministry",
+        (
+            "国家发展改革委",
+            "发改委",
+            "工信部",
+            "财政部",
+            "央行",
+            "商务部",
+            "国家统计局",
+            "海关总署",
+        ),
+    ),
     ("exchange", ("中国证监会", "证监会", "上交所", "深交所", "北交所")),
     ("listed_company", ("巨潮资讯网", "公司公告", "年度报告", "临时公告")),
-    ("top_media", ("财新", "第一财经", "上海证券报", "证券时报", "中国证券报", "Bloomberg", "Reuters")),
+    (
+        "top_media",
+        (
+            "财新",
+            "第一财经",
+            "上海证券报",
+            "证券时报",
+            "中国证券报",
+            "Bloomberg",
+            "Reuters",
+        ),
+    ),
 )
 SUBTYPE_RULES = {
-    "产业政策": ("产业政策", "行动计划", "实施方案", "发展方案", "促进", "支持", "补贴"),
+    "产业政策": (
+        "产业政策",
+        "行动计划",
+        "实施方案",
+        "发展方案",
+        "促进",
+        "支持",
+        "补贴",
+    ),
     "监管政策": ("监管", "规范", "审查", "处罚", "问询", "征求意见", "规则"),
     "财政税收": ("财政", "税", "减免", "退税", "专项债"),
     "货币金融": ("利率", "降准", "降息", "社融", "信贷", "汇率"),
     "业绩公告": ("业绩", "营收", "净利润", "利润", "财报", "预告"),
     "重大合同": ("合同", "订单", "中标", "采购"),
     "产能投产": ("投产", "扩产", "产能", "开工", "竣工"),
-    "产品发布": ("产品发布", "新品", "发布会", "临床试验批准", "临床试验申请", "上市许可申请", "获受理", "获批"),
-    "股权变动": ("股权", "增持", "减持", "回购", "并购", "重组", "定增", "递表", "IPO", "辅导验收", "发行H股", "赴港IPO", "股份冻结", "股份转让"),
+    "产品发布": (
+        "产品发布",
+        "新品",
+        "发布会",
+        "临床试验批准",
+        "临床试验申请",
+        "上市许可申请",
+        "获受理",
+        "获批",
+    ),
+    "股权变动": (
+        "股权",
+        "增持",
+        "减持",
+        "回购",
+        "并购",
+        "重组",
+        "定增",
+        "递表",
+        "IPO",
+        "辅导验收",
+        "发行H股",
+        "赴港IPO",
+        "股份冻结",
+        "股份转让",
+        "风险警示",
+        "退市风险警示",
+        "撤销退市风险警示",
+        "摘帽",
+        "摘星",
+        "戴帽",
+        "ST",
+    ),
     "诉讼仲裁": ("诉讼", "仲裁", "法院裁定", "处罚", "监管措施"),
     "高管变动": ("聘任", "辞职", "辞任", "财务总监", "董秘", "总裁", "董事长", "高管"),
     "技术标准": ("技术标准", "行业标准", "标准发布"),
-    "供需价格": ("价格", "涨价", "降价", "库存", "供需", "资金流入", "资金流出", "两融余额", "股息率", "成交额突破", "净流入", "净流出", "杠杆资金", "排行榜", "新建仓"),
+    "供需价格": (
+        "价格",
+        "涨价",
+        "降价",
+        "库存",
+        "供需",
+        "资金流向",
+        "资金流入",
+        "资金流出",
+        "资金流入榜",
+        "资金流出榜",
+        "资金流入",
+        "资金流出",
+        "两融余额",
+        "融资余额",
+        "杠杆资金",
+        "股息率",
+        "分红",
+        "股息率",
+        "成交额突破",
+        "成交额",
+        "净流入",
+        "净流出",
+        "杠杆资金",
+        "排行榜",
+        "新建仓",
+    ),
     "宏观数据": ("GDP", "CPI", "PPI", "PMI", "社融", "失业率", "增加值"),
     "贸易摩擦": ("贸易摩擦", "关税", "制裁", "出口管制"),
     "区域冲突": ("冲突", "战事", "空战", "停火", "中东", "霍尔木兹", "印巴"),
     "自然灾害": ("地震", "洪水", "台风", "灾害"),
     "公共卫生": ("疫情", "公共卫生", "传染病"),
     "安全事故": ("事故", "爆炸", "停产", "罢工"),
+}
+SUBTYPE_FALLBACK_BY_SUBJECT = {
+    "公司类": "公司事项",
+    "行业类": "行业跟踪",
+    "政策类": "政策动态",
+    "宏观类": "宏观跟踪",
+    "地缘类": "地缘事件",
 }
 STAGE_RULES = {
     "预期": ("拟", "计划", "预计", "可能", "或将", "有望", "征求意见"),
@@ -235,7 +416,15 @@ SHOCK_SOURCE_RULES = {
     "安全事故": ("事故", "爆炸", "停产", "罢工"),
     "地缘政治": GEO_SUBJECT_ANCHOR_KEYWORDS,
     "政策制度": ("政策", "监管", "制度", "规则", "方案", "通知", "办法", "标准"),
-    "技术系统冲击": ("技术突破", "人工智能", "物联网", "通信", "卫星", "网络安全", "系统故障"),
+    "技术系统冲击": (
+        "技术突破",
+        "人工智能",
+        "物联网",
+        "通信",
+        "卫星",
+        "网络安全",
+        "系统故障",
+    ),
 }
 TIME_ORIENTATION_RULES = {
     "future_oriented": ("将", "未来", "明年", "后续", "预计", "有望", "计划", "拟"),
@@ -246,8 +435,29 @@ REGION_SCOPE_RULES = {
     "overseas": ("美国", "欧洲", "日韩", "东南亚", "海外", "境外"),
     "regional": ("长三角", "珠三角", "京津冀", "区域", "省内", "本地"),
 }
-STRONG_TRIGGER_WORDS = ("重大", "首次", "突破", "全面", "紧急", "超预期", "重磅", "落地", "提速", "大幅")
-UNCERTAINTY_WORDS = ("拟", "计划", "预计", "可能", "或将", "有望", "研究", "探讨", "征求意见")
+STRONG_TRIGGER_WORDS = (
+    "重大",
+    "首次",
+    "突破",
+    "全面",
+    "紧急",
+    "超预期",
+    "重磅",
+    "落地",
+    "提速",
+    "大幅",
+)
+UNCERTAINTY_WORDS = (
+    "拟",
+    "计划",
+    "预计",
+    "可能",
+    "或将",
+    "有望",
+    "研究",
+    "探讨",
+    "征求意见",
+)
 
 
 def _copy_rules(source: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -279,7 +489,9 @@ def load_feedback_keywords(path: Path) -> Dict[str, Dict[str, List[str]]]:
     return result
 
 
-def merge_rules(base_rules: Dict[str, List[str]], feedback_rules: Dict[str, List[str]]) -> Dict[str, List[str]]:
+def merge_rules(
+    base_rules: Dict[str, List[str]], feedback_rules: Dict[str, List[str]]
+) -> Dict[str, List[str]]:
     merged = _copy_rules(base_rules)
     for label, words in feedback_rules.items():
         merged.setdefault(label, [])
@@ -292,9 +504,13 @@ def merge_rules(base_rules: Dict[str, List[str]], feedback_rules: Dict[str, List
 _feedback = load_feedback_keywords(RULE_FEEDBACK_PATH)
 ACTIVE_SUBJECT_RULES = merge_rules(SUBJECT_RULES, _feedback["subject"])
 ACTIVE_INDUSTRY_RULES = merge_rules(INDUSTRY_RULES, _feedback["industry"])
-ACTIVE_PREDICTABILITY_RULES = merge_rules(PREDICTABILITY_RULES, _feedback["predictability"])
+ACTIVE_PREDICTABILITY_RULES = merge_rules(
+    PREDICTABILITY_RULES, _feedback["predictability"]
+)
 ACTIVE_DURATION_RULES = merge_rules(DURATION_RULES, _feedback["duration"])
-ACTIVE_EVENT_KEYWORDS = sorted({word for words in ACTIVE_SUBJECT_RULES.values() for word in words})
+ACTIVE_EVENT_KEYWORDS = sorted(
+    {word for words in ACTIVE_SUBJECT_RULES.values() for word in words}
+)
 
 
 @dataclass
@@ -348,7 +564,9 @@ def canonical_text(text: str) -> str:
 
 
 def dedup_key(row: Dict[str, str]) -> str:
-    base = canonical_text(row["title"])[:80] + "::" + canonical_text(row["content"])[:160]
+    base = (
+        canonical_text(row["title"])[:80] + "::" + canonical_text(row["content"])[:160]
+    )
     return hashlib.md5(base.encode("utf-8")).hexdigest()[:12]
 
 
@@ -368,7 +586,7 @@ def resolve_source_weight(source: str) -> float:
 
 
 def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateResult:
-    full_text = f'{row["title"]} {row["content"]}'
+    full_text = f"{row['title']} {row['content']}"
     publish_time = normalize_datetime(row["publish_time"])
     non_event_hits = keyword_hits(full_text, NON_EVENT_KEYWORDS)
     weak_hits = keyword_hits(full_text, WEAK_NEUTRAL_KEYWORDS)
@@ -377,14 +595,22 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
     title_narrative_hits = keyword_hits(row["title"], GOV_NARRATIVE_KEYWORDS)
     title_policy_action_hits = keyword_hits(row["title"], POLICY_ACTION_KEYWORDS)
     title_macro_data_hits = keyword_hits(row["title"], MACRO_DATA_KEYWORDS)
-    listing_financing_hits = keyword_hits(row["title"], LISTING_FINANCING_STRONG_KEYWORDS)
-    listing_financing_exclusion_hits = keyword_hits(row["title"], LISTING_FINANCING_EXCLUSION_KEYWORDS)
-    listing_financing_strong = bool(listing_financing_hits) and not listing_financing_exclusion_hits
+    listing_financing_hits = keyword_hits(
+        row["title"], LISTING_FINANCING_STRONG_KEYWORDS
+    )
+    listing_financing_exclusion_hits = keyword_hits(
+        row["title"], LISTING_FINANCING_EXCLUSION_KEYWORDS
+    )
+    listing_financing_strong = (
+        bool(listing_financing_hits) and not listing_financing_exclusion_hits
+    )
     csrc_routine_hits = keyword_hits(row["title"], CSRC_ROUTINE_TITLE_KEYWORDS)
     csrc_hard_event_hits = keyword_hits(full_text, CSRC_HARD_EVENT_KEYWORDS)
     event_hits = keyword_hits(full_text, ACTIVE_EVENT_KEYWORDS)
     company_action_hits = keyword_hits(full_text, COMPANY_ACTION_STRONG_KEYWORDS)
-    strong_event_hits = [kw for kw in event_hits if kw not in GENERIC_EVENT_HITS] + company_action_hits
+    strong_event_hits = [
+        kw for kw in event_hits if kw not in GENERIC_EVENT_HITS
+    ] + company_action_hits
 
     if non_event_hits:
         return CandidateResult(
@@ -394,7 +620,9 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=False,
             filter_reason="non_financial_noise",
-            evidence="命中非金融关键词: " + "|".join(non_event_hits) + f"; score=0; threshold={EVENT_SCORE_THRESHOLD}",
+            evidence="命中非金融关键词: "
+            + "|".join(non_event_hits)
+            + f"; score=0; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=0,
             event_score=0,
             event_threshold=EVENT_SCORE_THRESHOLD,
@@ -408,7 +636,9 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=False,
             filter_reason="routine_disclosure_without_signal",
-            evidence="常规披露且无显著事件关键词: " + "|".join(weak_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
+            evidence="常规披露且无显著事件关键词: "
+            + "|".join(weak_hits)
+            + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,
@@ -422,7 +652,9 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=False,
             filter_reason="routine_announcement_without_signal",
-            evidence="常规公告且缺少强事件关键词: " + "|".join(routine_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
+            evidence="常规公告且缺少强事件关键词: "
+            + "|".join(routine_hits)
+            + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,
@@ -436,13 +668,19 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=False,
             filter_reason="announcement_template_without_signal",
-            evidence="公告模板词且缺少强事件关键词: " + "|".join(template_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
+            evidence="公告模板词且缺少强事件关键词: "
+            + "|".join(template_hits)
+            + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,
         )
 
-    if row.get("source", "").startswith(("上交所", "深交所", "巨潮资讯网")) and not strong_event_hits and not listing_financing_strong:
+    if (
+        row.get("source", "").startswith(("上交所", "深交所", "巨潮资讯网"))
+        and not strong_event_hits
+        and not listing_financing_strong
+    ):
         return CandidateResult(
             row=row,
             normalized_publish_time=publish_time,
@@ -450,14 +688,22 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=False,
             filter_reason="generic_announcement_without_signal",
-            evidence="公告源文本仅含通用披露词; score=1; threshold=" + str(EVENT_SCORE_THRESHOLD),
+            evidence="公告源文本仅含通用披露词; score=1; threshold="
+            + str(EVENT_SCORE_THRESHOLD),
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,
         )
 
-    if row.get("source", "").startswith(("上交所", "深交所", "巨潮资讯网")) and company_action_hits:
-        score_hint = max(EVENT_SCORE_THRESHOLD, len(company_action_hits) + min(duplicate_group_size, EVENT_DUPLICATE_BONUS_CAP))
+    if (
+        row.get("source", "").startswith(("上交所", "深交所", "巨潮资讯网"))
+        and company_action_hits
+    ):
+        score_hint = max(
+            EVENT_SCORE_THRESHOLD,
+            len(company_action_hits)
+            + min(duplicate_group_size, EVENT_DUPLICATE_BONUS_CAP),
+        )
         return CandidateResult(
             row=row,
             normalized_publish_time=publish_time,
@@ -465,13 +711,20 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=True,
             filter_reason="event_signal_detected",
-            evidence="公告强事项关键词: " + "|".join(company_action_hits) + f"; score={score_hint}; threshold={EVENT_SCORE_THRESHOLD}",
+            evidence="公告强事项关键词: "
+            + "|".join(company_action_hits)
+            + f"; score={score_hint}; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=score_hint,
             event_score=score_hint,
             event_threshold=EVENT_SCORE_THRESHOLD,
         )
 
-    if row.get("source", "").startswith("中国政府网") and title_narrative_hits and not title_policy_action_hits and not title_macro_data_hits:
+    if (
+        row.get("source", "").startswith("中国政府网")
+        and title_narrative_hits
+        and not title_policy_action_hits
+        and not title_macro_data_hits
+    ):
         return CandidateResult(
             row=row,
             normalized_publish_time=publish_time,
@@ -479,7 +732,9 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
             duplicate_group_size=duplicate_group_size,
             is_event=False,
             filter_reason="government_narrative_without_action",
-            evidence="官媒叙事型标题且缺少正式政策动作/数据词: " + "|".join(title_narrative_hits) + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
+            evidence="官媒叙事型标题且缺少正式政策动作/数据词: "
+            + "|".join(title_narrative_hits)
+            + f"; score=1; threshold={EVENT_SCORE_THRESHOLD}",
             score_hint=1,
             event_score=1,
             event_threshold=EVENT_SCORE_THRESHOLD,
@@ -487,7 +742,11 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
 
     if row.get("source", "").startswith("中国证监会"):
         only_csrc_token_signal = bool(event_hits) and set(event_hits) <= {"证监会"}
-        if (csrc_routine_hits or only_csrc_token_signal) and not csrc_hard_event_hits and not title_policy_action_hits:
+        if (
+            (csrc_routine_hits or only_csrc_token_signal)
+            and not csrc_hard_event_hits
+            and not title_policy_action_hits
+        ):
             return CandidateResult(
                 row=row,
                 normalized_publish_time=publish_time,
@@ -525,7 +784,9 @@ def detect_event(row: Dict[str, str], duplicate_group_size: int) -> CandidateRes
     )
 
 
-def choose_label(text: str, rules: Dict[str, List[str]], default: str) -> Tuple[str, List[str]]:
+def choose_label(
+    text: str, rules: Dict[str, List[str]], default: str
+) -> Tuple[str, List[str]]:
     scores = []
     for label, keywords in rules.items():
         hits = keyword_hits(text, keywords)
@@ -549,12 +810,19 @@ def compute_sentiment(text: str) -> str:
 
 def compute_heat_score(title: str, source: str, duplicate_group_size: int) -> int:
     source_score = int(resolve_source_weight(source) * HEAT_SOURCE_MULTIPLIER)
-    title_score = min(len(keyword_hits(title, TITLE_EMPHASIS_WORDS)) * HEAT_TITLE_PER_HIT, HEAT_TITLE_CAP)
-    duplicate_score = min(duplicate_group_size * HEAT_DUPLICATE_PER_COUNT, HEAT_DUPLICATE_CAP)
+    title_score = min(
+        len(keyword_hits(title, TITLE_EMPHASIS_WORDS)) * HEAT_TITLE_PER_HIT,
+        HEAT_TITLE_CAP,
+    )
+    duplicate_score = min(
+        duplicate_group_size * HEAT_DUPLICATE_PER_COUNT, HEAT_DUPLICATE_CAP
+    )
     return min(source_score + title_score + duplicate_score, HEAT_TOTAL_CAP)
 
 
-def compute_intensity_score(text: str, subject_type: str, predictability_type: str) -> int:
+def compute_intensity_score(
+    text: str, subject_type: str, predictability_type: str
+) -> int:
     base = INTENSITY_BASE_BY_SUBJECT.get(subject_type, INTENSITY_DEFAULT_BASE)
     if predictability_type == "突发型":
         base += INTENSITY_SURPRISE_BONUS
@@ -566,7 +834,9 @@ def compute_intensity_score(text: str, subject_type: str, predictability_type: s
 
 
 def compute_impact_scope(subject_type: str, industry_type: str, text: str) -> str:
-    if subject_type in {"宏观类", "政策类"} and any(word in text for word in IMPACT_WIDE_KEYWORDS):
+    if subject_type in {"宏观类", "政策类"} and any(
+        word in text for word in IMPACT_WIDE_KEYWORDS
+    ):
         return freeze_enum("全市场", IMPACT_SCOPE_ENUM, IMPACT_SCOPE_DEFAULT)
     if subject_type in {"地缘类", "行业类", "政策类"}:
         return freeze_enum("行业", IMPACT_SCOPE_ENUM, IMPACT_SCOPE_DEFAULT)
@@ -605,8 +875,14 @@ def compute_source_credibility_score(source_type: str) -> int:
     return 1
 
 
-def compute_event_subject_subtype(text: str) -> str:
-    return choose_first_label(text, SUBTYPE_RULES, "未细分")
+def compute_event_subject_subtype(text: str, subject_type: str = "") -> str:
+    subtype = choose_first_label(text, SUBTYPE_RULES, "未细分")
+    if subtype != "未细分":
+        return subtype
+    fallback = SUBTYPE_FALLBACK_BY_SUBJECT.get(subject_type, "")
+    if fallback:
+        return fallback
+    return "未细分"
 
 
 def compute_event_stage(text: str) -> str:
@@ -631,7 +907,7 @@ def count_keyword_score(text: str, keywords: Iterable[str]) -> int:
 
 def compute_explicitness_score(text: str) -> int:
     score = 0
-    if re.search(r"\d+(?:\.\d+)?\s*(?:亿|万亿|万元|亿元|万美元|亿美元)", text):
+    if re.search(r"\d+(?:\.\d+)?\s*(?:万亿|亿|万元|亿元|万美元|亿美元)", text):
         score += 1
     if re.search(r"\d+(?:\.\d+)?\s*%", text):
         score += 1
@@ -647,7 +923,21 @@ def compute_novelty_score(duplicate_group_size: int) -> int:
 
 
 def compute_amount_scale(text: str) -> str:
-    amounts = [float(m.group(1)) for m in re.finditer(r"(\d+(?:\.\d+)?)\s*(亿|万亿|亿元|亿美元)", text)]
+    amounts = []
+    for m in re.finditer(r"(\d+(?:\.\d+)?)\s*(万亿|亿|万元|亿元|万美元|亿美元)", text):
+        value = float(m.group(1))
+        unit = m.group(2)
+        if "万亿" in unit:
+            value *= 10000  # 万亿 → 亿 (1万亿 = 10000亿)
+        if value >= 1000:
+            amounts.append(value)
+            continue
+        # 万元/万美元 convert to 亿 scale for comparison
+        if "万元" in unit or "万美元" in unit:
+            value_yi = value / 10000  # 万元 → 亿
+            amounts.append(value_yi)
+        else:
+            amounts.append(value)
     if not amounts:
         return "none"
     amount = max(amounts)
@@ -683,7 +973,9 @@ def normalize_entity_candidate(text: str) -> str:
     return candidate
 
 
-def extract_subject_entities(text: str, symbol_or_subject: str = "", title: str = "") -> List[str]:
+def extract_subject_entities(
+    text: str, symbol_or_subject: str = "", title: str = ""
+) -> List[str]:
     seen = []
     if title:
         title_prefix = re.split(r"[：:]", title, maxsplit=1)[0]
@@ -712,7 +1004,9 @@ def build_event_name(title: str, subject_entities: List[str]) -> str:
 
 
 def event_id(result: CandidateResult) -> str:
-    raw = f'{result.normalized_publish_time}|{result.row["source"]}|{result.row["title"]}'
+    raw = (
+        f"{result.normalized_publish_time}|{result.row['source']}|{result.row['title']}"
+    )
     return "EVT-" + hashlib.md5(raw.encode("utf-8")).hexdigest()[:10]
 
 
@@ -728,7 +1022,9 @@ def write_csv(path: Path, rows: List[Dict[str, object]], fieldnames: List[str]) 
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run Task 1 event structuring pipeline.")
+    parser = argparse.ArgumentParser(
+        description="Run Task 1 event structuring pipeline."
+    )
     parser.add_argument(
         "--input",
         action="append",
@@ -773,11 +1069,15 @@ def load_outputs_to_postgres(db_name: str) -> None:
     )
 
 
-def build_candidate_row(row: Dict[str, str], result: CandidateResult) -> Dict[str, object]:
-    full_text = f'{row["title"]} {row["content"]}'
+def build_candidate_row(
+    row: Dict[str, str], result: CandidateResult
+) -> Dict[str, object]:
+    full_text = f"{row['title']} {row['content']}"
     _, subject_hits = choose_label(full_text, ACTIVE_SUBJECT_RULES, SUBJECT_DEFAULT)
     _, industry_hits = choose_label(full_text, ACTIVE_INDUSTRY_RULES, INDUSTRY_DEFAULT)
-    _, predictability_hits = choose_label(full_text, ACTIVE_PREDICTABILITY_RULES, PREDICTABILITY_DEFAULT)
+    _, predictability_hits = choose_label(
+        full_text, ACTIVE_PREDICTABILITY_RULES, PREDICTABILITY_DEFAULT
+    )
     _, duration_hits = choose_label(full_text, ACTIVE_DURATION_RULES, DURATION_DEFAULT)
     evidence = (
         result.evidence
@@ -787,7 +1087,8 @@ def build_candidate_row(row: Dict[str, str], result: CandidateResult) -> Dict[st
             [
                 "subject:" + (",".join(subject_hits) if subject_hits else "none"),
                 "industry:" + (",".join(industry_hits) if industry_hits else "none"),
-                "predictability:" + (",".join(predictability_hits) if predictability_hits else "none"),
+                "predictability:"
+                + (",".join(predictability_hits) if predictability_hits else "none"),
                 "duration:" + (",".join(duration_hits) if duration_hits else "none"),
             ]
         )
@@ -810,24 +1111,42 @@ def build_candidate_row(row: Dict[str, str], result: CandidateResult) -> Dict[st
     }
 
 
-def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[str, object]:
-    full_text = f'{row["title"]} {row["content"]}'
-    subject_type, subject_hits = choose_label(full_text, ACTIVE_SUBJECT_RULES, SUBJECT_DEFAULT)
-    industry_type, industry_hits = choose_label(full_text, ACTIVE_INDUSTRY_RULES, INDUSTRY_DEFAULT)
-    predictability_type, predictability_hits = choose_label(full_text, ACTIVE_PREDICTABILITY_RULES, PREDICTABILITY_DEFAULT)
-    duration_type, duration_hits = choose_label(full_text, ACTIVE_DURATION_RULES, DURATION_DEFAULT)
+def build_structured_row(
+    row: Dict[str, str], result: CandidateResult
+) -> Dict[str, object]:
+    full_text = f"{row['title']} {row['content']}"
+    subject_type, subject_hits = choose_label(
+        full_text, ACTIVE_SUBJECT_RULES, SUBJECT_DEFAULT
+    )
+    industry_type, industry_hits = choose_label(
+        full_text, ACTIVE_INDUSTRY_RULES, INDUSTRY_DEFAULT
+    )
+    predictability_type, predictability_hits = choose_label(
+        full_text, ACTIVE_PREDICTABILITY_RULES, PREDICTABILITY_DEFAULT
+    )
+    duration_type, duration_hits = choose_label(
+        full_text, ACTIVE_DURATION_RULES, DURATION_DEFAULT
+    )
     subject_type = freeze_enum(subject_type, EVENT_SUBJECT_ENUM, SUBJECT_DEFAULT)
     industry_type = freeze_enum(industry_type, INDUSTRY_ENUM, INDUSTRY_DEFAULT)
-    predictability_type = freeze_enum(predictability_type, PREDICTABILITY_ENUM, PREDICTABILITY_DEFAULT)
+    predictability_type = freeze_enum(
+        predictability_type, PREDICTABILITY_ENUM, PREDICTABILITY_DEFAULT
+    )
     duration_type = freeze_enum(duration_type, DURATION_ENUM, DURATION_DEFAULT)
-    subject_entities = extract_subject_entities(full_text, row.get("symbol_or_subject", ""), row.get("title", ""))
+    subject_entities = extract_subject_entities(
+        full_text, row.get("symbol_or_subject", ""), row.get("title", "")
+    )
     sentiment = compute_sentiment(full_text)
-    heat_score = compute_heat_score(row["title"], row["source"], result.duplicate_group_size)
-    intensity_score = compute_intensity_score(full_text, subject_type, predictability_type)
+    heat_score = compute_heat_score(
+        row["title"], row["source"], result.duplicate_group_size
+    )
+    intensity_score = compute_intensity_score(
+        full_text, subject_type, predictability_type
+    )
     impact_scope = compute_impact_scope(subject_type, industry_type, full_text)
     source_type = compute_source_type(row["source"])
     authority_level = compute_authority_level(row["source"], source_type)
-    event_subject_subtype = compute_event_subject_subtype(full_text)
+    event_subject_subtype = compute_event_subject_subtype(full_text, subject_type)
     time_orientation = compute_time_orientation(full_text)
     event_stage = compute_event_stage(full_text)
     shock_source_type = compute_shock_source_type(full_text)
@@ -879,14 +1198,19 @@ def build_structured_row(row: Dict[str, str], result: CandidateResult) -> Dict[s
                 f"rule_version={RULE_VERSION}",
                 "subject=" + (",".join(subject_hits) if subject_hits else "none"),
                 "industry=" + (",".join(industry_hits) if industry_hits else "none"),
-                "predictability=" + (",".join(predictability_hits) if predictability_hits else "none"),
+                "predictability="
+                + (",".join(predictability_hits) if predictability_hits else "none"),
                 "duration=" + (",".join(duration_hits) if duration_hits else "none"),
             ]
         ),
     }
 
 
-def should_trigger_llm(row: Dict[str, str], result: CandidateResult, structured_preview: Optional[Dict[str, object]]) -> tuple[bool, list[str]]:
+def should_trigger_llm(
+    row: Dict[str, str],
+    result: CandidateResult,
+    structured_preview: Optional[Dict[str, object]],
+) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     score_gap = abs(result.event_score - result.event_threshold)
     if score_gap <= 1:
@@ -904,7 +1228,9 @@ def should_trigger_llm(row: Dict[str, str], result: CandidateResult, structured_
     return bool(reasons), reasons
 
 
-def promote_candidate_result(result: CandidateResult, reason_suffix: str) -> CandidateResult:
+def promote_candidate_result(
+    result: CandidateResult, reason_suffix: str
+) -> CandidateResult:
     return CandidateResult(
         row=result.row,
         normalized_publish_time=result.normalized_publish_time,
@@ -931,6 +1257,7 @@ SECRETS_DIR = ROOT / ".secrets"
 LLM_KEY_FILE = SECRETS_DIR / "llm_api_key.txt"
 LLM_BASE_URL_FILE = SECRETS_DIR / "llm_base_url.txt"
 LLM_MODEL_FILE = SECRETS_DIR / "llm_model.txt"
+
 
 class AsyncLLMClient:
     def __init__(self, api_key: str = None, base_url: str = None, model: str = None):
@@ -995,20 +1322,30 @@ class AsyncLLMClient:
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.1,
-            "response_format": {"type": "json_object"}
+            "response_format": {"type": "json_object"},
         }
-        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(f"{self.base_url}/chat/completions", json=payload, headers=headers, timeout=30) as resp:
+                async with session.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                    timeout=30,
+                ) as resp:
                     if resp.status == 200:
                         text = await resp.text()
                         data = json.loads(text)
                         return json.loads(data["choices"][0]["message"]["content"])
                     else:
                         body = await resp.text()
-                        print(f"[WARN] LLM API Error: Status {resp.status}; body={body[:300]}")
+                        print(
+                            f"[WARN] LLM API Error: Status {resp.status}; body={body[:300]}"
+                        )
                         return {}
         except Exception as e:
             print(f"[WARN] LLM API Exception: {e}")
@@ -1017,7 +1354,9 @@ class AsyncLLMClient:
 
 class AsyncOllamaClient:
     def __init__(self, base_url: str = None, model: str = None):
-        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")).rstrip("/")
+        self.base_url = (
+            base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        ).rstrip("/")
         self.model = model or os.getenv("OLLAMA_MODEL", "qwen3:8b")
 
     async def extract_event_data(self, title: str, content: str) -> dict:
@@ -1048,10 +1387,14 @@ class AsyncOllamaClient:
         }
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(f"{self.base_url}/api/generate", json=payload, timeout=60) as resp:
+                async with session.post(
+                    f"{self.base_url}/api/generate", json=payload, timeout=60
+                ) as resp:
                     text = await resp.text()
                     if resp.status != 200:
-                        print(f"[WARN] Ollama API Error: Status {resp.status}; body={text[:300]}")
+                        print(
+                            f"[WARN] Ollama API Error: Status {resp.status}; body={text[:300]}"
+                        )
                         return {}
                     data = json.loads(text)
                     response_text = (data.get("response") or "").strip()
@@ -1062,6 +1405,7 @@ class AsyncOllamaClient:
             print(f"[WARN] Ollama API Exception: {e}")
             return {}
 
+
 @dataclass
 class LLMResultEnrichment:
     is_event_llm: bool = False
@@ -1071,6 +1415,7 @@ class LLMResultEnrichment:
     sentiment_llm: str = ""
     summary_llm: str = ""
 
+
 def normalize_llm_subject(value: str, fallback: str) -> str:
     key = (value or "").strip().lower()
     return freeze_enum(LLM_SUBJECT_MAP.get(key, fallback), EVENT_SUBJECT_ENUM, fallback)
@@ -1078,7 +1423,9 @@ def normalize_llm_subject(value: str, fallback: str) -> str:
 
 def normalize_llm_industry(value: str, fallback: str) -> str:
     text = (value or "").strip()
-    return freeze_enum(text if text in INDUSTRY_ENUM else fallback, INDUSTRY_ENUM, fallback)
+    return freeze_enum(
+        text if text in INDUSTRY_ENUM else fallback, INDUSTRY_ENUM, fallback
+    )
 
 
 def normalize_llm_sentiment(value: str, fallback: str) -> str:
@@ -1093,7 +1440,9 @@ def anchored_subject_type(row: Dict[str, str], current_subject: str) -> str:
     return current_subject
 
 
-def anchored_industry_type(row: Dict[str, str], current_industry: str, rule_industry: str) -> str:
+def anchored_industry_type(
+    row: Dict[str, str], current_industry: str, rule_industry: str
+) -> str:
     text = f"{row.get('title', '')} {row.get('content', '')}"
     anchored = current_industry
     for label, keywords in INDUSTRY_ANCHOR_RULES.items():
@@ -1111,14 +1460,14 @@ async def classify_rows_async(
     """Classify rows with optional LLM second pass."""
     client = AsyncLLMClient()
     ollama_client = AsyncOllamaClient()
-    semaphore = asyncio.Semaphore(5) # Concurrency limit to avoid rate limits
-    
+    semaphore = asyncio.Semaphore(5)  # Concurrency limit to avoid rate limits
+
     # First Pass: Deterministic Rules (Fast & Free)
     duplicate_counts = Counter(dedup_key(row) for row in rows)
     candidate_results = []
     for row in rows:
         candidate_results.append(detect_event(row, duplicate_counts[dedup_key(row)]))
-    
+
     llm_budget = 0
 
     async def process_one(row, res, allow_llm: bool):
@@ -1137,13 +1486,20 @@ async def classify_rows_async(
                         and res.event_score >= res.event_threshold - 1
                         and can_llm_promote(res)
                     ):
-                        effective_result = promote_candidate_result(res, "remote_llm_borderline")
+                        effective_result = promote_candidate_result(
+                            res, "remote_llm_borderline"
+                        )
                     candidate_row = build_candidate_row(row, effective_result)
-                    structured_row = build_structured_row(row, effective_result) if effective_result.is_event else None
+                    structured_row = (
+                        build_structured_row(row, effective_result)
+                        if effective_result.is_event
+                        else None
+                    )
                     if structured_row is None:
                         return candidate_row, None
                     llm_subject = normalize_llm_subject(
-                        llm_data.get("subject_type", ""), structured_row["event_subject_type"]
+                        llm_data.get("subject_type", ""),
+                        structured_row["event_subject_type"],
                     )
                     llm_industry = normalize_llm_industry(
                         llm_data.get("industry", ""), structured_row["industry_type"]
@@ -1151,23 +1507,35 @@ async def classify_rows_async(
                     llm_sentiment = normalize_llm_sentiment(
                         llm_data.get("sentiment", ""), structured_row["sentiment"]
                     )
-                    llm_summary = (llm_data.get("summary") or structured_row["event_summary"]).strip()[:120]
-                    llm_event_name = (llm_data.get("event_name") or structured_row["event_name"]).strip()[:80]
+                    llm_summary = (
+                        llm_data.get("summary") or structured_row["event_summary"]
+                    ).strip()[:120]
+                    llm_event_name = (
+                        llm_data.get("event_name") or structured_row["event_name"]
+                    ).strip()[:80]
                     llm_subject = anchored_subject_type(row, llm_subject)
-                    llm_industry = anchored_industry_type(row, llm_industry, structured_row["industry_type"])
-                    structured_row.update({
-                        "event_name": llm_event_name,
-                        "event_subject_type": llm_subject,
-                        "industry_type": llm_industry,
-                        "sentiment": llm_sentiment,
-                        "event_summary": llm_summary,
-                        "classification_evidence": structured_row["classification_evidence"]
-                        + f"|llm=1|llm_backend=remote|llm_trigger={','.join(llm_reasons)}|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
-                    })
+                    llm_industry = anchored_industry_type(
+                        row, llm_industry, structured_row["industry_type"]
+                    )
+                    structured_row.update(
+                        {
+                            "event_name": llm_event_name,
+                            "event_subject_type": llm_subject,
+                            "industry_type": llm_industry,
+                            "sentiment": llm_sentiment,
+                            "event_summary": llm_summary,
+                            "classification_evidence": structured_row[
+                                "classification_evidence"
+                            ]
+                            + f"|llm=1|llm_backend=remote|llm_trigger={','.join(llm_reasons)}|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
+                        }
+                    )
                     return candidate_row, structured_row
         if allow_llm and llm_trigger and use_llm:
             async with semaphore:
-                llm_data = await ollama_client.extract_event_data(row["title"], row["content"])
+                llm_data = await ollama_client.extract_event_data(
+                    row["title"], row["content"]
+                )
                 if llm_data:
                     effective_result = res
                     if (
@@ -1176,13 +1544,20 @@ async def classify_rows_async(
                         and res.event_score >= res.event_threshold - 1
                         and can_llm_promote(res)
                     ):
-                        effective_result = promote_candidate_result(res, "ollama_llm_borderline")
+                        effective_result = promote_candidate_result(
+                            res, "ollama_llm_borderline"
+                        )
                     candidate_row = build_candidate_row(row, effective_result)
-                    structured_row = build_structured_row(row, effective_result) if effective_result.is_event else None
+                    structured_row = (
+                        build_structured_row(row, effective_result)
+                        if effective_result.is_event
+                        else None
+                    )
                     if structured_row is None:
                         return candidate_row, None
                     llm_subject = normalize_llm_subject(
-                        llm_data.get("subject_type", ""), structured_row["event_subject_type"]
+                        llm_data.get("subject_type", ""),
+                        structured_row["event_subject_type"],
                     )
                     llm_industry = normalize_llm_industry(
                         llm_data.get("industry", ""), structured_row["industry_type"]
@@ -1190,23 +1565,35 @@ async def classify_rows_async(
                     llm_sentiment = normalize_llm_sentiment(
                         llm_data.get("sentiment", ""), structured_row["sentiment"]
                     )
-                    llm_summary = (llm_data.get("summary") or structured_row["event_summary"]).strip()[:120]
-                    llm_event_name = (llm_data.get("event_name") or structured_row["event_name"]).strip()[:80]
+                    llm_summary = (
+                        llm_data.get("summary") or structured_row["event_summary"]
+                    ).strip()[:120]
+                    llm_event_name = (
+                        llm_data.get("event_name") or structured_row["event_name"]
+                    ).strip()[:80]
                     llm_subject = anchored_subject_type(row, llm_subject)
-                    llm_industry = anchored_industry_type(row, llm_industry, structured_row["industry_type"])
-                    structured_row.update({
-                        "event_name": llm_event_name,
-                        "event_subject_type": llm_subject,
-                        "industry_type": llm_industry,
-                        "sentiment": llm_sentiment,
-                        "event_summary": llm_summary,
-                        "classification_evidence": structured_row["classification_evidence"]
-                        + f"|llm=1|llm_backend=ollama|llm_trigger={','.join(llm_reasons)}|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
-                    })
+                    llm_industry = anchored_industry_type(
+                        row, llm_industry, structured_row["industry_type"]
+                    )
+                    structured_row.update(
+                        {
+                            "event_name": llm_event_name,
+                            "event_subject_type": llm_subject,
+                            "industry_type": llm_industry,
+                            "sentiment": llm_sentiment,
+                            "event_summary": llm_summary,
+                            "classification_evidence": structured_row[
+                                "classification_evidence"
+                            ]
+                            + f"|llm=1|llm_backend=ollama|llm_trigger={','.join(llm_reasons)}|llm_subject={llm_subject}|llm_industry={llm_industry}|llm_sentiment={llm_sentiment}",
+                        }
+                    )
                     return candidate_row, structured_row
 
         # Fallback to rules-only
-        return build_candidate_row(row, res), (structured_preview if res.is_event else None)
+        return build_candidate_row(row, res), (
+            structured_preview if res.is_event else None
+        )
 
     tasks = []
     for row, res in zip(rows, candidate_results):
@@ -1218,11 +1605,11 @@ async def classify_rows_async(
             llm_budget += 1
         tasks.append(process_one(row, res, allow_llm))
     results = await asyncio.gather(*tasks)
-    
+
     candidate_rows = []
     structured_rows = []
     seen_structured_dedup_keys = set()
-    
+
     for row, (cand, struct) in zip(rows, results):
         candidate_rows.append(cand)
         if struct:
@@ -1231,7 +1618,7 @@ async def classify_rows_async(
             if d_key not in seen_structured_dedup_keys:
                 seen_structured_dedup_keys.add(d_key)
                 structured_rows.append(struct)
-                
+
     return candidate_rows, structured_rows
 
 
@@ -1239,7 +1626,7 @@ def load_rows_from_db(db: str) -> List[Dict[str, str]]:
     """Load latest raw_documents from database for classification."""
     import psycopg
     from capabilities.storage.db_guard import dsn_for
-    
+
     sql = """
         SELECT source, title, content, publish_time::text, url, symbol_or_subject 
         FROM raw_documents
@@ -1260,16 +1647,16 @@ async def run_classification_pipeline(
 ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
     """Orchestrate classification and persist results into stage and final tables."""
     from capabilities.storage.load_task1 import insert_final_tables, load_stage_tables
-    
+
     rows = input_rows if input_rows is not None else load_rows_from_db(db)
     if not rows:
         print("No documents found for classification.")
         return [], []
-        
+
     candidate_rows, structured_rows = await classify_rows_async(
         rows, use_llm=use_llm, llm_max_rows=llm_max_rows
     )
-    
+
     load_stage_tables(db, [], candidate_rows, structured_rows)
     insert_final_tables(db)
     return candidate_rows, structured_rows
@@ -1277,7 +1664,7 @@ async def run_classification_pipeline(
 
 def main() -> None:
     args = parse_args()
-    
+
     async def _run():
         if args.inputs:
             input_paths = [Path(p).resolve() for p in args.inputs]
@@ -1302,12 +1689,14 @@ def main() -> None:
         raw_output_path = output_dir / "raw_event_candidates.csv"
         structured_output_path = output_dir / "structured_events.csv"
         ensure_output_dir(output_dir)
-        
+
         write_csv(raw_output_path, candidate_rows, RAW_CANDIDATE_FIELDS)
         write_csv(structured_output_path, structured_rows, STRUCTURED_EVENT_FIELDS)
 
         print(f"Wrote {len(candidate_rows)} raw candidates to {raw_output_path}")
-        print(f"Wrote {len(structured_rows)} structured events to {structured_output_path}")
+        print(
+            f"Wrote {len(structured_rows)} structured events to {structured_output_path}"
+        )
 
     asyncio.run(_run())
 

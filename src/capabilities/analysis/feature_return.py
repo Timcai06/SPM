@@ -381,6 +381,7 @@ def main() -> None:
             e.impact_scope,
             CASE
                 WHEN d.symbol_or_subject ~ '^[0-9]{6}$' AND d.source LIKE '上交所%' THEN d.symbol_or_subject || '.SH'
+                WHEN d.symbol_or_subject ~ '^[0-9]{6}$' AND d.source LIKE '北交所%' THEN d.symbol_or_subject || '.BJ'
                 WHEN d.symbol_or_subject ~ '^[0-9]{6}$' THEN d.symbol_or_subject || '.SZ'
                 ELSE NULL
             END AS ts_code,
@@ -610,9 +611,6 @@ def main() -> None:
             valid_any = True
         if not valid_any:
             reason_counts["insufficient_event_window"] += 1
-            continue
-        if max_window and not has_max_window:
-            reason_counts["insufficient_max_event_window"] += 1
             continue
 
         dataset_rows.append(

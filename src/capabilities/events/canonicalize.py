@@ -9,7 +9,7 @@ import hashlib
 import json
 import re
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import date as date_type, datetime
 from pathlib import Path
 from typing import Dict, List, Set
 
@@ -57,8 +57,10 @@ def write_csv(path: Path, rows: List[Dict[str, object]], fieldnames: List[str]) 
         writer.writerows(rows)
 
 
-def parse_date(value: str) -> datetime.date:
-    return datetime.strptime(value.strip(), "%Y-%m-%d").date()
+def parse_date(value) -> date_type:
+    if isinstance(value, date_type):
+        return value
+    return datetime.strptime(str(value).strip(), "%Y-%m-%d").date()
 
 
 def normalize_phrase(text: str) -> str:
