@@ -32,7 +32,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db", default="stock_event_mining")
     parser.add_argument("--batch-size", type=int, default=5000)
     parser.add_argument("--max-batches", type=int, default=0, help="0 means all.")
+    parser.add_argument("--start-date", default="")
+    parser.add_argument("--end-date", default="")
+    parser.add_argument("--only-needy", action="store_true")
     parser.add_argument("--use-llm", action="store_true")
+    parser.add_argument("--local-llm-only", action="store_true")
     parser.add_argument("--llm-max-rows", type=int, default=200)
     parser.add_argument("--llm-confidence-threshold", type=float, default=0.70)
     parser.add_argument("--llm-progress-every", type=int, default=10)
@@ -40,9 +44,37 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_batch(cur: psycopg.Cursor, batch_size: int, offset: int) -> List[Dict[str, Any]]:
+def load_batch(
+    cur: psycopg.Cursor,
+    batch_size: int,
+    offset: int,
+    start_date: str,
+    end_date: str,
+    only_needy: bool,
+    confidence_threshold: float,
+) -> List[Dict[str, Any]]:
+    filters = []
+    params: list[Any] = []
+    if start_date:
+        filters.append("se.event_date >= %s::date")
+        params.append(start_date)
+    if end_date:
+        filters.append("se.event_date < %s::date")
+        params.append(end_date)
+    if only_needy:
+        filters.append(
+            "("
+            "se.sw_l1_industry = '其他' "
+            "OR COALESCE(se.industry_count, 0) = 0 "
+            "OR se.shock_source_type = '其他' "
+            "OR se.event_subject_subtype IN ('未细分','公司事项','行业跟踪','政策动态','宏观跟踪','地缘事件') "
+            "OR COALESCE(se.classification_confidence, 0) < %s"
+            ")"
+        )
+        params.append(confidence_threshold)
+    where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
     cur.execute(
-        """
+        f"""
         SELECT
             se.id, se.event_name, se.event_summary, se.classification_evidence, se.subject_entities,
             se.sentiment, se.source_type, se.authority_level, se.predictability_type, se.shock_source_type,
@@ -51,10 +83,11 @@ def load_batch(cur: psycopg.Cursor, batch_size: int, offset: int) -> List[Dict[s
         FROM structured_events se
         JOIN int_event_candidates c ON c.id = se.candidate_id
         JOIN raw_documents rd ON rd.id = c.raw_document_id
+        {where_sql}
         ORDER BY se.id
         OFFSET %s LIMIT %s
         """,
-        (offset, batch_size),
+        tuple(params + [offset, batch_size]),
     )
     return [dict(row) for row in cur.fetchall()]
 
@@ -115,6 +148,7 @@ async def apply_llm_to_updates(
     updates: List[Dict[str, Any]],
     llm_max_rows: int,
     progress_every: int,
+    local_llm_only: bool,
 ) -> Dict[str, int]:
     client = AsyncLLMClient()
     ollama = AsyncOllamaClient()
@@ -132,7 +166,7 @@ async def apply_llm_to_updates(
             "impact_scope": update["impact_scope"],
         }
         llm_data = {}
-        if client.api_key:
+        if client.api_key and not local_llm_only:
             llm_data = await client.extract_feature_data(
                 row.get("raw_title") or row.get("event_name") or "",
                 row.get("raw_content") or row.get("event_summary") or "",
@@ -241,7 +275,15 @@ def main() -> None:
                 while True:
                     if args.max_batches > 0 and batch_idx >= args.max_batches:
                         break
-                    rows = load_batch(cur, args.batch_size, batch_idx * args.batch_size)
+                    rows = load_batch(
+                        cur,
+                        args.batch_size,
+                        batch_idx * args.batch_size,
+                        args.start_date,
+                        args.end_date,
+                        args.only_needy,
+                        args.llm_confidence_threshold,
+                    )
                     if not rows:
                         break
                     updates = [build_update(row) for row in rows]
@@ -268,6 +310,7 @@ def main() -> None:
                                     [update for _, update in llm_rows],
                                     args.llm_max_rows,
                                     args.llm_progress_every,
+                                    args.local_llm_only,
                                 )
                             )
                     update_rows(cur, updates)

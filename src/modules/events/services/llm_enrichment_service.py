@@ -135,8 +135,9 @@ class AsyncLLMClient:
     async def extract_feature_data(self, title: str, content: str, current: Dict[str, Any]) -> dict:
         if not self.api_key:
             return {}
+        compact_content = content[:700]
         prompt = f"""
-你是金融事件结构化专家。请根据标题和正文，对以下字段做保守判断，并严格返回 JSON：
+你是金融事件结构化专家。请只做保守纠偏，严格返回 JSON：
 {{
   "sw_l1_industry": "必须是以下之一：{','.join(SW_L1_NAMES)}，若无法判断返回其他",
   "event_subject_subtype": "必须是以下之一：{','.join(SUBTYPE_RULES.keys())}，若无法判断返回{current.get('event_subject_subtype', '未细分')}",
@@ -146,7 +147,7 @@ class AsyncLLMClient:
 }}
 当前结果：{json.dumps(current, ensure_ascii=False)}
 标题：{title}
-正文：{content[:1200]}
+正文：{compact_content}
 """
         payload = {
             "model": self.model,
@@ -191,8 +192,9 @@ class AsyncOllamaClient:
             return {}
 
     async def extract_feature_data(self, title: str, content: str, current: Dict[str, Any]) -> dict:
+        compact_content = content[:700]
         prompt = f"""
-你是金融事件结构化专家。请严格返回 JSON：
+你是金融事件结构化专家。请只做保守纠偏，并严格返回 JSON：
 {{
   "sw_l1_industry": "从这些值中选择：{','.join(SW_L1_NAMES)}，若无法判断返回其他",
   "event_subject_subtype": "从这些值中选择：{','.join(SUBTYPE_RULES.keys())}",
@@ -202,7 +204,7 @@ class AsyncOllamaClient:
 }}
 当前结果：{json.dumps(current, ensure_ascii=False)}
 标题：{title}
-正文：{content[:1200]}
+正文：{compact_content}
 """
         payload = {"model": self.model, "prompt": prompt, "stream": False, "format": "json", "options": {"temperature": 0.0}}
         try:
