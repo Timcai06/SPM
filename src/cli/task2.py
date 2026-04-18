@@ -12,24 +12,24 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.linking import link_events
+from modules.linking.jobs import relink_job
 from capabilities.analysis import build_negative_samples
+from modules.companies.jobs import (
+    board_industries_job,
+    import_companies_job,
+    import_profiles_job,
+    import_stats_job,
+    import_stats_local_job,
+    load_profiles_job,
+    load_stats_job,
+    standard_industries_job,
+)
 from capabilities.storage import (
-    import_companies_akshare,
     import_companies_public,
     import_companies_tushare,
-    import_company_industries_akshare,
-    import_company_profiles_akshare,
-    import_company_standard_industries_akshare,
-    import_company_stats_akshare,
-    import_company_stats_local,
-    import_company_stats_sina,
-    import_company_stats_tushare,
-    load_company_profiles,
     load_market_environment,
     load_sentiment_propagation,
     load_companies,
-    load_company_stats,
 )
 from pipelines import task2 as task2_pipeline
 
@@ -286,7 +286,7 @@ def main() -> None:
                 str(args.lock_timeout_sec),
             ]
         ):
-            import_companies_akshare.main()
+            import_companies_job.main()
         return
 
     if args.command == "import-company-industries":
@@ -307,7 +307,7 @@ def main() -> None:
                 str(args.lock_timeout_sec),
             ]
         ):
-            import_company_industries_akshare.main()
+            board_industries_job.main()
         return
 
     if args.command == "import-company-standard-industries":
@@ -339,7 +339,7 @@ def main() -> None:
         if args.skip_legacy:
             argv.append("--skip-legacy")
         with patched_argv(argv):
-            import_company_standard_industries_akshare.main()
+            standard_industries_job.main()
         return
 
     if args.command == "import-companies-public":
@@ -350,7 +350,7 @@ def main() -> None:
     if args.command == "import-company-profiles":
         with patched_argv(
             [
-                "import_company_profiles_akshare.py",
+                "import_profiles_job.py",
                 "--db",
                 args.db,
                 "--input",
@@ -366,13 +366,13 @@ def main() -> None:
             ]
             + (["--with-holders"] if args.with_holders else [])
         ):
-            import_company_profiles_akshare.main()
+            import_profiles_job.main()
         return
 
     if args.command == "import-company-stats":
         if args.source == "sina":
             argv = [
-                "import_company_stats_sina.py",
+                "import_stats_job.py",
                 "--output",
                 args.output,
                 "--quotes-output",
@@ -393,7 +393,7 @@ def main() -> None:
                 str(args.timeout_sec),
             ]
             with patched_argv(argv):
-                import_company_stats_sina.main()
+                import_stats_job.run_sina()
             return
 
         def run_akshare_import() -> None:
@@ -425,7 +425,7 @@ def main() -> None:
             if args.resume_existing:
                 argv.append("--resume-existing")
             with patched_argv(argv):
-                import_company_stats_akshare.main()
+                import_stats_job.run_akshare()
 
         if args.source in ("tushare", "auto"):
             argv = [
@@ -447,7 +447,7 @@ def main() -> None:
                 argv.extend(["--tushare-token-file", args.tushare_token_file])
             try:
                 with patched_argv(argv):
-                    import_company_stats_tushare.main()
+                    import_stats_job.run_tushare()
                 return
             except (Exception, SystemExit) as exc:
                 if args.source == "tushare":
@@ -461,7 +461,7 @@ def main() -> None:
             except (Exception, SystemExit) as exc:
                 print(f"[import-company-stats] akshare failed, fallback to sina: {exc}")
                 argv = [
-                    "import_company_stats_sina.py",
+                    "import_stats_job.py",
                     "--output",
                     args.output,
                     "--quotes-output",
@@ -482,7 +482,7 @@ def main() -> None:
                     str(args.timeout_sec),
                 ]
                 with patched_argv(argv):
-                    import_company_stats_sina.main()
+                    import_stats_job.run_sina()
                 return
         run_akshare_import()
         return
@@ -490,7 +490,7 @@ def main() -> None:
     if args.command == "import-company-stats-local":
         with patched_argv(
             [
-                "import_company_stats_local.py",
+                "import_stats_local_job.py",
                 "--input",
                 args.input,
                 "--output",
@@ -499,13 +499,13 @@ def main() -> None:
                 args.quotes_output,
             ]
         ):
-            import_company_stats_local.main()
+            import_stats_local_job.main()
         return
 
     if args.command == "load-company-stats":
         with patched_argv(
             [
-                "load_company_stats.py",
+                "load_stats_job.py",
                 "--db",
                 args.db,
                 "--input",
@@ -514,13 +514,13 @@ def main() -> None:
                 args.quotes_input,
             ]
         ):
-            load_company_stats.main()
+            load_stats_job.main()
         return
 
     if args.command == "load-company-profiles":
         with patched_argv(
             [
-                "load_company_profiles.py",
+                "load_profiles_job.py",
                 "--db",
                 args.db,
                 "--snapshot-date",
@@ -531,7 +531,7 @@ def main() -> None:
                 str(args.lock_timeout_sec),
             ]
         ):
-            load_company_profiles.main()
+            load_profiles_job.main()
         return
 
     if args.command == "load-market-environment":
@@ -570,7 +570,7 @@ def main() -> None:
     if args.command == "link-events":
         with patched_argv(
             [
-                "link_events.py",
+                "relink_job.py",
                 "--db",
                 args.db,
                 "--top-k",
@@ -583,7 +583,7 @@ def main() -> None:
                 str(args.progress_every),
             ]
         ):
-            link_events.main()
+            relink_job.main()
         return
 
     if args.command == "build-negative-samples":

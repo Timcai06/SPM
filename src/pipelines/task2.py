@@ -14,7 +14,7 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.linking import link_events
+from modules.linking.jobs import relink_job
 from capabilities.storage import load_companies
 from capabilities.storage.db_guard import dsn_for
 
@@ -66,7 +66,7 @@ def main() -> None:
             )
     with patched_argv(
         [
-            "link_events.py",
+            "relink_job.py",
             "--db",
             args.db,
             "--top-k",
@@ -77,7 +77,7 @@ def main() -> None:
             args.canonical_map,
         ]
     ):
-        link_events.main()
+        relink_job.main()
     print(f"Task 2 workflow completed for database: {args.db}")
 
 

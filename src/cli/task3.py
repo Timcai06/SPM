@@ -12,7 +12,7 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.graph import propagate_event_links
+from modules.graph.jobs import propagate_links_job
 from capabilities.storage import load_task3_relations
 from pipelines import task3 as task3_pipeline
 
@@ -79,7 +79,7 @@ def main() -> None:
     if args.command == "propagate":
         with patched_argv(
             [
-                "propagate_event_links.py",
+                "propagate_links_job.py",
                 "--db",
                 args.db,
                 "--min-source-score",
@@ -90,7 +90,7 @@ def main() -> None:
                 args.canonical_map,
             ]
         ):
-            propagate_event_links.main()
+            propagate_links_job.main()
 
 
 if __name__ == "__main__":

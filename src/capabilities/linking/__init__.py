@@ -1,2 +1,0 @@
-"""Event-company linking capability."""
-

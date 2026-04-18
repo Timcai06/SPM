@@ -12,7 +12,7 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.graph import propagate_event_links
+from modules.graph.jobs import propagate_links_job
 from capabilities.storage import load_task3_relations
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -44,7 +44,7 @@ def main() -> None:
         load_task3_relations.main()
     with patched_argv(
         [
-            "propagate_event_links.py",
+            "propagate_links_job.py",
             "--db",
             args.db,
             "--min-source-score",
@@ -55,7 +55,7 @@ def main() -> None:
             args.canonical_map,
         ]
     ):
-        propagate_event_links.main()
+        propagate_links_job.main()
     print(f"Task 3 preparation workflow completed for database: {args.db}")
 
 
