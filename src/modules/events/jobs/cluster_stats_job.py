@@ -35,13 +35,10 @@ def refresh_cluster_stats(db_name: str, lock_timeout_sec: int = 120) -> int:
     CREATE INDEX ON se_cluster_base (cluster_key, event_date);
 
     CREATE TEMP TABLE se_cluster_daily ON COMMIT DROP AS
-    SELECT
-        cluster_key, event_date,
-        count(*) AS reports,
-        count(DISTINCT source) AS media_cov,
-        count(*) FILTER (WHERE sentiment = '利好') AS pos_cnt,
-        count(*) FILTER (WHERE sentiment = '中性') AS neu_cnt,
-        count(*) FILTER (WHERE sentiment = '利空') AS neg_cnt
+    SELECT cluster_key, event_date, count(*) AS reports, count(DISTINCT source) AS media_cov,
+           count(*) FILTER (WHERE sentiment = '利好') AS pos_cnt,
+           count(*) FILTER (WHERE sentiment = '中性') AS neu_cnt,
+           count(*) FILTER (WHERE sentiment = '利空') AS neg_cnt
     FROM se_cluster_base
     GROUP BY cluster_key, event_date;
 
@@ -57,20 +54,16 @@ def refresh_cluster_stats(db_name: str, lock_timeout_sec: int = 120) -> int:
     GROUP BY cluster_key;
 
     CREATE TEMP TABLE se_cluster_enriched ON COMMIT DROP AS
-    SELECT
-        b.id,
-        g.report_count,
-        s.media_coverage_count,
-        g.heat_duration_days,
-        CASE WHEN prev.reports IS NULL THEN 0::numeric
-             ELSE round((curr.reports - prev.reports)::numeric / (prev.reports + 1), 6)
-        END AS heat_growth_rate,
-        CASE WHEN curr.reports <= 0 THEN 0::numeric
-             ELSE round(
-                (CASE WHEN curr.pos_cnt > 0 THEN -(curr.pos_cnt::numeric / curr.reports) * ln(curr.pos_cnt::numeric / curr.reports) ELSE 0 END
-               + CASE WHEN curr.neu_cnt > 0 THEN -(curr.neu_cnt::numeric / curr.reports) * ln(curr.neu_cnt::numeric / curr.reports) ELSE 0 END
-               + CASE WHEN curr.neg_cnt > 0 THEN -(curr.neg_cnt::numeric / curr.reports) * ln(curr.neg_cnt::numeric / curr.reports) ELSE 0 END), 6)
-        END AS disagreement_score
+    SELECT b.id, g.report_count, s.media_coverage_count, g.heat_duration_days,
+           CASE WHEN prev.reports IS NULL THEN 0::numeric
+                ELSE round((curr.reports - prev.reports)::numeric / (prev.reports + 1), 6)
+           END AS heat_growth_rate,
+           CASE WHEN curr.reports <= 0 THEN 0::numeric
+                ELSE round(
+                    (CASE WHEN curr.pos_cnt > 0 THEN -(curr.pos_cnt::numeric / curr.reports) * ln(curr.pos_cnt::numeric / curr.reports) ELSE 0 END
+                   + CASE WHEN curr.neu_cnt > 0 THEN -(curr.neu_cnt::numeric / curr.reports) * ln(curr.neu_cnt::numeric / curr.reports) ELSE 0 END
+                   + CASE WHEN curr.neg_cnt > 0 THEN -(curr.neg_cnt::numeric / curr.reports) * ln(curr.neg_cnt::numeric / curr.reports) ELSE 0 END), 6)
+           END AS disagreement_score
     FROM se_cluster_base b
     JOIN se_cluster_daily curr
       ON curr.cluster_key = b.cluster_key AND curr.event_date = b.event_date

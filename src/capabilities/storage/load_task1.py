@@ -20,7 +20,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.storage.db_guard import dsn_for, write_guard
-from capabilities.adapters.task1.stage_builders import (
+from modules.events.adapters.stage_builders import (
     build_candidate_stage_rows,
     build_structured_stage_rows,
 )

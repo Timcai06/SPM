@@ -1,2 +1,0 @@
-"""Event engine capability."""
-

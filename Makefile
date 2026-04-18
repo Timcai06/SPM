@@ -35,6 +35,10 @@ CLASSIFY_MAX_BATCHES ?= 20
 RECLASSIFY_SOURCE ?= 巨潮资讯网/历史公告
 RECLASSIFY_BATCH_SIZE ?= 5000
 RECLASSIFY_MAX_BATCHES ?= 10
+EVENT_LLM ?= 0
+EVENT_LLM_MAX_ROWS ?= 100
+EVENT_LLM_CONFIDENCE_THRESHOLD ?= 0.70
+EVENT_LLM_PROGRESS_EVERY ?= 10
 INDUSTRY_MAX ?= 100
 INDUSTRY_OFFSET ?= 0
 INDUSTRY_SLEEP ?= 0.05
@@ -59,7 +63,7 @@ endif
 
 .PHONY: help \
 	companies-all standard-industries industries history classify-pending reclassify-source relink core-status core-pipeline \
-	cluster-stats backfill-structured-features export-yearly check-export-size \
+	cluster-stats backfill-structured-features event-refresh export-yearly check-export-size \
 	collect link feature train status qa stats-import stats-load negatives \
 	profiles \
 	market-env \
@@ -78,6 +82,7 @@ help:
 	@echo "  make history             # 历史采集 raw_documents（默认巨潮公告）"
 	@echo "  make classify-pending    # 分类未处理 raw_documents"
 	@echo "  make reclassify-source   # 重跑某个来源的分类规则"
+	@echo "  make event-refresh       # 一条命令串行跑 event 优化（重分类 -> 特征回填 -> 簇统计）"
 	@echo "  make relink              # 重跑 event_company_links，带进度"
 	@echo "  make cluster-stats       # 回填事件簇统计特征（报道量/分歧度等）"
 	@echo "  make backfill-structured-features # 回填结构化事件新增特征列"
@@ -154,10 +159,33 @@ relink:
 		--progress-every $(LINK_PROGRESS_EVERY)
 
 cluster-stats:
-	$(PY) src/capabilities/jobs/events/cluster_stats_job.py --db $(DB)
+	$(PY) src/modules/events/jobs/cluster_stats_job.py --db $(DB)
 
 backfill-structured-features:
-	$(PY) src/capabilities/jobs/events/backfill_structured_features_job.py --db $(DB) --batch-size 5000 --max-batches 0
+	$(PY) src/modules/events/jobs/backfill_structured_features_job.py \
+		--db $(DB) \
+		--batch-size $(RECLASSIFY_BATCH_SIZE) \
+		--max-batches $(RECLASSIFY_MAX_BATCHES) \
+		$(if $(filter 1,$(EVENT_LLM)),--use-llm,) \
+		--llm-max-rows $(EVENT_LLM_MAX_ROWS) \
+		--llm-confidence-threshold $(EVENT_LLM_CONFIDENCE_THRESHOLD) \
+		--llm-progress-every $(EVENT_LLM_PROGRESS_EVERY)
+
+event-refresh:
+	$(PY) src/cli/task1.py reclassify-source \
+		--db $(DB) \
+		--source '$(RECLASSIFY_SOURCE)' \
+		--batch-size $(RECLASSIFY_BATCH_SIZE) \
+		--max-batches $(RECLASSIFY_MAX_BATCHES)
+	$(MAKE) backfill-structured-features \
+		DB=$(DB) \
+		RECLASSIFY_BATCH_SIZE=$(RECLASSIFY_BATCH_SIZE) \
+		RECLASSIFY_MAX_BATCHES=$(RECLASSIFY_MAX_BATCHES) \
+		EVENT_LLM=$(EVENT_LLM) \
+		EVENT_LLM_MAX_ROWS=$(EVENT_LLM_MAX_ROWS) \
+		EVENT_LLM_CONFIDENCE_THRESHOLD=$(EVENT_LLM_CONFIDENCE_THRESHOLD) \
+		EVENT_LLM_PROGRESS_EVERY=$(EVENT_LLM_PROGRESS_EVERY)
+	$(PY) src/modules/events/jobs/cluster_stats_job.py --db $(DB)
 
 export-yearly:
 	mkdir -p $(DELIVERY_DIR)

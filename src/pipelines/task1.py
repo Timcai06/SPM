@@ -43,8 +43,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 from capabilities.collectors.run import collect_all_async
-from capabilities.events.classify import run_classification_pipeline
-from capabilities.events.canonicalize import run_canonicalization_pipeline
+from modules.events.jobs.classify_job import run_classification_pipeline
+from modules.events.jobs.canonicalize_job import run_canonicalization_pipeline
 from capabilities.quality.check import run_validation_pipeline
 from capabilities.storage.load_task1_canonical import run_loading_pipeline
 from capabilities.storage.load_task1 import upsert_raw_documents

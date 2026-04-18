@@ -19,7 +19,12 @@ if str(SRC_ROOT) not in sys.path:
 from capabilities.analysis import build_model_samples, feature_return
 from capabilities.collectors import run as collector_run
 from capabilities.collectors import history as history_collector
-from capabilities.events import canonicalize, classify
+from modules.events.jobs import (
+    canonicalize_job,
+    classify_job,
+    classify_pending_job,
+    reclassify_source_job,
+)
 from capabilities.quality import check, delivery_status, quality_report
 from capabilities.storage import load_task1_canonical
 from capabilities.storage.db_guard import dsn_for
@@ -199,50 +204,6 @@ def print_db_status(db_name: str) -> None:
                 cur.execute(f"SELECT count(*) FROM {table}")
                 count = cur.fetchone()[0]
                 print(f"- {table}: {count}")
-
-
-def load_pending_raw_documents(db_name: str, batch_size: int) -> list[dict[str, str]]:
-    with psycopg.connect(dsn_for(db_name), row_factory=psycopg.rows.dict_row) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT d.source,
-                       d.title,
-                       d.content,
-                       d.publish_time::text AS publish_time,
-                       d.url,
-                       COALESCE(d.symbol_or_subject, '') AS symbol_or_subject
-                FROM raw_documents d
-                LEFT JOIN int_event_candidates c ON c.raw_document_id = d.id
-                WHERE c.id IS NULL
-                ORDER BY d.publish_time, d.id
-                LIMIT %s
-                """,
-                (batch_size,),
-            )
-            return [dict(row) for row in cur.fetchall()]
-
-
-def load_source_raw_documents(db_name: str, source: str, batch_size: int, offset: int) -> list[dict[str, str]]:
-    with psycopg.connect(dsn_for(db_name), row_factory=psycopg.rows.dict_row) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT source,
-                       title,
-                       content,
-                       publish_time::text AS publish_time,
-                       url,
-                       COALESCE(symbol_or_subject, '') AS symbol_or_subject
-                FROM raw_documents
-                WHERE source = %s
-                ORDER BY publish_time, id
-                OFFSET %s
-                LIMIT %s
-                """,
-                (source, offset, batch_size),
-            )
-            return [dict(row) for row in cur.fetchall()]
 
 
 def parse_feature_top_reasons(path: Path, top_n: int = 3) -> list[tuple[str, int]]:
@@ -466,66 +427,41 @@ def main() -> None:
         if args.use_llm:
             argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
         with patched_argv(argv):
-            classify.main()
+            classify_job.main()
         return
 
     if args.command == "classify-pending":
-        import asyncio
-
-        total_candidates = 0
-        total_structured = 0
-        for batch_idx in range(args.max_batches):
-            rows = load_pending_raw_documents(args.db, args.batch_size)
-            if not rows:
-                print(f"[classify-pending] no pending raw_documents at batch {batch_idx + 1}")
-                break
-            candidate_rows, structured_rows = asyncio.run(
-                classify.run_classification_pipeline(
-                    args.db,
-                    input_rows=rows,
-                    use_llm=args.use_llm,
-                    llm_max_rows=args.llm_max_rows,
-                )
-            )
-            total_candidates += len(candidate_rows)
-            total_structured += len(structured_rows)
-            print(
-                f"[classify-pending] batch {batch_idx + 1}/{args.max_batches}: "
-                f"candidates={len(candidate_rows)}, structured={len(structured_rows)}"
-            )
-            if len(rows) < args.batch_size:
-                break
-        print(f"[classify-pending] total candidates={total_candidates}, structured={total_structured}")
+        with patched_argv(
+            [
+                "classify_pending_job.py",
+                "--db",
+                args.db,
+                "--batch-size",
+                str(args.batch_size),
+                "--max-batches",
+                str(args.max_batches),
+            ]
+            + (["--use-llm", "--llm-max-rows", str(args.llm_max_rows)] if args.use_llm else [])
+        ):
+            classify_pending_job.main()
         return
 
     if args.command == "reclassify-source":
-        import asyncio
-
-        total_candidates = 0
-        total_structured = 0
-        for batch_idx in range(args.max_batches):
-            offset = batch_idx * args.batch_size
-            rows = load_source_raw_documents(args.db, args.source, args.batch_size, offset)
-            if not rows:
-                print(f"[reclassify-source] no rows for source={args.source!r} at batch {batch_idx + 1}")
-                break
-            candidate_rows, structured_rows = asyncio.run(
-                classify.run_classification_pipeline(
-                    args.db,
-                    input_rows=rows,
-                    use_llm=args.use_llm,
-                    llm_max_rows=args.llm_max_rows,
-                )
-            )
-            total_candidates += len(candidate_rows)
-            total_structured += len(structured_rows)
-            print(
-                f"[reclassify-source] batch {batch_idx + 1}/{args.max_batches}: "
-                f"source={args.source!r}, candidates={len(candidate_rows)}, structured={len(structured_rows)}"
-            )
-            if len(rows) < args.batch_size:
-                break
-        print(f"[reclassify-source] total candidates={total_candidates}, structured={total_structured}")
+        with patched_argv(
+            [
+                "reclassify_source_job.py",
+                "--db",
+                args.db,
+                "--source",
+                args.source,
+                "--batch-size",
+                str(args.batch_size),
+                "--max-batches",
+                str(args.max_batches),
+            ]
+            + (["--use-llm", "--llm-max-rows", str(args.llm_max_rows)] if args.use_llm else [])
+        ):
+            reclassify_source_job.main()
         return
 
     if args.command == "check":
@@ -535,7 +471,7 @@ def main() -> None:
 
     if args.command == "canonicalize":
         with patched_argv(["canonicalize.py"]):
-            canonicalize.main()
+            canonicalize_job.main()
         return
 
     if args.command == "canonical-load":

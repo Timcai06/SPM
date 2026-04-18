@@ -11,7 +11,7 @@ SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.events.rules import DURATION_ENUM, EVENT_SUBJECT_ENUM, IMPACT_SCOPE_ENUM, INDUSTRY_ENUM, PREDICTABILITY_ENUM, RULE_VERSION
+from modules.events.domain.classification_rules import DURATION_ENUM, EVENT_SUBJECT_ENUM, IMPACT_SCOPE_ENUM, INDUSTRY_ENUM, PREDICTABILITY_ENUM, RULE_VERSION
 
 
 ROOT = Path(__file__).resolve().parents[3]

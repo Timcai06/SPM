@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from capabilities.services.events.structured_event_features import enrich_row
+from modules.events.services.structured_feature_service import enrich_row
 
 
 def build_candidate_stage_rows(raw_candidates: List[Dict[str, str]]) -> List[Dict[str, str]]:

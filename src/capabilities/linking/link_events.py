@@ -17,7 +17,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.storage.db_guard import dsn_for, write_guard
-from capabilities.events.canonical_utils import (
+from modules.events.domain.canonical_matching import (
     load_canonical_map_from_csv,
     load_canonical_map_from_db,
 )
