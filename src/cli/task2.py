@@ -58,18 +58,26 @@ def parse_args() -> argparse.Namespace:
     load_parser.add_argument("--db", default="stock_event_mining")
     load_parser.add_argument("--input", default="output/seeds/companies_seed.csv")
 
-    import_parser = sub.add_parser("import-companies", help="import company basics from Tushare")
+    import_parser = sub.add_parser(
+        "import-companies", help="import company basics from Tushare"
+    )
     import_parser.add_argument("--output", default="output/seeds/companies_a_share.csv")
     import_parser.add_argument("--tushare-token", default="")
     import_parser.add_argument("--tushare-token-file", default="")
 
-    import_all_a_parser = sub.add_parser("import-companies-all-a", help="import A-share company universe directly into DB")
+    import_all_a_parser = sub.add_parser(
+        "import-companies-all-a",
+        help="import A-share company universe directly into DB",
+    )
     import_all_a_parser.add_argument("--db", default="stock_event_mining")
     import_all_a_parser.add_argument("--max-symbols", type=int, default=0)
     import_all_a_parser.add_argument("--offset", type=int, default=0)
     import_all_a_parser.add_argument("--lock-timeout-sec", type=int, default=120)
 
-    import_industries_parser = sub.add_parser("import-company-industries", help="backfill company industries from public board constituents")
+    import_industries_parser = sub.add_parser(
+        "import-company-industries",
+        help="backfill company industries from public board constituents",
+    )
     import_industries_parser.add_argument("--db", default="stock_event_mining")
     import_industries_parser.add_argument("--max-industries", type=int, default=0)
     import_industries_parser.add_argument("--offset", type=int, default=0)
@@ -82,31 +90,72 @@ def parse_args() -> argparse.Namespace:
         help="backfill standard company industry_l1 from CNInfo classification",
     )
     import_standard_industries_parser.add_argument("--db", default="stock_event_mining")
-    import_standard_industries_parser.add_argument("--max-symbols", type=int, default=200)
+    import_standard_industries_parser.add_argument(
+        "--max-symbols", type=int, default=200
+    )
     import_standard_industries_parser.add_argument("--offset", type=int, default=0)
-    import_standard_industries_parser.add_argument("--start-date", default="20230101")
+    import_standard_industries_parser.add_argument("--start-date", default="19900101")
     import_standard_industries_parser.add_argument("--end-date", default="20251231")
-    import_standard_industries_parser.add_argument("--sleep-sec", type=float, default=0.05)
-    import_standard_industries_parser.add_argument("--progress-every", type=int, default=20)
-    import_standard_industries_parser.add_argument("--lock-timeout-sec", type=int, default=120)
+    import_standard_industries_parser.add_argument(
+        "--sleep-sec", type=float, default=0.05
+    )
+    import_standard_industries_parser.add_argument(
+        "--progress-every", type=int, default=20
+    )
+    import_standard_industries_parser.add_argument(
+        "--lock-timeout-sec", type=int, default=120
+    )
+    import_standard_industries_parser.add_argument("--retries", type=int, default=2)
+    import_standard_industries_parser.add_argument(
+        "--failure-backoff-sec", type=float, default=0.8
+    )
+    import_standard_industries_parser.add_argument(
+        "--only-dirty",
+        action="store_true",
+        help="Only reprocess companies whose industry_l1 is empty, '其他', or not a standard code.",
+    )
+    import_standard_industries_parser.add_argument(
+        "--skip-legacy",
+        action="store_true",
+        help="Skip likely legacy/delisted company names for faster high-yield batches.",
+    )
 
-    import_public_parser = sub.add_parser("import-companies-public", help="build company seed from collected public sources")
-    import_public_parser.add_argument("--output", default="output/seeds/companies_public.csv")
+    import_public_parser = sub.add_parser(
+        "import-companies-public",
+        help="build company seed from collected public sources",
+    )
+    import_public_parser.add_argument(
+        "--output", default="output/seeds/companies_public.csv"
+    )
 
-    import_profiles_parser = sub.add_parser("import-company-profiles", help="build company profile seed from public sources")
+    import_profiles_parser = sub.add_parser(
+        "import-company-profiles", help="build company profile seed from public sources"
+    )
     import_profiles_parser.add_argument("--db", default="stock_event_mining")
-    import_profiles_parser.add_argument("--input", default="output/seeds/company_profiles_seed.csv")
-    import_profiles_parser.add_argument("--output", default="output/seeds/company_profiles_seed.csv")
+    import_profiles_parser.add_argument(
+        "--input", default="output/seeds/company_profiles_seed.csv"
+    )
+    import_profiles_parser.add_argument(
+        "--output", default="output/seeds/company_profiles_seed.csv"
+    )
     import_profiles_parser.add_argument("--max-symbols", type=int, default=0)
     import_profiles_parser.add_argument("--sleep-sec", type=float, default=0.05)
     import_profiles_parser.add_argument("--progress-every", type=int, default=10)
     import_profiles_parser.add_argument("--with-holders", action="store_true")
 
-    import_stats_parser = sub.add_parser("import-company-stats", help="import company stats from Tushare or AKShare")
+    import_stats_parser = sub.add_parser(
+        "import-company-stats", help="import company stats from Tushare or AKShare"
+    )
     import_stats_parser.add_argument("--db", default="stock_event_mining")
-    import_stats_parser.add_argument("--output", default="output/seeds/company_stats.csv")
-    import_stats_parser.add_argument("--quotes-output", default="output/seeds/stock_daily_quotes.csv")
-    import_stats_parser.add_argument("--source", choices=["auto", "tushare", "akshare", "sina"], default="auto")
+    import_stats_parser.add_argument(
+        "--output", default="output/seeds/company_stats.csv"
+    )
+    import_stats_parser.add_argument(
+        "--quotes-output", default="output/seeds/stock_daily_quotes.csv"
+    )
+    import_stats_parser.add_argument(
+        "--source", choices=["auto", "tushare", "akshare", "sina"], default="auto"
+    )
     import_stats_parser.add_argument("--tushare-token", default="")
     import_stats_parser.add_argument("--tushare-token-file", default="")
     import_stats_parser.add_argument("--days", type=int, default=30)
@@ -120,30 +169,48 @@ def parse_args() -> argparse.Namespace:
     import_stats_parser.add_argument("--failure-backoff-sec", type=float, default=0.8)
     import_stats_parser.add_argument("--resume-existing", action="store_true")
 
-    import_local_parser = sub.add_parser("import-company-stats-local", help="import company stats from local price CSV")
+    import_local_parser = sub.add_parser(
+        "import-company-stats-local", help="import company stats from local price CSV"
+    )
     import_local_parser.add_argument("--input", required=True)
-    import_local_parser.add_argument("--output", default="output/seeds/company_stats.csv")
-    import_local_parser.add_argument("--quotes-output", default="output/seeds/stock_daily_quotes.csv")
+    import_local_parser.add_argument(
+        "--output", default="output/seeds/company_stats.csv"
+    )
+    import_local_parser.add_argument(
+        "--quotes-output", default="output/seeds/stock_daily_quotes.csv"
+    )
 
-    load_stats_parser = sub.add_parser("load-company-stats", help="load company stats csv")
+    load_stats_parser = sub.add_parser(
+        "load-company-stats", help="load company stats csv"
+    )
     load_stats_parser.add_argument("--db", default="stock_event_mining")
     load_stats_parser.add_argument("--input", default="output/seeds/company_stats.csv")
-    load_stats_parser.add_argument("--quotes-input", default="output/seeds/stock_daily_quotes.csv")
+    load_stats_parser.add_argument(
+        "--quotes-input", default="output/seeds/stock_daily_quotes.csv"
+    )
 
-    load_profiles_parser = sub.add_parser("load-company-profiles", help="load company profiles snapshot from companies table")
+    load_profiles_parser = sub.add_parser(
+        "load-company-profiles",
+        help="load company profiles snapshot from companies table",
+    )
     load_profiles_parser.add_argument("--db", default="stock_event_mining")
     load_profiles_parser.add_argument("--snapshot-date", default="")
     load_profiles_parser.add_argument("--input", default="")
     load_profiles_parser.add_argument("--lock-timeout-sec", type=int, default=120)
 
-    load_market_parser = sub.add_parser("load-market-environment", help="load market environment daily rows from stock quotes")
+    load_market_parser = sub.add_parser(
+        "load-market-environment",
+        help="load market environment daily rows from stock quotes",
+    )
     load_market_parser.add_argument("--db", default="stock_event_mining")
     load_market_parser.add_argument("--benchmark", default="hs300")
     load_market_parser.add_argument("--input", default="")
     load_market_parser.add_argument("--timeout-sec", type=float, default=12.0)
     load_market_parser.add_argument("--lock-timeout-sec", type=int, default=120)
 
-    load_sentiment_parser = sub.add_parser("load-sentiment-propagation", help="load sentiment propagation daily rows")
+    load_sentiment_parser = sub.add_parser(
+        "load-sentiment-propagation", help="load sentiment propagation daily rows"
+    )
     load_sentiment_parser.add_argument("--db", default="stock_event_mining")
     load_sentiment_parser.add_argument("--lock-timeout-sec", type=int, default=120)
     load_sentiment_parser.add_argument("--quiet", action="store_true")
@@ -152,10 +219,14 @@ def parse_args() -> argparse.Namespace:
     link_parser.add_argument("--db", default="stock_event_mining")
     link_parser.add_argument("--top-k", type=int, default=3)
     link_parser.add_argument("--min-score", type=float, default=0.35)
-    link_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
+    link_parser.add_argument(
+        "--canonical-map", default="output/event_canonical_map.csv"
+    )
     link_parser.add_argument("--progress-every", type=int, default=250)
 
-    negative_parser = sub.add_parser("build-negative-samples", help="build non-event training samples")
+    negative_parser = sub.add_parser(
+        "build-negative-samples", help="build non-event training samples"
+    )
     negative_parser.add_argument("--db", default="stock_event_mining")
     negative_parser.add_argument("--start-date", default="")
     negative_parser.add_argument("--end-date", default="")
@@ -185,7 +256,9 @@ def main() -> None:
         return
 
     if args.command == "load-companies":
-        with patched_argv(["load_companies.py", "--db", args.db, "--input", args.input]):
+        with patched_argv(
+            ["load_companies.py", "--db", args.db, "--input", args.input]
+        ):
             load_companies.main()
         return
 
@@ -238,27 +311,34 @@ def main() -> None:
         return
 
     if args.command == "import-company-standard-industries":
-        with patched_argv(
-            [
-                "import_company_standard_industries_akshare.py",
-                "--db",
-                args.db,
-                "--max-symbols",
-                str(args.max_symbols),
-                "--offset",
-                str(args.offset),
-                "--start-date",
-                args.start_date,
-                "--end-date",
-                args.end_date,
-                "--sleep-sec",
-                str(args.sleep_sec),
-                "--progress-every",
-                str(args.progress_every),
-                "--lock-timeout-sec",
-                str(args.lock_timeout_sec),
-            ]
-        ):
+        argv = [
+            "import_company_standard_industries_akshare.py",
+            "--db",
+            args.db,
+            "--max-symbols",
+            str(args.max_symbols),
+            "--offset",
+            str(args.offset),
+            "--start-date",
+            args.start_date,
+            "--end-date",
+            args.end_date,
+            "--sleep-sec",
+            str(args.sleep_sec),
+            "--progress-every",
+            str(args.progress_every),
+            "--lock-timeout-sec",
+            str(args.lock_timeout_sec),
+            "--retries",
+            str(args.retries),
+            "--failure-backoff-sec",
+            str(args.failure_backoff_sec),
+        ]
+        if args.only_dirty:
+            argv.append("--only-dirty")
+        if args.skip_legacy:
+            argv.append("--skip-legacy")
+        with patched_argv(argv):
             import_company_standard_industries_akshare.main()
         return
 
@@ -315,6 +395,7 @@ def main() -> None:
             with patched_argv(argv):
                 import_company_stats_sina.main()
             return
+
         def run_akshare_import() -> None:
             argv = [
                 "import_company_stats_akshare.py",
@@ -371,7 +452,9 @@ def main() -> None:
             except (Exception, SystemExit) as exc:
                 if args.source == "tushare":
                     raise
-                print(f"[import-company-stats] tushare failed, fallback to akshare: {exc}")
+                print(
+                    f"[import-company-stats] tushare failed, fallback to akshare: {exc}"
+                )
             try:
                 run_akshare_import()
                 return
