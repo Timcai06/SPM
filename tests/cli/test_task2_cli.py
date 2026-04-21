@@ -108,6 +108,26 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
+    @patch("cli.task2.import_companies_tushare.main")
+    def test_import_companies_handler_calls_legacy_main_with_explicit_argv(self, mock_tushare_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-companies"
+        task2_args.output = "output/seeds/companies_a_share.csv"
+        task2_args.tushare_token = "token"
+        task2_args.tushare_token_file = ""
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_tushare_main.assert_called_once_with(
+            [
+                "--output",
+                "output/seeds/companies_a_share.csv",
+                "--tushare-token",
+                "token",
+            ]
+        )
+
     @patch("cli.task2.board_industries_job.main")
     def test_import_company_industries_handler_calls_job_with_explicit_argv(self, mock_board_main: MagicMock) -> None:
         task2_args = MagicMock()
@@ -333,6 +353,37 @@ class Task2CliTests(unittest.TestCase):
 
         mock_sentiment_main.assert_called_once_with(
             ["--db", "stock_event_mining", "--lock-timeout-sec", "120", "--quiet"]
+        )
+
+    @patch("cli.task2.negative_samples_job.main")
+    def test_build_negative_samples_handler_calls_job_with_explicit_argv(self, mock_negative_samples_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "build-negative-samples"
+        task2_args.db = "stock_event_mining"
+        task2_args.start_date = "2025-01-01"
+        task2_args.end_date = "2025-12-31"
+        task2_args.max_per_day = 50
+        task2_args.min_link_score = 0.35
+        task2_args.run_id = "run_1"
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_negative_samples_main.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--start-date",
+                "2025-01-01",
+                "--end-date",
+                "2025-12-31",
+                "--max-per-day",
+                "50",
+                "--min-link-score",
+                "0.35",
+                "--run-id",
+                "run_1",
+            ]
         )
 
 

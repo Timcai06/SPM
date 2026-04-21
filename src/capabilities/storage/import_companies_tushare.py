@@ -32,13 +32,13 @@ STOCK_BASIC_FIELDS = "ts_code,name,industry,fullname,area,market,list_date"
 STOCK_COMPANY_FIELDS = "ts_code,province,city,employees,main_business,business_scope"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import A-share company basics from Tushare.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--tushare-token", default="")
     parser.add_argument("--tushare-token-file", default="")
     parser.add_argument("--list-status", default="L", help="Tushare list_status, default L.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def resolve_tushare_token(args: argparse.Namespace) -> tuple[str, str]:
@@ -243,8 +243,8 @@ def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     token, token_source = resolve_tushare_token(args)
     if not token:
         raise SystemExit("Missing Tushare token. Provide --tushare-token, --tushare-token-file, or TUSHARE_TOKEN.")

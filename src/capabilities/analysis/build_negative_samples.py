@@ -23,7 +23,7 @@ DEFAULT_DB = "stock_event_mining"
 CREATE_SQL_PATH = ROOT / "sql" / "create_training_support_tables.sql"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build non-event samples for training.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--start-date", default="", help="Optional lower bound YYYY-MM-DD.")
@@ -32,11 +32,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-link-score", type=float, default=0.35, help="Event-company link score threshold for exclusion.")
     parser.add_argument("--run-id", default="", help="Optional run id.")
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     run_id = args.run_id or datetime.now().strftime("%Y%m%d_%H%M%S")
 
     where_parts = []

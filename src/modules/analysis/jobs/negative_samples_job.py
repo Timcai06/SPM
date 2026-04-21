@@ -13,10 +13,9 @@ if str(SRC_ROOT) not in sys.path:
 from capabilities.analysis import build_negative_samples as legacy_build_negative_samples
 
 
-def main() -> None:
-    legacy_build_negative_samples.main()
+def main(argv: list[str] | None = None) -> None:
+    legacy_build_negative_samples.main(argv)
 
 
 if __name__ == "__main__":
     main()
-

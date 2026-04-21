@@ -100,13 +100,12 @@ def main() -> None:
         return
 
     if args.command == "import-companies":
-        argv = ["import_companies_tushare.py", "--output", args.output]
+        argv = ["--output", args.output]
         if args.tushare_token:
             argv.extend(["--tushare-token", args.tushare_token])
         if args.tushare_token_file:
             argv.extend(["--tushare-token-file", args.tushare_token_file])
-        with patched_argv(argv):
-            import_companies_tushare.main()
+        import_companies_tushare.main(argv)
         return
 
     if args.command == "import-companies-all-a":
@@ -387,7 +386,6 @@ def main() -> None:
 
     if args.command == "build-negative-samples":
         argv = [
-            "build_negative_samples.py",
             "--db",
             args.db,
             "--start-date",
@@ -401,8 +399,7 @@ def main() -> None:
         ]
         if args.run_id:
             argv.extend(["--run-id", args.run_id])
-        with patched_argv(argv):
-            negative_samples_job.main()
+        negative_samples_job.main(argv)
         return
 
 
