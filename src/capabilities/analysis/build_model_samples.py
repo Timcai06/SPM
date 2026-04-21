@@ -27,7 +27,7 @@ CREATE_SQL_PATH = ROOT / "sql" / "create_model_training_tables.sql"
 SUPPORT_SQL_PATH = ROOT / "sql" / "create_training_support_tables.sql"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build model-ready samples for training.")
     parser.add_argument("--db", default=DEFAULT_DB, help="Target PostgreSQL database.")
     parser.add_argument("--min-link-score", type=float, default=0.35, help="Minimum event-company link score.")
@@ -38,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--run-id", default="", help="Optional run id for traceability.")
     parser.add_argument("--lock-timeout-sec", type=int, default=120, help="Write lock timeout in seconds.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def parse_float(value: str) -> Optional[float]:
@@ -206,8 +206,8 @@ def fetch_base_rows(conn: psycopg.Connection, min_link_score: float) -> list[dic
     return rows
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     run_id = args.run_id or datetime.now().strftime("%Y%m%d_%H%M%S")
     label_path = resolve_label_dataset(Path(args.label_dataset).resolve())
     label_map, label_path_used = load_label_map(label_path)

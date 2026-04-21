@@ -48,7 +48,7 @@ INDEX_SINA_SYMBOL_MAP = {"hs300": "sh000300"}
 INDEX_EASTMONEY_SECID_MAP = {"hs300": "1.000300"}
 ENABLE_EASTMONEY_FALLBACK = os.getenv("USE_EASTMONEY", "0") == "1"
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Task1 event-study analysis.")
     parser.add_argument("--db", default="stock_event_mining", help="PostgreSQL database name.")
     parser.add_argument("--min-link-score", type=float, default=0.35, help="Minimum event-company link score.")
@@ -69,11 +69,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-path", default=str(DEFAULT_CACHE), help="Local JSON cache path for market returns.")
     parser.add_argument("--disable-cache", action="store_true", help="Disable persistent market returns cache.")
     parser.add_argument("--event-align-max-gap-days", type=int, default=7, help="Max calendar-day gap when snapping event date to nearest trade date.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     if args.analysis_mode != "event-study":
         raise ValueError(f"Unsupported analysis mode: {args.analysis_mode}")
     event_windows = parse_windows(args.event_windows)

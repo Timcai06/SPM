@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
+ROOT = Path(__file__).resolve().parents[2]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 from modules.analysis.services.legacy_analysis_service import (
     run_feature_return,
@@ -13,22 +18,16 @@ from modules.analysis.services.legacy_analysis_service import (
 
 class LegacyAnalysisServiceTests(unittest.TestCase):
     @patch("modules.analysis.services.legacy_analysis_service.legacy_feature_return.main")
-    def test_run_feature_return_patches_argv(self, mock_main) -> None:
-        original_argv = sys.argv[:]
-
+    def test_run_feature_return_passes_argv(self, mock_main) -> None:
         run_feature_return(["--db", "stock_event_mining", "--benchmark", "hs300"])
 
-        mock_main.assert_called_once_with()
-        self.assertEqual(sys.argv, original_argv)
+        mock_main.assert_called_once_with(["--db", "stock_event_mining", "--benchmark", "hs300"])
 
     @patch("modules.analysis.services.legacy_analysis_service.legacy_build_model_samples.main")
-    def test_run_train_samples_patches_argv(self, mock_main) -> None:
-        original_argv = sys.argv[:]
-
+    def test_run_train_samples_passes_argv(self, mock_main) -> None:
         run_train_samples(["--db", "stock_event_mining", "--label-dataset", "out.csv"])
 
-        mock_main.assert_called_once_with()
-        self.assertEqual(sys.argv, original_argv)
+        mock_main.assert_called_once_with(["--db", "stock_event_mining", "--label-dataset", "out.csv"])
 
 
 if __name__ == "__main__":
