@@ -28,12 +28,12 @@ SHORT_NAME_SZSE_RE = re.compile(r"^([^：:\s]{2,20})[：:]")
 BOARD_RE = re.compile(r"板块[:：]\s*([A-Z]+)")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build public company seed CSV from collected sources.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--seed", default=str(DEFAULT_SEED))
     parser.add_argument("--manual", default=str(DEFAULT_MANUAL))
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -189,8 +189,8 @@ def apply_manual_overrides(records: dict[str, dict[str, str]], path: Path) -> di
     return records
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     records = seed_records(Path(args.seed).resolve())
 
     for source_file in SOURCE_FILES:

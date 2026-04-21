@@ -111,7 +111,7 @@ STATE_OWNER_KEYWORDS = [
 ]
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import company profile seed rows from AKShare public endpoints.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--input", default=str(DEFAULT_INPUT), help="Existing seed to preserve manual fields from.")
@@ -120,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-sec", type=float, default=0.05)
     parser.add_argument("--progress-every", type=int, default=10)
     parser.add_argument("--with-holders", action="store_true", help="Also query top holders for state-owned heuristics.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def read_seed(path: Path) -> dict[str, dict[str, str]]:
@@ -317,8 +317,8 @@ def build_row(
     }
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     seed_rows = read_seed(Path(args.input).resolve())
     companies = load_companies(args.db, args.max_symbols)
     output_rows: list[dict[str, str]] = []

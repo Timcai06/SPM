@@ -33,7 +33,7 @@ FALLBACK_INPUTS = [
 ]
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load company profiles into PostgreSQL.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--snapshot-date", default=DEFAULT_SNAPSHOT_DATE)
@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
         help="Optional company profile seed CSV. If omitted, loader auto-discovers common seed files.",
     )
     parser.add_argument("--lock-timeout-sec", type=int, default=120, help="Max seconds to wait for DB write lock.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def normalize_snapshot_date(value: str) -> str:
@@ -230,8 +230,8 @@ def build_company_profile_rows(
     return rows
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     snapshot_date = normalize_snapshot_date(args.snapshot_date)
     seed_path = resolve_input_path(args.input)
     seed_rows = read_seed_rows(seed_path)

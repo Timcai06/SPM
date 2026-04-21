@@ -25,7 +25,7 @@ from modules.companies.domain.company_identity import safe_text
 STANDARD_L1_CODE_PATTERN = re.compile(r"^[A-Y][0-9]{2}$")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Backfill standard industry_l1 from CNInfo.")
     parser.add_argument("--db", default="stock_event_mining")
     parser.add_argument("--max-symbols", type=int, default=200)
@@ -39,7 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
     parser.add_argument("--retries", type=int, default=2)
     parser.add_argument("--failure-backoff-sec", type=float, default=0.8)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def normalize_code(ts_code: str) -> str:
@@ -112,8 +112,8 @@ def update_companies(db_name: str, rows: list[dict[str, str]], lock_timeout_sec:
     return updated
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     companies = load_active_companies(
         args.db,
         max_symbols=args.max_symbols,
@@ -164,4 +164,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

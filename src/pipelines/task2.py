@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 
 import psycopg
@@ -32,22 +31,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-@contextmanager
-def patched_argv(argv: list[str]):
-    old = sys.argv[:]
-    sys.argv = argv
-    try:
-        yield
-    finally:
-        sys.argv = old
-
-
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     seed_path = Path(args.input).resolve()
     if seed_path.exists():
-        with patched_argv(["load_companies.py", "--db", args.db, "--input", str(seed_path)]):
-            load_companies.main()
+        load_companies.main(["--db", args.db, "--input", str(seed_path)])
     else:
         with psycopg.connect(dsn_for(args.db)) as conn:
             with conn.cursor() as cur:

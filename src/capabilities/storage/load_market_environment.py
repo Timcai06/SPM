@@ -28,7 +28,7 @@ DEFAULT_DB = "stock_event_mining"
 DEFAULT_INPUT = ROOT / "output" / "seeds" / "market_environment_seed.csv"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load market environment daily rows into PostgreSQL.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--benchmark", default="hs300")
@@ -39,7 +39,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--timeout-sec", type=float, default=12.0)
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 def get_trade_rows(conn: psycopg.Connection) -> list[dict[str, object]]:
     with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
@@ -228,8 +228,8 @@ def build_market_rows(
     return output_rows
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     seed_path = resolve_input_path(args.input)
     seed_rows = read_seed_rows(seed_path)
 

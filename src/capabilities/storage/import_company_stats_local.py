@@ -21,12 +21,12 @@ DEFAULT_OUTPUT = ROOT / "output" / "seeds" / "company_stats.csv"
 DEFAULT_QUOTES_OUTPUT = ROOT / "output" / "seeds" / "stock_daily_quotes.csv"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import company stats from local CSV.")
     parser.add_argument("--input", required=True, help="Local CSV with daily price data.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--quotes-output", default=str(DEFAULT_QUOTES_OUTPUT))
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def parse_date(value: str) -> Optional[str]:
@@ -83,8 +83,8 @@ def normalize_bool(value) -> Optional[bool]:
     return None
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     input_path = Path(args.input).resolve()
     output_path = Path(args.output).resolve()
     quotes_output_path = Path(args.quotes_output).resolve()

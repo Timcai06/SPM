@@ -13,10 +13,9 @@ if str(SRC_ROOT) not in sys.path:
 from capabilities.storage import import_company_stats_local as legacy_local
 
 
-def main() -> None:
-    legacy_local.main()
+def main(argv: list[str] | None = None) -> None:
+    legacy_local.main(argv)
 
 
 if __name__ == "__main__":
     main()
-

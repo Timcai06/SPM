@@ -96,10 +96,7 @@ def main() -> None:
         return
 
     if args.command == "load-companies":
-        with patched_argv(
-            ["load_companies.py", "--db", args.db, "--input", args.input]
-        ):
-            load_companies.main()
+        load_companies.main(["--db", args.db, "--input", args.input])
         return
 
     if args.command == "import-companies":
@@ -113,9 +110,8 @@ def main() -> None:
         return
 
     if args.command == "import-companies-all-a":
-        with patched_argv(
+        import_companies_job.main(
             [
-                "import_companies_akshare.py",
                 "--db",
                 args.db,
                 "--max-symbols",
@@ -125,14 +121,12 @@ def main() -> None:
                 "--lock-timeout-sec",
                 str(args.lock_timeout_sec),
             ]
-        ):
-            import_companies_job.main()
+        )
         return
 
     if args.command == "import-company-industries":
-        with patched_argv(
+        board_industries_job.main(
             [
-                "import_company_industries_akshare.py",
                 "--db",
                 args.db,
                 "--max-industries",
@@ -146,13 +140,11 @@ def main() -> None:
                 "--lock-timeout-sec",
                 str(args.lock_timeout_sec),
             ]
-        ):
-            board_industries_job.main()
+        )
         return
 
     if args.command == "import-company-standard-industries":
         argv = [
-            "import_company_standard_industries_akshare.py",
             "--db",
             args.db,
             "--max-symbols",
@@ -178,19 +170,16 @@ def main() -> None:
             argv.append("--only-dirty")
         if args.skip_legacy:
             argv.append("--skip-legacy")
-        with patched_argv(argv):
-            standard_industries_job.main()
+        standard_industries_job.main(argv)
         return
 
     if args.command == "import-companies-public":
-        with patched_argv(["import_companies_public.py", "--output", args.output]):
-            import_companies_public.main()
+        import_companies_public.main(["--output", args.output])
         return
 
     if args.command == "import-company-profiles":
-        with patched_argv(
+        import_profiles_job.main(
             [
-                "import_profiles_job.py",
                 "--db",
                 args.db,
                 "--input",
@@ -205,8 +194,7 @@ def main() -> None:
                 str(args.progress_every),
             ]
             + (["--with-holders"] if args.with_holders else [])
-        ):
-            import_profiles_job.main()
+        )
         return
 
     if args.command == "import-company-stats":
@@ -328,9 +316,8 @@ def main() -> None:
         return
 
     if args.command == "import-company-stats-local":
-        with patched_argv(
+        import_stats_local_job.main(
             [
-                "import_stats_local_job.py",
                 "--input",
                 args.input,
                 "--output",
@@ -338,14 +325,12 @@ def main() -> None:
                 "--quotes-output",
                 args.quotes_output,
             ]
-        ):
-            import_stats_local_job.main()
+        )
         return
 
     if args.command == "load-company-stats":
-        with patched_argv(
+        load_stats_job.main(
             [
-                "load_stats_job.py",
                 "--db",
                 args.db,
                 "--input",
@@ -353,14 +338,12 @@ def main() -> None:
                 "--quotes-input",
                 args.quotes_input,
             ]
-        ):
-            load_stats_job.main()
+        )
         return
 
     if args.command == "load-company-profiles":
-        with patched_argv(
+        load_profiles_job.main(
             [
-                "load_profiles_job.py",
                 "--db",
                 args.db,
                 "--snapshot-date",
@@ -370,14 +353,12 @@ def main() -> None:
                 "--lock-timeout-sec",
                 str(args.lock_timeout_sec),
             ]
-        ):
-            load_profiles_job.main()
+        )
         return
 
     if args.command == "load-market-environment":
-        with patched_argv(
+        load_market_environment.main(
             [
-                "load_market_environment.py",
                 "--db",
                 args.db,
                 "--benchmark",
@@ -389,13 +370,11 @@ def main() -> None:
                 "--lock-timeout-sec",
                 str(args.lock_timeout_sec),
             ]
-        ):
-            load_market_environment.main()
+        )
         return
 
     if args.command == "load-sentiment-propagation":
         argv = [
-            "load_sentiment_propagation.py",
             "--db",
             args.db,
             "--lock-timeout-sec",
@@ -403,8 +382,7 @@ def main() -> None:
         ]
         if args.quiet:
             argv.append("--quiet")
-        with patched_argv(argv):
-            load_sentiment_propagation.main()
+        load_sentiment_propagation.main(argv)
         return
 
     if args.command == "build-negative-samples":

@@ -83,6 +83,258 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
+    @patch("cli.task2.import_companies_job.main")
+    def test_import_companies_all_a_handler_calls_job_with_explicit_argv(self, mock_import_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-companies-all-a"
+        task2_args.db = "stock_event_mining"
+        task2_args.max_symbols = 100
+        task2_args.offset = 20
+        task2_args.lock_timeout_sec = 120
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_import_main.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--max-symbols",
+                "100",
+                "--offset",
+                "20",
+                "--lock-timeout-sec",
+                "120",
+            ]
+        )
+
+    @patch("cli.task2.board_industries_job.main")
+    def test_import_company_industries_handler_calls_job_with_explicit_argv(self, mock_board_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-company-industries"
+        task2_args.db = "stock_event_mining"
+        task2_args.max_industries = 50
+        task2_args.offset = 10
+        task2_args.sleep_sec = 0.05
+        task2_args.progress_every = 20
+        task2_args.lock_timeout_sec = 120
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_board_main.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--max-industries",
+                "50",
+                "--offset",
+                "10",
+                "--sleep-sec",
+                "0.05",
+                "--progress-every",
+                "20",
+                "--lock-timeout-sec",
+                "120",
+            ]
+        )
+
+    @patch("cli.task2.standard_industries_job.main")
+    def test_import_standard_industries_handler_calls_job_with_explicit_argv(self, mock_standard_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-company-standard-industries"
+        task2_args.db = "stock_event_mining"
+        task2_args.max_symbols = 200
+        task2_args.offset = 0
+        task2_args.start_date = "19900101"
+        task2_args.end_date = "20251231"
+        task2_args.sleep_sec = 0.05
+        task2_args.progress_every = 20
+        task2_args.lock_timeout_sec = 120
+        task2_args.retries = 2
+        task2_args.failure_backoff_sec = 0.8
+        task2_args.only_dirty = True
+        task2_args.skip_legacy = True
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_standard_main.assert_called_once()
+        argv = mock_standard_main.call_args.args[0]
+        self.assertIn("--only-dirty", argv)
+        self.assertIn("--skip-legacy", argv)
+        self.assertNotIn("import_company_standard_industries_akshare.py", argv)
+
+    @patch("cli.task2.load_companies.main")
+    def test_load_companies_handler_calls_legacy_main_with_explicit_argv(self, mock_load_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "load-companies"
+        task2_args.db = "stock_event_mining"
+        task2_args.input = "output/seeds/companies_seed.csv"
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_load_main.assert_called_once_with(
+            ["--db", "stock_event_mining", "--input", "output/seeds/companies_seed.csv"]
+        )
+
+    @patch("cli.task2.import_companies_public.main")
+    def test_import_companies_public_handler_calls_legacy_main_with_explicit_argv(self, mock_public_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-companies-public"
+        task2_args.output = "output/seeds/companies_public.csv"
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_public_main.assert_called_once_with(["--output", "output/seeds/companies_public.csv"])
+
+    @patch("cli.task2.import_profiles_job.main")
+    def test_import_company_profiles_handler_calls_job_with_explicit_argv(self, mock_profiles_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-company-profiles"
+        task2_args.db = "stock_event_mining"
+        task2_args.input = "output/seeds/company_profiles_seed.csv"
+        task2_args.output = "output/seeds/company_profiles_seed.csv"
+        task2_args.max_symbols = 100
+        task2_args.sleep_sec = 0.05
+        task2_args.progress_every = 10
+        task2_args.with_holders = True
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_profiles_main.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--input",
+                "output/seeds/company_profiles_seed.csv",
+                "--output",
+                "output/seeds/company_profiles_seed.csv",
+                "--max-symbols",
+                "100",
+                "--sleep-sec",
+                "0.05",
+                "--progress-every",
+                "10",
+                "--with-holders",
+            ]
+        )
+
+    @patch("cli.task2.import_stats_local_job.main")
+    def test_import_company_stats_local_handler_calls_job_with_explicit_argv(self, mock_local_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-company-stats-local"
+        task2_args.input = "quotes.csv"
+        task2_args.output = "company_stats.csv"
+        task2_args.quotes_output = "stock_daily_quotes.csv"
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_local_main.assert_called_once_with(
+            [
+                "--input",
+                "quotes.csv",
+                "--output",
+                "company_stats.csv",
+                "--quotes-output",
+                "stock_daily_quotes.csv",
+            ]
+        )
+
+    @patch("cli.task2.load_stats_job.main")
+    def test_load_company_stats_handler_calls_job_with_explicit_argv(self, mock_load_stats_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "load-company-stats"
+        task2_args.db = "stock_event_mining"
+        task2_args.input = "company_stats.csv"
+        task2_args.quotes_input = "stock_daily_quotes.csv"
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_load_stats_main.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--input",
+                "company_stats.csv",
+                "--quotes-input",
+                "stock_daily_quotes.csv",
+            ]
+        )
+
+    @patch("cli.task2.load_profiles_job.main")
+    def test_load_company_profiles_handler_calls_job_with_explicit_argv(self, mock_load_profiles_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "load-company-profiles"
+        task2_args.db = "stock_event_mining"
+        task2_args.snapshot_date = "2026-04-21"
+        task2_args.input = "company_profiles_seed.csv"
+        task2_args.lock_timeout_sec = 120
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_load_profiles_main.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--snapshot-date",
+                "2026-04-21",
+                "--input",
+                "company_profiles_seed.csv",
+                "--lock-timeout-sec",
+                "120",
+            ]
+        )
+
+    @patch("cli.task2.load_market_environment.main")
+    def test_load_market_environment_handler_calls_legacy_main_with_explicit_argv(self, mock_market_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "load-market-environment"
+        task2_args.db = "stock_event_mining"
+        task2_args.benchmark = "hs300"
+        task2_args.input = "market_environment_seed.csv"
+        task2_args.timeout_sec = 12.0
+        task2_args.lock_timeout_sec = 120
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_market_main.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--benchmark",
+                "hs300",
+                "--input",
+                "market_environment_seed.csv",
+                "--timeout-sec",
+                "12.0",
+                "--lock-timeout-sec",
+                "120",
+            ]
+        )
+
+    @patch("cli.task2.load_sentiment_propagation.main")
+    def test_load_sentiment_propagation_handler_calls_legacy_main_with_explicit_argv(self, mock_sentiment_main: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "load-sentiment-propagation"
+        task2_args.db = "stock_event_mining"
+        task2_args.lock_timeout_sec = 120
+        task2_args.quiet = True
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_sentiment_main.assert_called_once_with(
+            ["--db", "stock_event_mining", "--lock-timeout-sec", "120", "--quiet"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

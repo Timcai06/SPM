@@ -52,12 +52,12 @@ SENTIMENT_MAP = {
 }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load sentiment propagation daily rows into PostgreSQL.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
     parser.add_argument("--quiet", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def normalize_source_channel(source_type: str, source_name: str) -> str:
@@ -246,8 +246,8 @@ def build_rows(source_rows: list[dict[str, object]]) -> list[dict[str, object]]:
     return rows
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     with write_guard(
         db_name=args.db,
         required_tables=[

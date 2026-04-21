@@ -13,10 +13,9 @@ if str(SRC_ROOT) not in sys.path:
 from capabilities.storage import import_company_profiles_akshare as legacy_profiles
 
 
-def main() -> None:
-    legacy_profiles.main()
+def main(argv: list[str] | None = None) -> None:
+    legacy_profiles.main(argv)
 
 
 if __name__ == "__main__":
     main()
-

@@ -18,13 +18,13 @@ from capabilities.storage.db_guard import dsn_for, write_guard
 from modules.companies.domain.company_identity import concept_json, exchange_from_code, ts_code_from_code
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import A-share companies from AKShare into PostgreSQL.")
     parser.add_argument("--db", default="stock_event_mining")
     parser.add_argument("--max-symbols", type=int, default=0)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def load_akshare_rows(offset: int, max_symbols: int) -> list[dict[str, str]]:
@@ -89,8 +89,8 @@ def upsert_companies(db_name: str, rows: list[dict[str, str]], lock_timeout_sec:
             conn.commit()
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     rows = load_akshare_rows(args.offset, args.max_symbols)
     if not rows:
         raise RuntimeError("AKShare returned zero A-share companies.")
@@ -100,4 +100,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

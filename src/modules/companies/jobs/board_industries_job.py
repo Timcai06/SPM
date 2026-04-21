@@ -21,7 +21,7 @@ from capabilities.storage.db_guard import dsn_for, write_guard
 from modules.companies.domain.company_identity import concept_json, market_suffix
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Backfill company industries from EastMoney board members.")
     parser.add_argument("--db", default="stock_event_mining")
     parser.add_argument("--max-industries", type=int, default=0)
@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-sec", type=float, default=0.05)
     parser.add_argument("--progress-every", type=int, default=20)
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def ts_code_from_code(code: str) -> str:
@@ -98,8 +98,8 @@ def update_companies(db_name: str, by_code: dict[str, list[str]], lock_timeout_s
     return updated
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     industry_names = load_industry_names(args.offset, args.max_industries)
     print(f"[industry-backfill] industries={len(industry_names)} offset={args.offset}", flush=True)
     by_code = collect_members(industry_names, args.sleep_sec, args.progress_every)
@@ -109,4 +109,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

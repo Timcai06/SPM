@@ -23,12 +23,12 @@ DEFAULT_DB = "stock_event_mining"
 DEFAULT_SEED = ROOT / "output" / "seeds" / "companies_seed.csv"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load company seed data into PostgreSQL.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--input", default=str(DEFAULT_SEED))
     parser.add_argument("--lock-timeout-sec", type=int, default=120, help="Max seconds to wait for DB write lock.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -49,8 +49,8 @@ def normalize_json_list(value: str) -> str:
     return json.dumps(parsed, ensure_ascii=False)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     rows = read_rows(Path(args.input).resolve())
 
     with write_guard(
