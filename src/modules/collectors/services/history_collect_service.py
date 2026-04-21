@@ -20,8 +20,9 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from modules.collectors.adapters import cninfo
+from modules.collectors.adapters.db_repository import upsert_raw_document_rows
 from capabilities.storage.db_guard import dsn_for
-from capabilities.storage.load_task1 import upsert_raw_documents
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -45,6 +46,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep-sec", type=float, default=0.05)
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--skip-db-load", action="store_true")
+    parser.add_argument("--cninfo-fulltext", action="store_true", help="Download CNInfo PDF attachments and extract text into content.")
+    parser.add_argument("--cninfo-fulltext-max-chars", type=int, default=12000)
+    parser.add_argument("--db-flush-every", type=int, default=100, help="Incrementally upsert every N collected rows.")
     return parser.parse_args()
 
 
@@ -66,10 +70,6 @@ def normalize_datetime(value: Any) -> str:
         except Exception:
             continue
     return "1970-01-01 00:00:00"
-
-
-def yyyymmdd(value: str) -> str:
-    return normalize_date(value).replace("-", "")
 
 
 def get_symbols_from_db(db_name: str, max_symbols: int, offset: int) -> list[tuple[str, str]]:
@@ -179,10 +179,7 @@ def resolve_symbols(db_name: str, max_symbols: int, offset: int, symbol_source: 
         return get_symbols_from_file(Path(symbol_file).expanduser().resolve(), max_symbols=max_symbols, offset=offset)
     if symbol_source == "all-a":
         return get_symbols_from_akshare(max_symbols=max_symbols, offset=offset)
-    symbols = get_symbols_from_db(db_name, max_symbols=max_symbols, offset=offset)
-    if symbols:
-        return symbols
-    return get_symbols_from_akshare(max_symbols=max_symbols, offset=offset)
+    return get_symbols_from_db(db_name, max_symbols=max_symbols, offset=offset)
 
 
 def in_date_range(value: str, start_date: str, end_date: str) -> bool:
@@ -235,38 +232,18 @@ def collect_cninfo_for_symbol(
     start_date: str,
     end_date: str,
     limit_per_symbol: int,
+    include_fulltext: bool = False,
+    fulltext_max_chars: int = 12000,
 ) -> list[dict[str, str]]:
-    symbol = ts_code.split(".", 1)[0]
-    df = ak.stock_zh_a_disclosure_report_cninfo(
-        symbol=symbol,
-        market="沪深京",
-        start_date=yyyymmdd(start_date),
-        end_date=yyyymmdd(end_date),
+    return cninfo.collect_history(
+        ts_code=ts_code,
+        company_name=company_name,
+        start_date=start_date,
+        end_date=end_date,
+        limit_per_symbol=limit_per_symbol,
+        include_fulltext=include_fulltext,
+        fulltext_max_chars=fulltext_max_chars,
     )
-    rows: list[dict[str, str]] = []
-    if df is None or df.empty:
-        return rows
-    for _, row in df.iterrows():
-        publish_time = str(row.get("公告时间") or "")
-        if not in_date_range(publish_time, start_date=start_date, end_date=end_date):
-            continue
-        title = str(row.get("公告标题") or "").strip()
-        url = str(row.get("公告链接") or "").strip()
-        if not title or not url:
-            continue
-        rows.append(
-            {
-                "source": "巨潮资讯网/历史公告",
-                "title": f"{company_name or symbol}：{title}",
-                "content": title,
-                "publish_time": normalize_datetime(publish_time),
-                "url": url,
-                "symbol_or_subject": ts_code,
-            }
-        )
-        if len(rows) >= limit_per_symbol:
-            break
-    return rows
 
 
 def collect_with_retry(
@@ -277,6 +254,8 @@ def collect_with_retry(
     limit_per_symbol: int,
     retries: int,
     sleep_sec: float,
+    cninfo_fulltext: bool = False,
+    cninfo_fulltext_max_chars: int = 12000,
 ) -> tuple[str, list[dict[str, str]], str]:
     ts_code, company_name = symbol
     last_error = ""
@@ -285,7 +264,15 @@ def collect_with_retry(
             if source == "akshare-news":
                 rows = collect_akshare_news_for_symbol(ts_code, company_name, start_date, end_date, limit_per_symbol)
             else:
-                rows = collect_cninfo_for_symbol(ts_code, company_name, start_date, end_date, limit_per_symbol)
+                rows = collect_cninfo_for_symbol(
+                    ts_code,
+                    company_name,
+                    start_date,
+                    end_date,
+                    limit_per_symbol,
+                    include_fulltext=cninfo_fulltext,
+                    fulltext_max_chars=cninfo_fulltext_max_chars,
+                )
             return ts_code, rows, ""
         except Exception as exc:
             last_error = f"{exc.__class__.__name__}: {exc}"
@@ -303,6 +290,23 @@ def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+def dedupe_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    unique: dict[str, dict[str, str]] = {}
+    for row in rows:
+        url = row.get("url") or ""
+        if not url:
+            digest = hashlib.md5(f"{row.get('title')}::{row.get('publish_time')}".encode("utf-8")).hexdigest()
+            url = f"local://history/{row.get('source', 'unknown')}/{digest}"
+            row["url"] = url
+        unique[url] = row
+    return sorted(unique.values(), key=lambda item: (item["publish_time"], item["url"]))
+
+
+def flush_rows_to_db(db: str, pending_rows: list[dict[str, str]]) -> int:
+    rows = dedupe_rows(pending_rows)
+    return upsert_raw_document_rows(db, rows)
+
+
 def main() -> None:
     args = parse_args()
     start_date = normalize_date(args.start_date)
@@ -316,7 +320,10 @@ def main() -> None:
     )
     started = time.time()
     all_rows: list[dict[str, str]] = []
+    pending_flush_rows: list[dict[str, str]] = []
     failures: list[tuple[str, str]] = []
+    db_flushes = 0
+    db_rows_upserted = 0
     print(
         f"[history] source={args.source} symbol_source={args.symbol_source} symbols={len(symbols)} offset={args.offset} "
         f"range={start_date}..{end_date} limit_per_symbol={args.limit_per_symbol} workers={args.workers}",
@@ -333,6 +340,8 @@ def main() -> None:
                 args.limit_per_symbol,
                 args.retries,
                 args.sleep_sec,
+                args.cninfo_fulltext,
+                args.cninfo_fulltext_max_chars,
             )
             for symbol in symbols
         ]
@@ -341,6 +350,17 @@ def main() -> None:
             if error:
                 failures.append((ts_code, error))
             all_rows.extend(rows)
+            if not args.skip_db_load:
+                pending_flush_rows.extend(rows)
+                if len(pending_flush_rows) >= max(1, args.db_flush_every):
+                    flushed = flush_rows_to_db(args.db, pending_flush_rows)
+                    db_flushes += 1
+                    db_rows_upserted += flushed
+                    print(
+                        f"[history] db_flush {db_flushes} rows={flushed} cumulative={db_rows_upserted}",
+                        flush=True,
+                    )
+                    pending_flush_rows.clear()
             if idx == 1 or idx % 20 == 0 or idx == len(futures):
                 elapsed = int(time.time() - started)
                 print(
@@ -348,21 +368,24 @@ def main() -> None:
                     flush=True,
                 )
 
-    unique: dict[str, dict[str, str]] = {}
-    for row in all_rows:
-        url = row.get("url") or ""
-        if not url:
-            digest = hashlib.md5(f"{row.get('title')}::{row.get('publish_time')}".encode("utf-8")).hexdigest()
-            url = f"local://history/{args.source}/{digest}"
-            row["url"] = url
-        unique[url] = row
-    rows = sorted(unique.values(), key=lambda item: (item["publish_time"], item["url"]))
+    rows = dedupe_rows(all_rows)
     out = Path(args.output_dir).resolve() / f"history_{args.source}_{start_date}_{end_date}_o{args.offset}_n{args.max_symbols}.csv"
     write_csv(out, rows)
     if not args.skip_db_load:
-        upsert_raw_documents(args.db, rows)
+        if pending_flush_rows:
+            flushed = flush_rows_to_db(args.db, pending_flush_rows)
+            db_flushes += 1
+            db_rows_upserted += flushed
+            print(
+                f"[history] db_flush {db_flushes} rows={flushed} cumulative={db_rows_upserted}",
+                flush=True,
+            )
+            pending_flush_rows.clear()
     print(f"[history] wrote {len(rows)} unique rows to {out}")
-    print(f"[history] db_load={'skipped' if args.skip_db_load else 'done'} failures={len(failures)}")
+    if args.skip_db_load:
+        print(f"[history] db_load=skipped failures={len(failures)}")
+    else:
+        print(f"[history] db_load=done flushes={db_flushes} upserted={db_rows_upserted} failures={len(failures)}")
     if failures:
         print("[history] first failures: " + "; ".join(f"{code}:{err[:80]}" for code, err in failures[:5]))
 

@@ -34,7 +34,7 @@ from modules.collectors.adapters import (
     akshare_api,
 )
 from modules.collectors.domain.catalog import write_source_catalog
-from capabilities.storage.load_task1 import upsert_raw_documents
+from modules.collectors.adapters.db_repository import upsert_raw_document_rows
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -306,7 +306,7 @@ def main() -> None:
     # Direct memory-to-database processing
     if all_rows:
         logger.info(f"Upserting {len(all_rows)} rows into database '{args.db}'...")
-        upsert_raw_documents(args.db, all_rows)
+        upsert_raw_document_rows(args.db, all_rows)
         logger.info("Database upsert complete.")
     else:
         logger.warning("No rows collected, skipping database upsert.")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Database reads used by event classification jobs."""
+"""Database access used by event classification jobs."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Dict, List
 
 import psycopg
 
+from capabilities.storage.load_task1 import insert_final_tables, load_stage_tables
 from capabilities.storage.db_guard import dsn_for
 
 
@@ -68,3 +69,15 @@ def load_source_raw_documents(
             )
             return [dict(row) for row in cur.fetchall()]
 
+
+def load_event_stage_rows(
+    db_name: str,
+    raw_documents: list[dict[str, str]],
+    raw_candidates: list[dict[str, str]],
+    structured_events: list[dict[str, str]],
+) -> None:
+    load_stage_tables(db_name, raw_documents, raw_candidates, structured_events)
+
+
+def insert_event_final_rows(db_name: str) -> None:
+    insert_final_tables(db_name)

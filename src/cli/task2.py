@@ -13,7 +13,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from modules.linking.jobs import relink_job
-from capabilities.analysis import build_negative_samples
+from modules.analysis.jobs import negative_samples_job
 from modules.companies.jobs import (
     board_industries_job,
     import_companies_job,
@@ -603,7 +603,7 @@ def main() -> None:
         if args.run_id:
             argv.extend(["--run-id", args.run_id])
         with patched_argv(argv):
-            build_negative_samples.main()
+            negative_samples_job.main()
         return
 
 

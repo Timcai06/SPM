@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 import statistics
 import sys
 import time
@@ -14,13 +13,13 @@ from pathlib import Path
 from typing import Optional
 
 import psycopg
-import requests
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.storage.db_guard import dsn_for
+from modules.analysis.services.market_data_service import fetch_sina_kline, ts_to_sina_symbol
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -59,23 +58,6 @@ def compound(values: list[float]) -> Optional[float]:
         result *= 1.0 + v
     return result - 1.0
 
-
-def ts_code_to_sina_symbol(ts_code: str) -> Optional[str]:
-    text = str(ts_code or "").strip().upper()
-    if "." not in text:
-        return None
-    code, exch = text.split(".", 1)
-    if len(code) != 6 or not code.isdigit():
-        return None
-    if exch == "SZ":
-        return f"sz{code}"
-    if exch == "SH":
-        return f"sh{code}"
-    if exch == "BJ":
-        return f"bj{code}"
-    return None
-
-
 def get_ts_codes_from_db(db_name: str, max_symbols: int) -> list[str]:
     rows: list[str] = []
     with psycopg.connect(dsn_for(db_name)) as conn:
@@ -95,22 +77,6 @@ def get_ts_codes_from_db(db_name: str, max_symbols: int) -> list[str]:
                 if text:
                     rows.append(text)
     return rows
-
-
-def fetch_sina_kline(symbol: str, max_rows: int, timeout_seconds: float) -> list[dict[str, str]]:
-    url = "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData"
-    params = {"symbol": symbol, "scale": "240", "ma": "no", "datalen": str(max_rows)}
-    resp = requests.get(url, params=params, timeout=timeout_seconds)
-    resp.raise_for_status()
-    text = resp.text.strip()
-    if not text:
-        return []
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return []
-    return [row for row in payload if row.get("day") and row.get("close")]
-
 
 def build_rows(
     db_name: str,
@@ -135,7 +101,7 @@ def build_rows(
     )
 
     for idx, ts_code in enumerate(ts_codes, start=1):
-        sina_symbol = ts_code_to_sina_symbol(ts_code)
+        sina_symbol = ts_to_sina_symbol(ts_code)
         before_rows = len(out_rows)
         if not sina_symbol:
             fail_count += 1

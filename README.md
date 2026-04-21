@@ -1,6 +1,19 @@
 # 项目说明
 
-这个目录实现了赛题任务 1 的一个最小可运行版本：把原始文本候选池转成标准化事件表，供统计同学直接接手。
+这个目录实现了赛题任务 1/2/3 的数据库中心化流水线：从 `raw_documents` 原始文本入库，逐步生成 `structured_events`、`event_company_links` 和传播关系结果。
+
+## 当前架构说明
+
+当前主路径已经迁入 `src/modules/...`，其中：
+
+- `src/modules/collectors/`：采集与正文回填
+- `src/modules/events/`：事件判定、结构化、回填
+- `src/modules/companies/`：公司画像与基础加载
+- `src/modules/linking/`：事件-公司关联
+- `src/modules/quality/`：交付检查与质量报告
+- `src/modules/analysis/`：分析作业入口
+
+`src/capabilities/...` 仍有少量 legacy 实现尚未完全退出，但不再作为新增功能入口。
 
 ## 当前实现范围
 
@@ -22,29 +35,31 @@
 - 输出标准化事件表：`output/structured_events.csv`
 - 输出标准事件簇：`output/canonical_events.csv`
 - 输出事件归并映射：`output/event_canonical_map.csv`
-- 任务 1 采集入口：`src/capabilities/collectors/run.py`
-- 任务 1 采集器目录：`src/capabilities/collectors/`
-- 任务 1 分类与特征提取：`src/capabilities/events/classify.py`
-- 任务 1 事件归并：`src/capabilities/events/canonicalize.py`
-- 任务 1 冻结规则配置：`src/capabilities/events/rules.py`
-- 任务 1 入库脚本：`src/capabilities/storage/load_task1.py`
+- 任务 1 采集入口：`src/modules/collectors/jobs/collect_job.py`
+- 任务 1 历史采集入口：`src/modules/collectors/jobs/history_job.py`
+- 任务 1 正文回填入口：`src/modules/collectors/jobs/cninfo_fulltext_backfill_job.py`
+- 任务 1 采集器目录：`src/modules/collectors/`
+- 任务 1 分类与特征提取：`src/modules/events/jobs/classify_job.py`
+- 任务 1 事件归并：`src/modules/events/jobs/canonicalize_job.py`
+- 任务 1 冻结规则配置：`src/modules/events/domain/classification_rules.py`
+- 任务 1 入库脚本（legacy storage）：`src/capabilities/storage/load_task1.py`
 - 任务 1 标准事件层入库脚本：`src/capabilities/storage/load_task1_canonical.py`
-- 任务 1 校验脚本：`src/capabilities/quality/check.py`
-- 任务 1 质量评估脚本：`src/capabilities/quality/quality_report.py`
-- 任务 1 特征-收益初步分析：`src/capabilities/analysis/feature_return.py`
-- 训练样本构建脚本：`src/capabilities/analysis/build_model_samples.py`
+- 任务 1 校验脚本：`src/modules/quality/jobs/check_job.py`
+- 任务 1 质量评估脚本：`src/modules/quality/jobs/quality_report_job.py`
+- 任务 1 特征-收益初步分析入口：`src/modules/analysis/jobs/feature_return_job.py`
+- 训练样本构建脚本：`src/modules/analysis/jobs/train_samples_job.py`
 - 任务 1 一键总入口：`src/pipelines/task1.py`
 - 任务 1 统一命令入口：`src/cli/task1.py`
 - 任务 2 表结构：`sql/create_task2_tables.sql`
 - 交付层分类字典与字段映射：`docs/delivery_classification_mapping.md`
 - 附录 2 来源目录（运行时生成）：`output/meta/appendix2_sources.csv`
-- 公司导入脚本：`src/capabilities/storage/load_companies.py`
+- 公司导入脚本：`src/modules/companies/jobs/load_profiles_job.py`
 - 公司统计特征导入脚本：`src/capabilities/storage/load_company_stats.py`
-- 事件-公司关联打分脚本：`src/capabilities/linking/link_events.py`
+- 事件-公司关联打分脚本：`src/modules/linking/jobs/link_events_job.py`
 - 任务 2 一键入口：`src/pipelines/task2.py`
 - 任务 2 统一命令入口：`src/cli/task2.py`
 - 任务 3 图谱关系导入：`src/capabilities/storage/load_task3_relations.py`
-- 任务 3 事件传播构建：`src/capabilities/graph/propagate_event_links.py`
+- 任务 3 事件传播构建：`src/modules/graph/jobs/propagate_event_links_job.py`
 - 任务 3 一键入口：`src/pipelines/task3.py`
 - 任务 3 统一命令入口：`src/cli/task3.py`
 - 正式表补数与无 token 路线说明：`docs/no_tushare_workflow.md`
@@ -76,6 +91,16 @@ python3 src/cli/task1.py classify
 python3 src/cli/task1.py canonicalize
 python3 src/cli/task1.py canonical-load
 python3 src/cli/task1.py check
+```
+
+正文回填与新数据采集要区分使用：
+
+```bash
+# 发现新数据
+python3 src/cli/task1.py collect-history --db stock_event_mining --source cninfo-disclosure
+
+# 回填已有 URL 的巨潮正文
+python3 src/cli/task1.py backfill-cninfo-fulltext --db stock_event_mining --start-date 2025-01-01 --end-date 2026-01-01
 ```
 
 推荐直接用一键总入口：
@@ -205,20 +230,7 @@ python3 src/cli/task1.py classify --skip-db-load
 
 ```bash
 python3 src/cli/task1.py collect --limit 8
-python3 src/capabilities/events/classify.py \
-  --input output/sources/source_gov.csv \
-  --input output/sources/source_ndrc.csv \
-  --input output/sources/source_csrc.csv \
-  --input output/sources/source_sse.csv \
-  --input output/sources/source_cninfo.csv \
-  --input output/sources/source_szse.csv \
-  --input output/sources/source_szse_suspension.csv \
-  --input output/sources/source_yicai.csv \
-  --input output/sources/source_eastmoney.csv \
-  --input output/sources/source_36kr.csv \
-  --input output/sources/source_caixin.csv \
-  --input output/sources/source_miit.csv \
-  --input output/seeds/manual_news.csv
+python3 src/cli/task1.py classify
 python3 src/cli/task1.py check
 ```
 

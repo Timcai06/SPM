@@ -43,11 +43,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 from modules.collectors.services.collect_service import collect_all_async
+from modules.collectors.adapters.db_repository import upsert_raw_document_rows
 from modules.events.jobs.classify_job import run_classification_pipeline
 from modules.events.jobs.canonicalize_job import run_canonicalization_pipeline
+from modules.events.services.canonical_loading_service import load_canonical_rows
 from modules.quality.services.validation_service import run_validation_pipeline
-from capabilities.storage.load_task1_canonical import run_loading_pipeline
-from capabilities.storage.load_task1 import upsert_raw_documents
 from modules.analysis.jobs.feature_return_job import main as analysis_main
 
 
@@ -64,7 +64,7 @@ def main() -> None:
         # 2. Storage Upsert
         if all_rows:
             print(f"Upserting {len(all_rows)} documents to database '{db}'...")
-            upsert_raw_documents(db, all_rows)
+            upsert_raw_document_rows(db, all_rows)
     else:
         print("Skipping collection phase.")
 
@@ -82,7 +82,7 @@ def main() -> None:
 
     # 5. Loading Canonical Layer
     print("--- Phase 4: Loading Canonical Layer ---")
-    run_loading_pipeline(
+    load_canonical_rows(
         db=db,
         canonical_event_rows=canonical_rows,
         canonical_link_rows=mapping_rows,

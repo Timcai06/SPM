@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 import math
 import statistics
 import sys
@@ -15,13 +14,13 @@ from pathlib import Path
 from typing import Any, Optional
 
 import psycopg
-import requests
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from capabilities.storage.db_guard import dsn_for, write_guard
+from modules.analysis.services.market_data_service import close_series_to_returns, fetch_sina_kline
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -41,41 +40,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout-sec", type=float, default=12.0)
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
     return parser.parse_args()
-
-
-def fetch_sina_kline(symbol: str, max_rows: int = 1200, timeout_seconds: float = 20.0) -> list[dict[str, str]]:
-    url = "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData"
-    params = {"symbol": symbol, "scale": "240", "ma": "no", "datalen": str(max_rows)}
-    resp = requests.get(url, params=params, timeout=timeout_seconds)
-    resp.raise_for_status()
-    text = resp.text.strip()
-    if not text:
-        return []
-    try:
-        payload = json.loads(text)
-    except Exception:
-        return []
-    return [row for row in payload if row.get("day") and row.get("close")]
-
-
-def close_series_to_returns(kline: list[dict[str, str]]) -> dict[str, float]:
-    rows = sorted(kline, key=lambda x: x["day"])
-    result: dict[str, float] = {}
-    prev_close: Optional[float] = None
-    for row in rows:
-        day = str(row.get("day") or "").strip().split(" ", 1)[0]
-        if not day:
-            continue
-        try:
-            close = float(row["close"])
-        except Exception:
-            prev_close = None
-            continue
-        if prev_close and prev_close != 0:
-            result[day] = (close - prev_close) / prev_close
-        prev_close = close
-    return result
-
 
 def get_trade_rows(conn: psycopg.Connection) -> list[dict[str, object]]:
     with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:

@@ -9,6 +9,7 @@ import sys
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
 import psycopg
 
@@ -17,15 +18,15 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from modules.analysis.jobs import feature_return_job, train_samples_job
-from modules.collectors.jobs import collect_job, history_job
+from modules.collectors.jobs import cninfo_fulltext_backfill_job, collect_job, history_job
 from modules.events.jobs import (
     canonicalize_job,
     classify_job,
     classify_pending_job,
     reclassify_source_job,
 )
+from modules.events.services.canonical_loading_service import load_canonical_rows
 from modules.quality.jobs import check_job, delivery_status_job, quality_report_job
-from capabilities.storage import load_task1_canonical
 from capabilities.storage.db_guard import dsn_for
 from pipelines import task1 as task1_pipeline
 
@@ -99,6 +100,27 @@ def parse_args() -> argparse.Namespace:
     collect_history_parser.add_argument("--sleep-sec", type=float, default=0.05)
     collect_history_parser.add_argument("--output-dir", default="output/history")
     collect_history_parser.add_argument("--skip-db-load", action="store_true")
+    collect_history_parser.add_argument("--db-flush-every", type=int, default=100)
+    collect_history_parser.add_argument("--cninfo-fulltext", action="store_true")
+    collect_history_parser.add_argument("--cninfo-fulltext-max-chars", type=int, default=12000)
+
+    cninfo_backfill_parser = sub.add_parser("backfill-cninfo-fulltext", help="backfill CNInfo fulltext using existing raw_documents URLs")
+    cninfo_backfill_parser.add_argument("--db", default="stock_event_mining")
+    cninfo_backfill_parser.add_argument("--source", default="巨潮资讯网/历史公告")
+    cninfo_backfill_parser.add_argument("--start-date", default="2025-01-01")
+    cninfo_backfill_parser.add_argument("--end-date", default="2026-01-01")
+    cninfo_backfill_parser.add_argument("--max-rows", type=int, default=5000)
+    cninfo_backfill_parser.add_argument("--offset", type=int, default=0)
+    cninfo_backfill_parser.add_argument("--id-min", type=int, default=0)
+    cninfo_backfill_parser.add_argument("--id-max", type=int, default=0)
+    cninfo_backfill_parser.add_argument("--shard-count", type=int, default=0)
+    cninfo_backfill_parser.add_argument("--shard-index", type=int, default=0)
+    cninfo_backfill_parser.add_argument("--workers", type=int, default=8)
+    cninfo_backfill_parser.add_argument("--retries", type=int, default=3)
+    cninfo_backfill_parser.add_argument("--sleep-sec", type=float, default=0.02)
+    cninfo_backfill_parser.add_argument("--db-flush-every", type=int, default=100)
+    cninfo_backfill_parser.add_argument("--fulltext-max-chars", type=int, default=12000)
+    cninfo_backfill_parser.add_argument("--skip-db-load", action="store_true")
 
     classify_parser = sub.add_parser("classify", help="classify and structure events")
     classify_parser.add_argument("--db", default="stock_event_mining")
@@ -338,171 +360,16 @@ def print_qa_summary(db_name: str, snapshot_path: Path, collector_report: Path, 
     )
 
 
-def main() -> None:
-    args = parse_args()
-    if args.command == "run":
-        argv = ["task1.py", "--limit", str(args.limit), "--db", args.db]
-        if args.skip_collect:
-            argv.append("--skip-collect")
-        if args.skip_validate:
-            argv.append("--skip-validate")
-        if args.with_analysis:
-            argv.append("--with-analysis")
-        argv.extend(
-            [
-                "--analysis-mode",
-                args.analysis_mode,
-                "--benchmark",
-                args.benchmark,
-                "--event-windows",
-                args.event_windows,
-                "--time-budget-sec",
-                str(args.time_budget_sec),
-                "--max-analysis-rows",
-                str(args.max_analysis_rows),
-                "--api-timeout-sec",
-                str(args.api_timeout_sec),
-                "--progress-every",
-                str(args.progress_every),
-            ]
-        )
-        if args.use_llm:
-            argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
-        with patched_argv(argv):
-            task1_pipeline.main()
-        return
-
-    if args.command == "collect":
-        argv = ["run.py", "--limit", str(args.limit)]
-        if args.include_non_keyword:
-            argv.append("--include-non-keyword")
-        with patched_argv(argv):
-            collect_job.main()
-        return
-
-    if args.command == "collect-history":
-        argv = [
-            "history.py",
-            "--db",
-            args.db,
-            "--source",
-            args.source,
-            "--symbol-source",
-            args.symbol_source,
-            "--symbol-file",
-            args.symbol_file,
-            "--start-date",
-            args.start_date,
-            "--end-date",
-            args.end_date,
-            "--max-symbols",
-            str(args.max_symbols),
-            "--offset",
-            str(args.offset),
-            "--limit-per-symbol",
-            str(args.limit_per_symbol),
-            "--workers",
-            str(args.workers),
-            "--retries",
-            str(args.retries),
-            "--sleep-sec",
-            str(args.sleep_sec),
-            "--output-dir",
-            args.output_dir,
-        ]
-        if args.skip_db_load:
-            argv.append("--skip-db-load")
-        with patched_argv(argv):
-            history_job.main()
-        return
-
-    if args.command == "classify":
-        argv = ["classify.py", "--db", args.db]
-        existing_inputs = [input_file for input_file in CLASSIFY_INPUT_FILES if (ROOT / input_file).exists()]
-        for input_file in existing_inputs:
-            argv.extend(["--input", input_file])
-        if args.skip_db_load:
-            argv.append("--skip-db-load")
-        if args.use_llm:
-            argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
-        with patched_argv(argv):
-            classify_job.main()
-        return
-
-    if args.command == "classify-pending":
-        with patched_argv(
-            [
-                "classify_pending_job.py",
-                "--db",
-                args.db,
-                "--batch-size",
-                str(args.batch_size),
-                "--max-batches",
-                str(args.max_batches),
-            ]
-            + (["--use-llm", "--llm-max-rows", str(args.llm_max_rows)] if args.use_llm else [])
-        ):
-            classify_pending_job.main()
-        return
-
-    if args.command == "reclassify-source":
-        with patched_argv(
-            [
-                "reclassify_source_job.py",
-                "--db",
-                args.db,
-                "--source",
-                args.source,
-                "--batch-size",
-                str(args.batch_size),
-                "--max-batches",
-                str(args.max_batches),
-            ]
-            + (["--use-llm", "--llm-max-rows", str(args.llm_max_rows)] if args.use_llm else [])
-        ):
-            reclassify_source_job.main()
-        return
-
-    if args.command == "check":
-        with patched_argv(["check.py"]):
-            check_job.main()
-        return
-
-    if args.command == "canonicalize":
-        with patched_argv(["canonicalize.py"]):
-            canonicalize_job.main()
-        return
-
-    if args.command == "canonical-load":
-        with patched_argv(
-            [
-                "load_task1_canonical.py",
-                "--db",
-                args.db,
-                "--canonical-events",
-                args.canonical_events,
-                "--canonical-map",
-                args.canonical_map,
-            ]
-        ):
-            load_task1_canonical.main()
-        return
-
-    if args.command == "quality":
-        argv = ["quality_report.py", "--sample-size", str(args.sample_size)]
-        if args.run_id:
-            argv.extend(["--run-id", args.run_id])
-        with patched_argv(argv):
-            quality_report_job.main()
-        return
-
-    if args.command == "feature":
-        argv = [
-            "feature_return.py",
-            "--db",
-            args.db,
-            "--min-link-score",
-            str(args.min_link_score),
+def run_pipeline_command(args: argparse.Namespace) -> None:
+    argv = ["task1.py", "--limit", str(args.limit), "--db", args.db]
+    if args.skip_collect:
+        argv.append("--skip-collect")
+    if args.skip_validate:
+        argv.append("--skip-validate")
+    if args.with_analysis:
+        argv.append("--with-analysis")
+    argv.extend(
+        [
             "--analysis-mode",
             args.analysis_mode,
             "--benchmark",
@@ -511,71 +378,292 @@ def main() -> None:
             args.event_windows,
             "--time-budget-sec",
             str(args.time_budget_sec),
-            "--max-rows",
-            str(args.max_rows),
+            "--max-analysis-rows",
+            str(args.max_analysis_rows),
             "--api-timeout-sec",
             str(args.api_timeout_sec),
             "--progress-every",
             str(args.progress_every),
-            "--market-max-rows",
-            str(args.market_max_rows),
-            "--dataset-path",
-            args.dataset_path,
-            "--report-path",
-            args.report_path,
         ]
-        if args.tushare_token:
-            argv.extend(["--tushare-token", args.tushare_token])
-        if args.tushare_token_file:
-            argv.extend(["--tushare-token-file", args.tushare_token_file])
-        if args.disable_tushare:
-            argv.append("--disable-tushare")
-        if args.disable_cache:
-            argv.append("--disable-cache")
-        if args.run_id:
-            argv.extend(["--run-id", args.run_id])
-        with patched_argv(argv):
-            feature_return_job.main()
-        return
+    )
+    if args.use_llm:
+        argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
+    with patched_argv(argv):
+        task1_pipeline.main()
 
-    if args.command == "train-samples":
-        argv = [
-            "build_model_samples.py",
-            "--db",
-            args.db,
-            "--min-link-score",
-            str(args.min_link_score),
-            "--label-dataset",
-            args.label_dataset,
-        ]
-        if args.run_id:
-            argv.extend(["--run-id", args.run_id])
-        with patched_argv(argv):
-            train_samples_job.main()
-        return
 
-    if args.command == "db-status":
-        print_db_status(args.db)
-        return
+def run_collect_command(args: argparse.Namespace) -> None:
+    argv = ["run.py", "--limit", str(args.limit)]
+    if args.include_non_keyword:
+        argv.append("--include-non-keyword")
+    with patched_argv(argv):
+        collect_job.main()
 
-    if args.command == "qa":
-        print_qa_summary(
-            db_name=args.db,
-            snapshot_path=Path(args.snapshot_path).resolve(),
-            collector_report=Path(args.collector_report).resolve(),
-            feature_report=Path(args.feature_report).resolve(),
-        )
-        return
 
-    if args.command == "delivery-status":
-        argv = ["delivery_status.py", "--db", args.db]
-        if args.output:
-            argv.extend(["--output", args.output])
-        if args.fail_on_blockers:
-            argv.append("--fail-on-blockers")
-        with patched_argv(argv):
-            delivery_status_job.main()
-        return
+def run_collect_history_command(args: argparse.Namespace) -> None:
+    argv = [
+        "history.py",
+        "--db",
+        args.db,
+        "--source",
+        args.source,
+        "--symbol-source",
+        args.symbol_source,
+        "--symbol-file",
+        args.symbol_file,
+        "--start-date",
+        args.start_date,
+        "--end-date",
+        args.end_date,
+        "--max-symbols",
+        str(args.max_symbols),
+        "--offset",
+        str(args.offset),
+        "--limit-per-symbol",
+        str(args.limit_per_symbol),
+        "--workers",
+        str(args.workers),
+        "--retries",
+        str(args.retries),
+        "--sleep-sec",
+        str(args.sleep_sec),
+        "--db-flush-every",
+        str(args.db_flush_every),
+        "--output-dir",
+        args.output_dir,
+    ]
+    if args.skip_db_load:
+        argv.append("--skip-db-load")
+    if args.cninfo_fulltext:
+        argv.append("--cninfo-fulltext")
+    argv.extend(["--cninfo-fulltext-max-chars", str(args.cninfo_fulltext_max_chars)])
+    with patched_argv(argv):
+        history_job.main()
+
+
+def run_cninfo_backfill_command(args: argparse.Namespace) -> None:
+    argv = [
+        "cninfo_fulltext_backfill.py",
+        "--db",
+        args.db,
+        "--source",
+        args.source,
+        "--start-date",
+        args.start_date,
+        "--end-date",
+        args.end_date,
+        "--max-rows",
+        str(args.max_rows),
+        "--offset",
+        str(args.offset),
+        "--id-min",
+        str(args.id_min),
+        "--id-max",
+        str(args.id_max),
+        "--shard-count",
+        str(args.shard_count),
+        "--shard-index",
+        str(args.shard_index),
+        "--workers",
+        str(args.workers),
+        "--retries",
+        str(args.retries),
+        "--sleep-sec",
+        str(args.sleep_sec),
+        "--db-flush-every",
+        str(args.db_flush_every),
+        "--fulltext-max-chars",
+        str(args.fulltext_max_chars),
+    ]
+    if args.skip_db_load:
+        argv.append("--skip-db-load")
+    with patched_argv(argv):
+        cninfo_fulltext_backfill_job.main()
+
+
+def run_classify_command(args: argparse.Namespace) -> None:
+    argv = ["classify.py", "--db", args.db]
+    existing_inputs = [input_file for input_file in CLASSIFY_INPUT_FILES if (ROOT / input_file).exists()]
+    for input_file in existing_inputs:
+        argv.extend(["--input", input_file])
+    if args.skip_db_load:
+        argv.append("--skip-db-load")
+    if args.use_llm:
+        argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
+    with patched_argv(argv):
+        classify_job.main()
+
+
+def run_feature_command(args: argparse.Namespace) -> None:
+    argv = [
+        "feature_return.py",
+        "--db",
+        args.db,
+        "--min-link-score",
+        str(args.min_link_score),
+        "--analysis-mode",
+        args.analysis_mode,
+        "--benchmark",
+        args.benchmark,
+        "--event-windows",
+        args.event_windows,
+        "--time-budget-sec",
+        str(args.time_budget_sec),
+        "--max-rows",
+        str(args.max_rows),
+        "--api-timeout-sec",
+        str(args.api_timeout_sec),
+        "--progress-every",
+        str(args.progress_every),
+        "--market-max-rows",
+        str(args.market_max_rows),
+        "--dataset-path",
+        args.dataset_path,
+        "--report-path",
+        args.report_path,
+    ]
+    if args.tushare_token:
+        argv.extend(["--tushare-token", args.tushare_token])
+    if args.tushare_token_file:
+        argv.extend(["--tushare-token-file", args.tushare_token_file])
+    if args.disable_tushare:
+        argv.append("--disable-tushare")
+    if args.disable_cache:
+        argv.append("--disable-cache")
+    if args.run_id:
+        argv.extend(["--run-id", args.run_id])
+    with patched_argv(argv):
+        feature_return_job.main()
+
+
+def run_classify_pending_command(args: argparse.Namespace) -> None:
+    argv = [
+        "classify_pending_job.py",
+        "--db",
+        args.db,
+        "--batch-size",
+        str(args.batch_size),
+        "--max-batches",
+        str(args.max_batches),
+    ]
+    if args.use_llm:
+        argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
+    with patched_argv(argv):
+        classify_pending_job.main()
+
+
+def run_reclassify_source_command(args: argparse.Namespace) -> None:
+    argv = [
+        "reclassify_source_job.py",
+        "--db",
+        args.db,
+        "--source",
+        args.source,
+        "--batch-size",
+        str(args.batch_size),
+        "--max-batches",
+        str(args.max_batches),
+    ]
+    if args.use_llm:
+        argv.extend(["--use-llm", "--llm-max-rows", str(args.llm_max_rows)])
+    with patched_argv(argv):
+        reclassify_source_job.main()
+
+
+def run_check_command(_args: argparse.Namespace) -> None:
+    with patched_argv(["check.py"]):
+        check_job.main()
+
+
+def run_canonicalize_command(_args: argparse.Namespace) -> None:
+    with patched_argv(["canonicalize.py"]):
+        canonicalize_job.main()
+
+
+def run_canonical_load_command(args: argparse.Namespace) -> None:
+    load_canonical_rows(
+        db=args.db,
+        canonical_event_rows=None,
+        canonical_link_rows=None,
+        canonical_events_path=args.canonical_events,
+        canonical_map_path=args.canonical_map,
+        quiet=False,
+    )
+
+
+def run_quality_command(args: argparse.Namespace) -> None:
+    argv = ["quality_report.py", "--sample-size", str(args.sample_size)]
+    if args.run_id:
+        argv.extend(["--run-id", args.run_id])
+    with patched_argv(argv):
+        quality_report_job.main()
+
+
+def run_train_samples_command(args: argparse.Namespace) -> None:
+    argv = [
+        "build_model_samples.py",
+        "--db",
+        args.db,
+        "--min-link-score",
+        str(args.min_link_score),
+        "--label-dataset",
+        args.label_dataset,
+    ]
+    if args.run_id:
+        argv.extend(["--run-id", args.run_id])
+    with patched_argv(argv):
+        train_samples_job.main()
+
+
+def run_db_status_command(args: argparse.Namespace) -> None:
+    print_db_status(args.db)
+
+
+def run_qa_command(args: argparse.Namespace) -> None:
+    print_qa_summary(
+        db_name=args.db,
+        snapshot_path=Path(args.snapshot_path).resolve(),
+        collector_report=Path(args.collector_report).resolve(),
+        feature_report=Path(args.feature_report).resolve(),
+    )
+
+
+def run_delivery_status_command(args: argparse.Namespace) -> None:
+    argv = ["delivery_status.py", "--db", args.db]
+    if args.output:
+        argv.extend(["--output", args.output])
+    if args.fail_on_blockers:
+        argv.append("--fail-on-blockers")
+    with patched_argv(argv):
+        delivery_status_job.main()
+
+
+COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
+    "run": run_pipeline_command,
+    "collect": run_collect_command,
+    "collect-history": run_collect_history_command,
+    "backfill-cninfo-fulltext": run_cninfo_backfill_command,
+    "classify": run_classify_command,
+    "classify-pending": run_classify_pending_command,
+    "reclassify-source": run_reclassify_source_command,
+    "check": run_check_command,
+    "canonicalize": run_canonicalize_command,
+    "canonical-load": run_canonical_load_command,
+    "quality": run_quality_command,
+    "feature": run_feature_command,
+    "train-samples": run_train_samples_command,
+    "db-status": run_db_status_command,
+    "qa": run_qa_command,
+    "delivery-status": run_delivery_status_command,
+}
+
+
+def main() -> None:
+    args = parse_args()
+    handler = COMMAND_HANDLERS.get(args.command)
+    if handler is None:
+        raise ValueError(f"Unsupported command: {args.command}")
+    handler(args)
 
 if __name__ == "__main__":
     main()

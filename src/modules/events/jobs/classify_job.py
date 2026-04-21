@@ -18,7 +18,11 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from modules.events.adapters.file_inputs import load_rows_from_inputs
-from modules.events.adapters.db_repository import load_rows_from_db
+from modules.events.adapters.db_repository import (
+    insert_event_final_rows,
+    load_event_stage_rows,
+    load_rows_from_db,
+)
 from modules.events.domain.classification_rules import (
     AUTHORITY_LEVEL_RULES,
     NEGATIVE_WORDS,
@@ -86,8 +90,6 @@ async def run_classification_pipeline(
     use_llm: bool = False,
     llm_max_rows: int = 20,
 ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
-    from capabilities.storage.load_task1 import insert_final_tables, load_stage_tables
-
     rows = input_rows if input_rows is not None else load_rows_from_db(db)
     if not rows:
         print("No documents found for classification.")
@@ -99,8 +101,8 @@ async def run_classification_pipeline(
         use_llm=use_llm,
         llm_max_rows=llm_max_rows,
     )
-    load_stage_tables(db, [], candidate_rows, structured_rows)
-    insert_final_tables(db)
+    load_event_stage_rows(db, [], candidate_rows, structured_rows)
+    insert_event_final_rows(db)
     return candidate_rows, structured_rows
 
 

@@ -30,12 +30,33 @@ HISTORY_LIMIT_PER_SYMBOL ?= 100
 HISTORY_WORKERS ?= 4
 HISTORY_RETRIES ?= 2
 HISTORY_SLEEP ?= 0.1
+HISTORY_CNINFO_FULLTEXT ?= 0
+HISTORY_CNINFO_FULLTEXT_MAX_CHARS ?= 12000
+HISTORY_DB_FLUSH_EVERY ?= 100
+CNINFO_BACKFILL_SOURCE ?= 巨潮资讯网/历史公告
+CNINFO_BACKFILL_START ?= 2025-01-01
+CNINFO_BACKFILL_END ?= 2026-01-01
+CNINFO_BACKFILL_MAX_ROWS ?= 5000
+CNINFO_BACKFILL_OFFSET ?= 0
+CNINFO_BACKFILL_ID_MIN ?= 0
+CNINFO_BACKFILL_ID_MAX ?= 0
+CNINFO_BACKFILL_SHARD_COUNT ?= 0
+CNINFO_BACKFILL_SHARD_INDEX ?= 0
+CNINFO_BACKFILL_WORKERS ?= 8
+CNINFO_BACKFILL_RETRIES ?= 3
+CNINFO_BACKFILL_SLEEP ?= 0.02
+CNINFO_BACKFILL_DB_FLUSH_EVERY ?= 100
+CNINFO_BACKFILL_MAX_CHARS ?= 12000
 CLASSIFY_BATCH_SIZE ?= 3000
 CLASSIFY_MAX_BATCHES ?= 20
 RECLASSIFY_SOURCE ?= 巨潮资讯网/历史公告
 RECLASSIFY_BATCH_SIZE ?= 5000
 RECLASSIFY_MAX_BATCHES ?= 10
+EVENT_START ?=
+EVENT_END ?=
+EVENT_ONLY_NEEDY ?= 0
 EVENT_LLM ?= 0
+EVENT_LOCAL_LLM_ONLY ?= 0
 EVENT_LLM_MAX_ROWS ?= 100
 EVENT_LLM_CONFIDENCE_THRESHOLD ?= 0.70
 EVENT_LLM_PROGRESS_EVERY ?= 10
@@ -63,6 +84,7 @@ endif
 
 .PHONY: help \
 	companies-all standard-industries industries history classify-pending reclassify-source relink core-status core-pipeline \
+	backfill-cninfo-fulltext \
 	cluster-stats backfill-structured-features event-refresh export-yearly check-export-size \
 	collect link feature train status qa stats-import stats-load negatives \
 	profiles \
@@ -80,6 +102,7 @@ help:
 	@echo "  make standard-industries # 补 companies 一级标准行业（CNInfo/证监会口径）"
 	@echo "  make industries          # 补 companies 二级行业/概念标签（东方财富板块）"
 	@echo "  make history             # 历史采集 raw_documents（默认巨潮公告）"
+	@echo "  make backfill-cninfo-fulltext # 用已有 raw_documents URL 回填巨潮正文"
 	@echo "  make classify-pending    # 分类未处理 raw_documents"
 	@echo "  make reclassify-source   # 重跑某个来源的分类规则"
 	@echo "  make event-refresh       # 一条命令串行跑 event 优化（重分类 -> 特征回填 -> 簇统计）"
@@ -91,9 +114,13 @@ help:
 	@echo ""
 	@echo "常用参数："
 	@echo "  make history HISTORY_SOURCE=akshare-news HISTORY_MAX_SYMBOLS=1000 HISTORY_OFFSET=0 HISTORY_LIMIT_PER_SYMBOL=20 HISTORY_WORKERS=12"
+	@echo "  make history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1 HISTORY_CNINFO_FULLTEXT_MAX_CHARS=12000"
+	@echo "  make backfill-cninfo-fulltext CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01 CNINFO_BACKFILL_MAX_ROWS=5000 CNINFO_BACKFILL_OFFSET=0"
+	@echo "  make backfill-cninfo-fulltext CNINFO_BACKFILL_SHARD_COUNT=100 CNINFO_BACKFILL_SHARD_INDEX=0"
 	@echo "  make standard-industries STANDARD_INDUSTRY_MAX=200 STANDARD_INDUSTRY_OFFSET=0"
 	@echo "  make industries INDUSTRY_MAX=100 INDUSTRY_OFFSET=100"
 	@echo "  make reclassify-source RECLASSIFY_SOURCE='巨潮资讯网/历史公告'"
+	@echo "  make event-refresh EVENT_START=2025-01-01 EVENT_END=2025-04-01 EVENT_ONLY_NEEDY=1 EVENT_LLM=1 EVENT_LOCAL_LLM_ONLY=1 RECLASSIFY_BATCH_SIZE=50 RECLASSIFY_MAX_BATCHES=0 EVENT_LLM_MAX_ROWS=50"
 	@echo ""
 	@echo "旧目标仍可用：collect link feature train status qa delivery-status stats-import stats-load market-env sentiment"
 	@echo ""
@@ -136,7 +163,28 @@ history:
 		--limit-per-symbol $(HISTORY_LIMIT_PER_SYMBOL) \
 		--workers $(HISTORY_WORKERS) \
 		--retries $(HISTORY_RETRIES) \
-		--sleep-sec $(HISTORY_SLEEP)
+		--sleep-sec $(HISTORY_SLEEP) \
+		--db-flush-every $(HISTORY_DB_FLUSH_EVERY) \
+		$(if $(filter 1,$(HISTORY_CNINFO_FULLTEXT)),--cninfo-fulltext,) \
+		--cninfo-fulltext-max-chars $(HISTORY_CNINFO_FULLTEXT_MAX_CHARS)
+
+backfill-cninfo-fulltext:
+	$(PY) src/cli/task1.py backfill-cninfo-fulltext \
+		--db $(DB) \
+		--source '$(CNINFO_BACKFILL_SOURCE)' \
+		--start-date $(CNINFO_BACKFILL_START) \
+		--end-date $(CNINFO_BACKFILL_END) \
+		--max-rows $(CNINFO_BACKFILL_MAX_ROWS) \
+		--offset $(CNINFO_BACKFILL_OFFSET) \
+		--id-min $(CNINFO_BACKFILL_ID_MIN) \
+		--id-max $(CNINFO_BACKFILL_ID_MAX) \
+		--shard-count $(CNINFO_BACKFILL_SHARD_COUNT) \
+		--shard-index $(CNINFO_BACKFILL_SHARD_INDEX) \
+		--workers $(CNINFO_BACKFILL_WORKERS) \
+		--retries $(CNINFO_BACKFILL_RETRIES) \
+		--sleep-sec $(CNINFO_BACKFILL_SLEEP) \
+		--db-flush-every $(CNINFO_BACKFILL_DB_FLUSH_EVERY) \
+		--fulltext-max-chars $(CNINFO_BACKFILL_MAX_CHARS)
 
 classify-pending:
 	$(PY) src/cli/task1.py classify-pending \
@@ -166,7 +214,11 @@ backfill-structured-features:
 		--db $(DB) \
 		--batch-size $(RECLASSIFY_BATCH_SIZE) \
 		--max-batches $(RECLASSIFY_MAX_BATCHES) \
+		$(if $(EVENT_START),--start-date $(EVENT_START),) \
+		$(if $(EVENT_END),--end-date $(EVENT_END),) \
+		$(if $(filter 1,$(EVENT_ONLY_NEEDY)),--only-needy,) \
 		$(if $(filter 1,$(EVENT_LLM)),--use-llm,) \
+		$(if $(filter 1,$(EVENT_LOCAL_LLM_ONLY)),--local-llm-only,) \
 		--llm-max-rows $(EVENT_LLM_MAX_ROWS) \
 		--llm-confidence-threshold $(EVENT_LLM_CONFIDENCE_THRESHOLD) \
 		--llm-progress-every $(EVENT_LLM_PROGRESS_EVERY)
@@ -181,7 +233,11 @@ event-refresh:
 		DB=$(DB) \
 		RECLASSIFY_BATCH_SIZE=$(RECLASSIFY_BATCH_SIZE) \
 		RECLASSIFY_MAX_BATCHES=$(RECLASSIFY_MAX_BATCHES) \
+		EVENT_START=$(EVENT_START) \
+		EVENT_END=$(EVENT_END) \
+		EVENT_ONLY_NEEDY=$(EVENT_ONLY_NEEDY) \
 		EVENT_LLM=$(EVENT_LLM) \
+		EVENT_LOCAL_LLM_ONLY=$(EVENT_LOCAL_LLM_ONLY) \
 		EVENT_LLM_MAX_ROWS=$(EVENT_LLM_MAX_ROWS) \
 		EVENT_LLM_CONFIDENCE_THRESHOLD=$(EVENT_LLM_CONFIDENCE_THRESHOLD) \
 		EVENT_LLM_PROGRESS_EVERY=$(EVENT_LLM_PROGRESS_EVERY)
