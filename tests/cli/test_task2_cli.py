@@ -108,7 +108,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.import_companies_tushare.main")
+    @patch("cli.task2.import_companies_tushare_job.main")
     def test_import_companies_handler_calls_legacy_main_with_explicit_argv(self, mock_tushare_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "import-companies"
@@ -185,7 +185,7 @@ class Task2CliTests(unittest.TestCase):
         self.assertIn("--skip-legacy", argv)
         self.assertNotIn("import_company_standard_industries_akshare.py", argv)
 
-    @patch("cli.task2.load_companies.main")
+    @patch("cli.task2.load_companies_job.main")
     def test_load_companies_handler_calls_legacy_main_with_explicit_argv(self, mock_load_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "load-companies"
@@ -199,7 +199,7 @@ class Task2CliTests(unittest.TestCase):
             ["--db", "stock_event_mining", "--input", "output/seeds/companies_seed.csv"]
         )
 
-    @patch("cli.task2.import_companies_public.main")
+    @patch("cli.task2.import_companies_public_job.main")
     def test_import_companies_public_handler_calls_legacy_main_with_explicit_argv(self, mock_public_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "import-companies-public"
@@ -405,7 +405,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.load_market_environment.main")
+    @patch("cli.task2.load_market_environment_job.main")
     def test_load_market_environment_handler_calls_legacy_main_with_explicit_argv(self, mock_market_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "load-market-environment"
@@ -433,7 +433,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.load_sentiment_propagation.main")
+    @patch("cli.task2.load_sentiment_propagation_job.main")
     def test_load_sentiment_propagation_handler_calls_legacy_main_with_explicit_argv(self, mock_sentiment_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "load-sentiment-propagation"

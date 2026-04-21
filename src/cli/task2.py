@@ -16,20 +16,18 @@ from modules.linking.jobs import relink_job
 from modules.analysis.jobs import negative_samples_job
 from modules.companies.jobs import (
     board_industries_job,
+    import_companies_public_job,
+    import_companies_tushare_job,
     import_companies_job,
     import_profiles_job,
     import_stats_job,
     import_stats_local_job,
+    load_companies_job,
+    load_market_environment_job,
     load_profiles_job,
+    load_sentiment_propagation_job,
     load_stats_job,
     standard_industries_job,
-)
-from capabilities.storage import (
-    import_companies_public,
-    import_companies_tushare,
-    load_market_environment,
-    load_sentiment_propagation,
-    load_companies,
 )
 from pipelines import task2 as task2_pipeline
 from cli.task2_parser import build_parser
@@ -85,7 +83,7 @@ def main() -> None:
         return
 
     if args.command == "load-companies":
-        load_companies.main(["--db", args.db, "--input", args.input])
+        load_companies_job.main(["--db", args.db, "--input", args.input])
         return
 
     if args.command == "import-companies":
@@ -94,7 +92,7 @@ def main() -> None:
             argv.extend(["--tushare-token", args.tushare_token])
         if args.tushare_token_file:
             argv.extend(["--tushare-token-file", args.tushare_token_file])
-        import_companies_tushare.main(argv)
+        import_companies_tushare_job.main(argv)
         return
 
     if args.command == "import-companies-all-a":
@@ -162,7 +160,7 @@ def main() -> None:
         return
 
     if args.command == "import-companies-public":
-        import_companies_public.main(["--output", args.output])
+        import_companies_public_job.main(["--output", args.output])
         return
 
     if args.command == "import-company-profiles":
@@ -337,7 +335,7 @@ def main() -> None:
         return
 
     if args.command == "load-market-environment":
-        load_market_environment.main(
+        load_market_environment_job.main(
             [
                 "--db",
                 args.db,
@@ -362,7 +360,7 @@ def main() -> None:
         ]
         if args.quiet:
             argv.append("--quiet")
-        load_sentiment_propagation.main(argv)
+        load_sentiment_propagation_job.main(argv)
         return
 
     if args.command == "build-negative-samples":

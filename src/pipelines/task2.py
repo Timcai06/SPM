@@ -13,8 +13,8 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from modules.companies.jobs import load_companies_job
 from modules.linking.jobs import relink_job
-from capabilities.storage import load_companies
 from capabilities.storage.db_guard import dsn_for
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,7 +35,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     seed_path = Path(args.input).resolve()
     if seed_path.exists():
-        load_companies.main(["--db", args.db, "--input", str(seed_path)])
+        load_companies_job.main(["--db", args.db, "--input", str(seed_path)])
     else:
         with psycopg.connect(dsn_for(args.db)) as conn:
             with conn.cursor() as cur:

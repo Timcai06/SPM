@@ -83,7 +83,7 @@ class Task3CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task3.load_task3_relations.main")
+    @patch("cli.task3.load_relations_job.main")
     def test_load_relations_handler_calls_job_with_explicit_argv(self, mock_load_relations: MagicMock) -> None:
         args = MagicMock()
         args.db = "stock_event_mining"

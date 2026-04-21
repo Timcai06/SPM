@@ -11,8 +11,8 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from modules.graph.jobs import load_relations_job
 from modules.graph.jobs import propagate_links_job
-from capabilities.storage import load_task3_relations
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -28,7 +28,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    load_task3_relations.main(["--db", args.db, "--input", args.input])
+    load_relations_job.main(["--db", args.db, "--input", args.input])
     propagate_links_job.main(
         [
             "--db",

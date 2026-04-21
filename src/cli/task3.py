@@ -12,8 +12,7 @@ SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from modules.graph.jobs import propagate_links_job
-from capabilities.storage import load_task3_relations
+from modules.graph.jobs import load_relations_job, propagate_links_job
 from pipelines import task3 as task3_pipeline
 from cli.task3_parser import build_parser
 
@@ -40,7 +39,7 @@ def run_pipeline_command(args: argparse.Namespace) -> None:
 
 
 def run_load_relations_command(args: argparse.Namespace) -> None:
-    load_task3_relations.main(["--db", args.db, "--input", args.input])
+    load_relations_job.main(["--db", args.db, "--input", args.input])
 
 
 def run_propagate_command(args: argparse.Namespace) -> None:
