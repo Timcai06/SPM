@@ -18,7 +18,7 @@ DEFAULT_DB = "stock_event_mining"
 CANONICAL_MAP_PATH = ROOT / "output" / "event_canonical_map.csv"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate minimal event-company links.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--top-k", type=int, default=3)
@@ -26,11 +26,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
     parser.add_argument("--canonical-map", default=str(CANONICAL_MAP_PATH))
     parser.add_argument("--progress-every", type=int, default=250)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     upserted, stale_deleted = run_linking(
         db=args.db,
         top_k=args.top_k,
@@ -44,4 +44,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -22,14 +22,14 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = "stock_event_mining"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run minimal Task 2 workflow.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--min-score", type=float, default=0.35)
     parser.add_argument("--input", default="output/seeds/companies_seed.csv")
     parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 @contextmanager
@@ -42,8 +42,8 @@ def patched_argv(argv: list[str]):
         sys.argv = old
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     seed_path = Path(args.input).resolve()
     if seed_path.exists():
         with patched_argv(["load_companies.py", "--db", args.db, "--input", str(seed_path)]):
@@ -64,9 +64,8 @@ def main() -> None:
                 "And no active companies found in DB. "
                 "Please run import/load companies first."
             )
-    with patched_argv(
+    relink_job.main(
         [
-            "relink_job.py",
             "--db",
             args.db,
             "--top-k",
@@ -76,8 +75,7 @@ def main() -> None:
             "--canonical-map",
             args.canonical_map,
         ]
-    ):
-        relink_job.main()
+    )
     print(f"Task 2 workflow completed for database: {args.db}")
 
 
