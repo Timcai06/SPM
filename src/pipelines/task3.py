@@ -18,14 +18,14 @@ from capabilities.storage import load_task3_relations
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run task3 graph preparation workflow.")
     parser.add_argument("--db", default="stock_event_mining")
     parser.add_argument("--input", default="output/seeds/company_relations_seed.csv")
     parser.add_argument("--min-source-score", type=float, default=0.35)
     parser.add_argument("--min-propagation-score", type=float, default=0.20)
     parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 @contextmanager
@@ -38,13 +38,12 @@ def patched_argv(argv: list[str]):
         sys.argv = old
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     with patched_argv(["load_task3_relations.py", "--db", args.db, "--input", args.input]):
         load_task3_relations.main()
-    with patched_argv(
+    propagate_links_job.main(
         [
-            "propagate_links_job.py",
             "--db",
             args.db,
             "--min-source-score",
@@ -54,8 +53,7 @@ def main() -> None:
             "--canonical-map",
             args.canonical_map,
         ]
-    ):
-        propagate_links_job.main()
+    )
     print(f"Task 3 preparation workflow completed for database: {args.db}")
 
 

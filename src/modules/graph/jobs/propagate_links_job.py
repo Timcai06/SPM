@@ -24,14 +24,14 @@ ROOT = Path(__file__).resolve().parents[3]
 CANONICAL_MAP_PATH = ROOT / "output" / "event_canonical_map.csv"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Propagate task2 links through company graph.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--min-source-score", type=float, default=0.35)
     parser.add_argument("--min-propagation-score", type=float, default=0.20)
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
     parser.add_argument("--canonical-map", default=str(CANONICAL_MAP_PATH), help="Optional event canonical map CSV.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def build_cluster_links(source_links: list[dict], event_to_cluster: dict[str, dict]) -> list[dict]:
@@ -69,8 +69,8 @@ def build_cluster_links(source_links: list[dict], event_to_cluster: dict[str, di
     return built
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     canonical_map = load_canonical_map_from_csv(Path(args.canonical_map).resolve())
     with write_guard(
         db_name=args.db,
