@@ -12,6 +12,7 @@ if str(SRC) not in sys.path:
 
 from modules.analysis.services.legacy_analysis_service import (
     run_feature_return,
+    run_negative_samples,
     run_train_samples,
 )
 
@@ -28,6 +29,12 @@ class LegacyAnalysisServiceTests(unittest.TestCase):
         run_train_samples(["--db", "stock_event_mining", "--label-dataset", "out.csv"])
 
         mock_main.assert_called_once_with(["--db", "stock_event_mining", "--label-dataset", "out.csv"])
+
+    @patch("modules.analysis.services.legacy_analysis_service.legacy_build_negative_samples.main")
+    def test_run_negative_samples_passes_argv(self, mock_main) -> None:
+        run_negative_samples(["--db", "stock_event_mining", "--max-per-day", "50"])
+
+        mock_main.assert_called_once_with(["--db", "stock_event_mining", "--max-per-day", "50"])
 
 
 if __name__ == "__main__":
