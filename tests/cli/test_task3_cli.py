@@ -83,6 +83,18 @@ class Task3CliTests(unittest.TestCase):
             ]
         )
 
+    @patch("cli.task3.load_task3_relations.main")
+    def test_load_relations_handler_calls_job_with_explicit_argv(self, mock_load_relations: MagicMock) -> None:
+        args = MagicMock()
+        args.db = "stock_event_mining"
+        args.input = "output/seeds/company_relations_seed.csv"
+
+        task3.run_load_relations_command(args)
+
+        mock_load_relations.assert_called_once_with(
+            ["--db", "stock_event_mining", "--input", "output/seeds/company_relations_seed.csv"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

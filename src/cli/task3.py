@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable
 
@@ -17,16 +16,6 @@ from modules.graph.jobs import propagate_links_job
 from capabilities.storage import load_task3_relations
 from pipelines import task3 as task3_pipeline
 from cli.task3_parser import build_parser
-
-
-@contextmanager
-def patched_argv(argv: list[str]):
-    old = sys.argv[:]
-    sys.argv = argv
-    try:
-        yield
-    finally:
-        sys.argv = old
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,8 +40,7 @@ def run_pipeline_command(args: argparse.Namespace) -> None:
 
 
 def run_load_relations_command(args: argparse.Namespace) -> None:
-    with patched_argv(["load_task3_relations.py", "--db", args.db, "--input", args.input]):
-        load_task3_relations.main()
+    load_task3_relations.main(["--db", args.db, "--input", args.input])
 
 
 def run_propagate_command(args: argparse.Namespace) -> None:

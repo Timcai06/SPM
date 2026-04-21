@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 
 SRC_ROOT = Path(__file__).resolve().parents[1]
@@ -27,21 +26,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
     return parser.parse_args(argv)
 
-
-@contextmanager
-def patched_argv(argv: list[str]):
-    old = sys.argv[:]
-    sys.argv = argv
-    try:
-        yield
-    finally:
-        sys.argv = old
-
-
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    with patched_argv(["load_task3_relations.py", "--db", args.db, "--input", args.input]):
-        load_task3_relations.main()
+    load_task3_relations.main(["--db", args.db, "--input", args.input])
     propagate_links_job.main(
         [
             "--db",

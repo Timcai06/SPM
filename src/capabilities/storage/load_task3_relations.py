@@ -24,12 +24,12 @@ DEFAULT_DB = "stock_event_mining"
 DEFAULT_INPUT = ROOT / "output" / "seeds" / "company_relations_seed.csv"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load task3 company relation edges.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--input", default=str(DEFAULT_INPUT))
     parser.add_argument("--lock-timeout-sec", type=int, default=120)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -114,8 +114,8 @@ def build_evidence(row: dict[str, str], source: dict[str, Any], target: dict[str
     return json.dumps(evidence, ensure_ascii=False)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     rows = read_rows(Path(args.input).resolve())
     inserted = 0
     updated = 0
