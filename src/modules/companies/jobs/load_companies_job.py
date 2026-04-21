@@ -10,11 +10,11 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage import load_companies as legacy_load_companies
+from modules.companies.services.company_seed_service import run_load_companies
 
 
 def main(argv: list[str] | None = None) -> None:
-    legacy_load_companies.main(argv)
+    run_load_companies(argv)
 
 
 if __name__ == "__main__":

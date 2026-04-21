@@ -10,11 +10,11 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage import import_companies_tushare as legacy_import_companies_tushare
+from modules.companies.services.company_seed_service import run_import_companies_tushare
 
 
 def main(argv: list[str] | None = None) -> None:
-    legacy_import_companies_tushare.main(argv)
+    run_import_companies_tushare(argv)
 
 
 if __name__ == "__main__":

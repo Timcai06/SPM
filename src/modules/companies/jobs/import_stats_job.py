@@ -10,20 +10,20 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage import (
-    import_company_stats_akshare as legacy_akshare,
-    import_company_stats_sina as legacy_sina,
-    import_company_stats_tushare as legacy_tushare,
+from modules.companies.services.company_metrics_service import (
+    run_import_stats_akshare,
+    run_import_stats_sina,
+    run_import_stats_tushare,
 )
 
 
 def run_sina(argv: list[str] | None = None) -> None:
-    legacy_sina.main(argv)
+    run_import_stats_sina(argv)
 
 
 def run_tushare(argv: list[str] | None = None) -> None:
-    legacy_tushare.main(argv)
+    run_import_stats_tushare(argv)
 
 
 def run_akshare(argv: list[str] | None = None) -> None:
-    legacy_akshare.main(argv)
+    run_import_stats_akshare(argv)
