@@ -10,11 +10,11 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage import load_task3_relations as legacy_load_task3_relations
+from modules.graph.services.graph_relation_service import run_load_relations
 
 
 def main(argv: list[str] | None = None) -> None:
-    legacy_load_task3_relations.main(argv)
+    run_load_relations(argv)
 
 
 if __name__ == "__main__":
