@@ -74,7 +74,7 @@ STRUCTURED_BUILDER_CONFIG = {
 }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Task 1 event structuring pipeline.")
     parser.add_argument("--input", action="append", dest="inputs")
     parser.add_argument("--output-dir", default=str(ROOT / "output"))
@@ -82,7 +82,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-db-load", action="store_true")
     parser.add_argument("--use-llm", action="store_true")
     parser.add_argument("--llm-max-rows", type=int, default=20)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 async def run_classification_pipeline(
     db: str,
@@ -153,8 +153,8 @@ def run_file_classification(args: argparse.Namespace) -> None:
     asyncio.run(_run())
 
 
-def main() -> None:
-    run_file_classification(parse_args())
+def main(argv: list[str] | None = None) -> None:
+    run_file_classification(parse_args(argv))
 
 
 if __name__ == "__main__":

@@ -462,16 +462,16 @@ def render_markdown(checks: list[Check]) -> str:
     return "\n".join(lines)
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Check formal data-delivery table readiness.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--output", default="", help="Optional markdown output path.")
     parser.add_argument("--fail-on-blockers", action="store_true", help="Exit nonzero when any BLOCK check exists.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     checks = build_checks(args.db)
     rendered = render_markdown(checks)
     print(rendered)

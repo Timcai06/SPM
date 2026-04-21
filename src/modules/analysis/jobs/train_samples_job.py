@@ -13,8 +13,8 @@ if str(SRC_ROOT) not in sys.path:
 from modules.analysis.services.legacy_analysis_service import run_train_samples
 
 
-def main() -> None:
-    run_train_samples()
+def main(argv: list[str] | None = None) -> None:
+    run_train_samples(argv)
 
 
 if __name__ == "__main__":

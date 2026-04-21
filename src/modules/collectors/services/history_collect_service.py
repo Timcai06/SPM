@@ -30,7 +30,7 @@ DEFAULT_DB = "stock_event_mining"
 DEFAULT_OUTPUT = ROOT / "output" / "history"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect historical raw documents for Task 1.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--source", choices=["akshare-news", "cninfo-disclosure"], default="akshare-news")
@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cninfo-fulltext", action="store_true", help="Download CNInfo PDF attachments and extract text into content.")
     parser.add_argument("--cninfo-fulltext-max-chars", type=int, default=12000)
     parser.add_argument("--db-flush-every", type=int, default=100, help="Incrementally upsert every N collected rows.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def normalize_date(value: str) -> str:
@@ -307,8 +307,8 @@ def flush_rows_to_db(db: str, pending_rows: list[dict[str, str]]) -> int:
     return upsert_raw_document_rows(db, rows)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     start_date = normalize_date(args.start_date)
     end_date = normalize_date(args.end_date)
     symbols = resolve_symbols(

@@ -202,18 +202,18 @@ def write_report(
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate quality sample and Task 1 quality report.")
     parser.add_argument("--sample-size", type=int, default=50, help="Manual review sample size (recommended 20-50).")
     parser.add_argument("--seed", type=int, default=42, help="Sampling random seed.")
     parser.add_argument("--sample-path", default=str(SAMPLE_PATH), help="Output CSV path for manual review sample.")
     parser.add_argument("--report-path", default=str(REPORT_PATH), help="Output markdown report path.")
     parser.add_argument("--run-id", default="", help="Run identifier for traceability.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     run_id = args.run_id or datetime.now().strftime("%Y%m%d_%H%M%S")
     raw_rows = read_csv(RAW_PATH)
     structured_rows = read_csv(STRUCTURED_PATH)

@@ -290,12 +290,12 @@ async def collect_all_async(limit: int, include_non_keyword: bool) -> list[dict]
     return all_combined_rows
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Collect live Task 1 source data (Async).")
     parser.add_argument("--limit", type=int, default=10, help="Max rows to fetch per source.")
     parser.add_argument("--include-non-keyword", action="store_true", help="Disable gov title keyword prefilter.")
     parser.add_argument("--db", default=DEFAULT_DB, help="Target PostgreSQL database name.")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     
     write_source_catalog(SOURCE_CATALOG)
     

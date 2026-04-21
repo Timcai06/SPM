@@ -13,10 +13,9 @@ if str(SRC_ROOT) not in sys.path:
 from modules.quality.services.validation_service import run_validation_pipeline
 
 
-def main() -> None:
+def main(_argv: list[str] | None = None) -> None:
     run_validation_pipeline()
 
 
 if __name__ == "__main__":
     main()
-

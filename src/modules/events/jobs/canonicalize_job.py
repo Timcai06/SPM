@@ -302,14 +302,18 @@ def run_canonicalization_pipeline(db: str = None, input_rows: List[Dict[str, str
     return canonical_rows, mapping_rows
 
 
-def main() -> None:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build canonical event clusters from structured events.")
     parser.add_argument("--db", help="Database name to read int_structured_events_stage from.")
     parser.add_argument("--input", default=str(INPUT_PATH), help="Structured events CSV path (if not using --db).")
     parser.add_argument("--canonical_output", default=str(CANONICAL_EVENTS_PATH), help="Canonical events CSV output path.")
     parser.add_argument("--mapping_output", default=str(CANONICAL_MAP_PATH), help="Event to canonical mapping CSV output path.")
     parser.add_argument("--report-path", default=str(REPORT_PATH), help="Markdown report output path.")
-    args = parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
 
     if args.db:
         print(f"Reading structured events from database: {args.db}")

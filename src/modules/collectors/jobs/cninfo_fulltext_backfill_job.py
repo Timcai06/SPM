@@ -6,8 +6,8 @@ from __future__ import annotations
 from modules.collectors.services import cninfo_fulltext_backfill_service
 
 
-def main() -> None:
-    cninfo_fulltext_backfill_service.main()
+def main(argv: list[str] | None = None) -> None:
+    cninfo_fulltext_backfill_service.main(argv)
 
 
 if __name__ == "__main__":

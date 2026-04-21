@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = "stock_event_mining"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the full Task 1 workflow.")
     parser.add_argument("--limit", type=int, default=8, help="Max rows to collect per live source.")
     parser.add_argument("--db", default=DEFAULT_DB, help="PostgreSQL database name.")
@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--progress-every", type=int, default=10, help="Print analysis progress every N rows.")
     parser.add_argument("--use-llm", action="store_true", help="Enable LLM enrichment for a small rule-positive subset.")
     parser.add_argument("--llm-max-rows", type=int, default=20, help="Max rows to enrich with LLM in one run.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 from modules.collectors.services.collect_service import collect_all_async
 from modules.collectors.adapters.db_repository import upsert_raw_document_rows
@@ -51,8 +51,8 @@ from modules.quality.services.validation_service import run_validation_pipeline
 from modules.analysis.jobs.feature_return_job import main as analysis_main
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     db = args.db
 
     # 1. Collection
@@ -99,33 +99,26 @@ def main() -> None:
     # 7. Analysis (Optional)
     if args.with_analysis:
         print("--- Phase 6: Event Analysis (Event Study) ---")
-        # For analysis_main, we might still need patched_argv if it's not refactored yet,
-        # but let's try to keep it simple for now or use the existing one if it works.
-        # Actually, let's keep it as is since it's an optional extension.
-        from contextlib import contextmanager
-        @contextmanager
-        def patched_argv(argv: list[str]):
-            old = sys.argv[:]
-            sys.argv = argv
-            try:
-                yield
-            finally:
-                sys.argv = old
-        
-        with patched_argv(
+        analysis_main(
             [
-                "feature_return.py",
-                "--db", db,
-                "--analysis-mode", args.analysis_mode,
-                "--benchmark", args.benchmark,
-                "--event-windows", args.event_windows,
-                "--time-budget-sec", str(args.time_budget_sec),
-                "--max-rows", str(args.max_analysis_rows),
-                "--api-timeout-sec", str(args.api_timeout_sec),
-                "--progress-every", str(args.progress_every),
+                "--db",
+                db,
+                "--analysis-mode",
+                args.analysis_mode,
+                "--benchmark",
+                args.benchmark,
+                "--event-windows",
+                args.event_windows,
+                "--time-budget-sec",
+                str(args.time_budget_sec),
+                "--max-rows",
+                str(args.max_analysis_rows),
+                "--api-timeout-sec",
+                str(args.api_timeout_sec),
+                "--progress-every",
+                str(args.progress_every),
             ]
-        ):
-            analysis_main()
+        )
 
     print(f"\nTask 1 workflow completed successfully for database: {db}")
 

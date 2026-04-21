@@ -16,7 +16,7 @@ from modules.events.adapters.db_repository import load_source_raw_documents
 from modules.events.jobs.classify_job import run_classification_pipeline
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Reclassify raw_documents for a source.")
     parser.add_argument("--db", default="stock_event_mining")
     parser.add_argument("--source", required=True)
@@ -24,11 +24,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-batches", type=int, default=1)
     parser.add_argument("--use-llm", action="store_true")
     parser.add_argument("--llm-max-rows", type=int, default=20)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     total_candidates = 0
     total_structured = 0
     for batch_idx in range(args.max_batches):

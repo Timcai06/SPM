@@ -113,7 +113,7 @@ def run_validation_pipeline(raw_rows: List[Dict[str, str]] = None, structured_ro
         return False
 
 
-def main() -> None:
+def main(_argv: list[str] | None = None) -> None:
     run_validation_pipeline()
 
 

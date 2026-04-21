@@ -13,10 +13,9 @@ if str(SRC_ROOT) not in sys.path:
 from modules.collectors.services import history_collect_service
 
 
-def main() -> None:
-    history_collect_service.main()
+def main(argv: list[str] | None = None) -> None:
+    history_collect_service.main(argv)
 
 
 if __name__ == "__main__":
     main()
-
