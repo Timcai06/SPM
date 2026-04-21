@@ -27,7 +27,7 @@ DEFAULT_OUTPUT = ROOT / "output" / "seeds" / "company_stats.csv"
 DEFAULT_QUOTES_OUTPUT = ROOT / "output" / "seeds" / "stock_daily_quotes.csv"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import company daily stats from Sina K-line API.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--quotes-output", default=str(DEFAULT_QUOTES_OUTPUT))
@@ -38,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--progress-every", type=int, default=20, help="Print progress every N symbols.")
     parser.add_argument("--timeout-sec", type=float, default=12.0, help="Timeout per HTTP request.")
     parser.add_argument("--db", default="stock_event_mining", help="Database used to load symbols from companies table.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def safe_float(value) -> Optional[float]:
@@ -320,8 +320,8 @@ def write_quotes_csv(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     rows, quote_rows = build_rows(
         db_name=args.db,
         max_symbols=args.max_symbols,

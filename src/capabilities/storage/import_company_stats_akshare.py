@@ -28,7 +28,7 @@ DEFAULT_OUTPUT = ROOT / "output" / "seeds" / "company_stats.csv"
 DEFAULT_QUOTES_OUTPUT = ROOT / "output" / "seeds" / "stock_daily_quotes.csv"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import company daily stats from AKShare.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--quotes-output", default=str(DEFAULT_QUOTES_OUTPUT))
@@ -42,7 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--failure-backoff-sec", type=float, default=0.8, help="Base backoff seconds after a failed symbol fetch.")
     parser.add_argument("--resume-existing", action="store_true", help="Skip ts_codes that already exist in output/quotes-output.")
     parser.add_argument("--db", default="stock_event_mining", help="Database used to load symbols from companies table.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def safe_float(value) -> Optional[float]:
@@ -433,8 +433,8 @@ _QUOTES_FIELDS = [
 ]
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     output_path = Path(args.output).resolve()
     quotes_output_path = Path(args.quotes_output).resolve()
     skip_ts_codes = existing_ts_codes(output_path, quotes_output_path) if args.resume_existing else set()

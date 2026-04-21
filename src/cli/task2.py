@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable
 
@@ -34,16 +33,6 @@ from capabilities.storage import (
 )
 from pipelines import task2 as task2_pipeline
 from cli.task2_parser import build_parser
-
-
-@contextmanager
-def patched_argv(argv: list[str]):
-    old = sys.argv[:]
-    sys.argv = argv
-    try:
-        yield
-    finally:
-        sys.argv = old
 
 
 def parse_args() -> argparse.Namespace:
@@ -199,7 +188,6 @@ def main() -> None:
     if args.command == "import-company-stats":
         if args.source == "sina":
             argv = [
-                "import_stats_job.py",
                 "--output",
                 args.output,
                 "--quotes-output",
@@ -219,13 +207,11 @@ def main() -> None:
                 "--timeout-sec",
                 str(args.timeout_sec),
             ]
-            with patched_argv(argv):
-                import_stats_job.run_sina()
+            import_stats_job.run_sina(argv)
             return
 
         def run_akshare_import() -> None:
             argv = [
-                "import_company_stats_akshare.py",
                 "--output",
                 args.output,
                 "--quotes-output",
@@ -251,12 +237,10 @@ def main() -> None:
             ]
             if args.resume_existing:
                 argv.append("--resume-existing")
-            with patched_argv(argv):
-                import_stats_job.run_akshare()
+            import_stats_job.run_akshare(argv)
 
         if args.source in ("tushare", "auto"):
             argv = [
-                "import_company_stats_tushare.py",
                 "--output",
                 args.output,
                 "--quotes-output",
@@ -273,8 +257,7 @@ def main() -> None:
             if args.tushare_token_file:
                 argv.extend(["--tushare-token-file", args.tushare_token_file])
             try:
-                with patched_argv(argv):
-                    import_stats_job.run_tushare()
+                import_stats_job.run_tushare(argv)
                 return
             except (Exception, SystemExit) as exc:
                 if args.source == "tushare":
@@ -288,7 +271,6 @@ def main() -> None:
             except (Exception, SystemExit) as exc:
                 print(f"[import-company-stats] akshare failed, fallback to sina: {exc}")
                 argv = [
-                    "import_stats_job.py",
                     "--output",
                     args.output,
                     "--quotes-output",
@@ -308,8 +290,7 @@ def main() -> None:
                     "--timeout-sec",
                     str(args.timeout_sec),
                 ]
-                with patched_argv(argv):
-                    import_stats_job.run_sina()
+                import_stats_job.run_sina(argv)
                 return
         run_akshare_import()
         return

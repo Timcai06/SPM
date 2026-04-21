@@ -17,14 +17,13 @@ from capabilities.storage import (
 )
 
 
-def run_sina() -> None:
-    legacy_sina.main()
+def run_sina(argv: list[str] | None = None) -> None:
+    legacy_sina.main(argv)
 
 
-def run_tushare() -> None:
-    legacy_tushare.main()
+def run_tushare(argv: list[str] | None = None) -> None:
+    legacy_tushare.main(argv)
 
 
-def run_akshare() -> None:
-    legacy_akshare.main()
-
+def run_akshare(argv: list[str] | None = None) -> None:
+    legacy_akshare.main(argv)

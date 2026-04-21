@@ -28,7 +28,7 @@ DEFAULT_QUOTES_OUTPUT = ROOT / "output" / "seeds" / "stock_daily_quotes.csv"
 DEFAULT_DB = "stock_event_mining"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import company daily stats from Tushare.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--quotes-output", default=str(DEFAULT_QUOTES_OUTPUT))
@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tushare-token-file", default="")
     parser.add_argument("--days", type=int, default=30, help="Recent trading-day span target.")
     parser.add_argument("--max-symbols", type=int, default=300, help="Max company symbols loaded from DB.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def resolve_tushare_token(args: argparse.Namespace) -> tuple[str, str]:
@@ -369,8 +369,8 @@ def write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> 
 
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     token, token_source = resolve_tushare_token(args)
     if not token:
         raise SystemExit("Missing Tushare token. Provide --tushare-token, --tushare-token-file, or TUSHARE_TOKEN.")

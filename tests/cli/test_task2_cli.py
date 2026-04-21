@@ -243,6 +243,99 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
+    @patch("cli.task2.import_stats_job.run_tushare")
+    def test_import_company_stats_tushare_handler_calls_job_with_explicit_argv(self, mock_run_tushare: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-company-stats"
+        task2_args.source = "tushare"
+        task2_args.output = "company_stats.csv"
+        task2_args.quotes_output = "stock_daily_quotes.csv"
+        task2_args.db = "stock_event_mining"
+        task2_args.days = 30
+        task2_args.max_symbols = 300
+        task2_args.max_rows = 1200
+        task2_args.sleep_sec = 0.05
+        task2_args.progress_every = 20
+        task2_args.timeout_sec = 12.0
+        task2_args.offset = 0
+        task2_args.retries = 2
+        task2_args.failure_backoff_sec = 0.8
+        task2_args.resume_existing = False
+        task2_args.tushare_token = "token"
+        task2_args.tushare_token_file = ""
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_run_tushare.assert_called_once_with(
+            [
+                "--output",
+                "company_stats.csv",
+                "--quotes-output",
+                "stock_daily_quotes.csv",
+                "--db",
+                "stock_event_mining",
+                "--days",
+                "30",
+                "--max-symbols",
+                "300",
+                "--tushare-token",
+                "token",
+            ]
+        )
+
+    @patch("cli.task2.import_stats_job.run_akshare")
+    def test_import_company_stats_akshare_handler_calls_job_with_explicit_argv(self, mock_run_akshare: MagicMock) -> None:
+        task2_args = MagicMock()
+        task2_args.command = "import-company-stats"
+        task2_args.source = "akshare"
+        task2_args.output = "company_stats.csv"
+        task2_args.quotes_output = "stock_daily_quotes.csv"
+        task2_args.db = "stock_event_mining"
+        task2_args.days = 30
+        task2_args.max_symbols = 300
+        task2_args.max_rows = 1200
+        task2_args.sleep_sec = 0.05
+        task2_args.progress_every = 20
+        task2_args.timeout_sec = 12.0
+        task2_args.offset = 10
+        task2_args.retries = 2
+        task2_args.failure_backoff_sec = 0.8
+        task2_args.resume_existing = True
+        task2_args.tushare_token = ""
+        task2_args.tushare_token_file = ""
+
+        with patch("cli.task2.parse_args", return_value=task2_args):
+            task2.main()
+
+        mock_run_akshare.assert_called_once_with(
+            [
+                "--output",
+                "company_stats.csv",
+                "--quotes-output",
+                "stock_daily_quotes.csv",
+                "--db",
+                "stock_event_mining",
+                "--days",
+                "30",
+                "--max-symbols",
+                "300",
+                "--offset",
+                "10",
+                "--sleep-sec",
+                "0.05",
+                "--progress-every",
+                "20",
+                "--timeout-sec",
+                "12.0",
+                "--retries",
+                "2",
+                "--failure-backoff-sec",
+                "0.8",
+                "--resume-existing",
+            ]
+        )
+
     @patch("cli.task2.import_stats_local_job.main")
     def test_import_company_stats_local_handler_calls_job_with_explicit_argv(self, mock_local_main: MagicMock) -> None:
         task2_args = MagicMock()
