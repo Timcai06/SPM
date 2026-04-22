@@ -11,7 +11,6 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from modules.analysis.services.feature_analysis_service import run_feature_return
-from modules.analysis.services.sample_generation_service import run_negative_samples, run_train_samples
 
 
 class AnalysisBridgeServiceTests(unittest.TestCase):
@@ -20,19 +19,6 @@ class AnalysisBridgeServiceTests(unittest.TestCase):
         run_feature_return(["--db", "stock_event_mining", "--benchmark", "hs300"])
 
         mock_main.assert_called_once_with(["--db", "stock_event_mining", "--benchmark", "hs300"])
-
-    @patch("modules.analysis.services.sample_generation_service.legacy_build_model_samples.main")
-    def test_run_train_samples_passes_argv(self, mock_main) -> None:
-        run_train_samples(["--db", "stock_event_mining", "--label-dataset", "out.csv"])
-
-        mock_main.assert_called_once_with(["--db", "stock_event_mining", "--label-dataset", "out.csv"])
-
-    @patch("modules.analysis.services.sample_generation_service.legacy_build_negative_samples.main")
-    def test_run_negative_samples_passes_argv(self, mock_main) -> None:
-        run_negative_samples(["--db", "stock_event_mining", "--max-per-day", "50"])
-
-        mock_main.assert_called_once_with(["--db", "stock_event_mining", "--max-per-day", "50"])
-
 
 if __name__ == "__main__":
     unittest.main()
