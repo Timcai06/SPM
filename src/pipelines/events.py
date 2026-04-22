@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-shot Task 1 workflow: collect -> classify -> load -> validate."""
+"""Event normalization workflow: collect -> classify -> canonicalize -> validate."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ DEFAULT_DB = "stock_event_mining"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the full Task 1 workflow.")
+    parser = argparse.ArgumentParser(description="Run the full event normalization workflow.")
     parser.add_argument("--limit", type=int, default=8, help="Max rows to collect per live source.")
     parser.add_argument("--db", default=DEFAULT_DB, help="PostgreSQL database name.")
     parser.add_argument(
@@ -40,6 +40,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--progress-every", type=int, default=10, help="Print analysis progress every N rows.")
     parser.add_argument("--use-llm", action="store_true", help="Enable LLM enrichment for a small rule-positive subset.")
     parser.add_argument("--llm-max-rows", type=int, default=20, help="Max rows to enrich with LLM in one run.")
+    parser.add_argument("--run-id", default="", help="Optional parent run id for step-level provenance.")
     return parser.parse_args(argv)
 
 from modules.collectors.services.collect_service import collect_all_async
@@ -49,6 +50,7 @@ from modules.events.jobs.canonicalize_job import run_canonicalization_pipeline
 from modules.events.services.canonical_loading_service import load_canonical_rows
 from modules.quality.services.validation_service import run_validation_pipeline
 from modules.analysis.jobs.feature_return_job import main as analysis_main
+from modules.runtime.services.run_metadata_service import logged_step
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -58,69 +60,77 @@ def main(argv: list[str] | None = None) -> None:
     # 1. Collection
     if not args.skip_collect:
         print(f"--- Phase 1: Asynchronous Collection (limit={args.limit}) ---")
-        all_rows = asyncio.run(collect_all_async(args.limit, include_non_keyword=False))
+        with logged_step(db, args.run_id, "collect_live", {"limit": args.limit}):
+            all_rows = asyncio.run(collect_all_async(args.limit, include_non_keyword=False))
         print(f"Collected {len(all_rows)} documents in memory.")
         
         # 2. Storage Upsert
         if all_rows:
             print(f"Upserting {len(all_rows)} documents to database '{db}'...")
-            upsert_raw_document_rows(db, all_rows)
+            with logged_step(db, args.run_id, "upsert_raw_documents", {"rows": len(all_rows)}):
+                upsert_raw_document_rows(db, all_rows)
     else:
         print("Skipping collection phase.")
 
     # 3. Classification
     print(f"--- Phase 2: Identification & Classification (DB: {db}) ---")
-    candidate_rows, structured_rows = asyncio.run(
-        run_classification_pipeline(db, use_llm=args.use_llm, llm_max_rows=args.llm_max_rows)
-    )
+    with logged_step(db, args.run_id, "classify_events", {"use_llm": args.use_llm}):
+        candidate_rows, structured_rows = asyncio.run(
+            run_classification_pipeline(db, use_llm=args.use_llm, llm_max_rows=args.llm_max_rows)
+        )
     print(f"Identified {len(structured_rows)} structured events from candidates.")
 
     # 4. Canonicalization
     print("--- Phase 3: Canonicalization (Grouping) ---")
-    canonical_rows, mapping_rows = run_canonicalization_pipeline(db=db)
+    with logged_step(db, args.run_id, "canonicalize_events"):
+        canonical_rows, mapping_rows = run_canonicalization_pipeline(db=db)
     print(f"Grouped into {len(canonical_rows)} canonical event clusters.")
 
     # 5. Loading Canonical Layer
     print("--- Phase 4: Loading Canonical Layer ---")
-    load_canonical_rows(
-        db=db,
-        canonical_event_rows=canonical_rows,
-        canonical_link_rows=mapping_rows,
-        quiet=False
-    )
+    with logged_step(db, args.run_id, "load_canonical_rows", {"canonical_rows": len(canonical_rows)}):
+        load_canonical_rows(
+            db=db,
+            canonical_event_rows=canonical_rows,
+            canonical_link_rows=mapping_rows,
+            quiet=False
+        )
 
     # 6. Validation
     if not args.skip_validate:
         print("--- Phase 5: Validation ---")
-        success = run_validation_pipeline(candidate_rows, structured_rows)
+        with logged_step(db, args.run_id, "validate_events"):
+            success = run_validation_pipeline(candidate_rows, structured_rows)
         if not success:
             print("[WARN] Validation failed, but continuing.")
 
     # 7. Analysis (Optional)
     if args.with_analysis:
         print("--- Phase 6: Event Analysis (Event Study) ---")
-        analysis_main(
-            [
-                "--db",
-                db,
-                "--analysis-mode",
-                args.analysis_mode,
-                "--benchmark",
-                args.benchmark,
-                "--event-windows",
-                args.event_windows,
-                "--time-budget-sec",
-                str(args.time_budget_sec),
-                "--max-rows",
-                str(args.max_analysis_rows),
-                "--api-timeout-sec",
-                str(args.api_timeout_sec),
-                "--progress-every",
-                str(args.progress_every),
-            ]
-        )
+        analysis_argv = [
+            "--db",
+            db,
+            "--analysis-mode",
+            args.analysis_mode,
+            "--benchmark",
+            args.benchmark,
+            "--event-windows",
+            args.event_windows,
+            "--time-budget-sec",
+            str(args.time_budget_sec),
+            "--max-rows",
+            str(args.max_analysis_rows),
+            "--api-timeout-sec",
+            str(args.api_timeout_sec),
+            "--progress-every",
+            str(args.progress_every),
+        ]
+        if args.run_id:
+            analysis_argv.extend(["--run-id", args.run_id])
+        with logged_step(db, args.run_id, "run_event_study", {"benchmark": args.benchmark}):
+            analysis_main(analysis_argv)
 
-    print(f"\nTask 1 workflow completed successfully for database: {db}")
+    print(f"\nEvent normalization workflow completed successfully for database: {db}")
 
 
 if __name__ == "__main__":

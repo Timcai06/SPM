@@ -11,18 +11,21 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from pipelines import task3 as task3_pipeline
+from pipelines import graph as graph_pipeline
 
 
-class Task3PipelineTests(unittest.TestCase):
-    @patch("pipelines.task3.propagate_links_job.main")
-    @patch("pipelines.task3.load_relations_job.main")
+class GraphPipelineTests(unittest.TestCase):
+    @patch("pipelines.graph.logged_step")
+    @patch("pipelines.graph.propagate_links_job.main")
+    @patch("pipelines.graph.load_relations_job.main")
     def test_main_loads_relations_then_propagates(
         self,
         mock_load_relations: MagicMock,
         mock_propagate: MagicMock,
+        mock_logged_step: MagicMock,
     ) -> None:
-        task3_pipeline.main(
+        mock_logged_step.return_value.__enter__.return_value = None
+        graph_pipeline.main(
             [
                 "--db",
                 "stock_event_mining",
@@ -34,6 +37,8 @@ class Task3PipelineTests(unittest.TestCase):
                 "0.3",
                 "--canonical-map",
                 "output/event_canonical_map.csv",
+                "--run-id",
+                "graph_pipeline_run_1",
             ]
         )
 

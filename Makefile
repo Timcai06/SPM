@@ -83,54 +83,52 @@ FEATURE_TOKEN_ARG := --disable-tushare
 endif
 
 .PHONY: help \
-	companies-all standard-industries industries history classify-pending reclassify-source relink core-status core-pipeline \
-	backfill-cninfo-fulltext \
-	cluster-stats backfill-structured-features event-refresh export-yearly check-export-size \
-	collect link feature train status qa stats-import stats-load negatives \
-	profiles \
-	market-env \
-	sentiment \
-	delivery-status \
-	full full-with-stats backfill \
-	text market llm trial \
-	go r q c l f t s qa ds si sl n bf
+	company-universe standard-industries board-industries \
+	collect-live collect-history backfill-cninfo-fulltext \
+	events-run classify-pending reclassify-source \
+	linking-run link-events \
+	graph-run load-relations propagate \
+	cluster-stats backfill-event-features refresh-event-features export-yearly check-export-size \
+	db-summary research-base-pipeline \
+	research-feature research-train-samples research-negative-samples \
+	stats-import stats-load profiles-import profiles-load market-env sentiment-load \
+	quality-check quality-sample quality-summary delivery-status \
+	full full-with-market llm trial go
 
 help:
 	@echo "推荐入口："
-	@echo "  make core-pipeline       # 四张核心表流水线：采历史 -> 分类 -> 链接 -> 状态"
-	@echo "  make companies-all       # 扩 companies 到全A公司池"
-	@echo "  make standard-industries # 补 companies 一级标准行业（CNInfo/证监会口径）"
-	@echo "  make industries          # 补 companies 二级行业/概念标签（东方财富板块）"
-	@echo "  make history             # 历史采集 raw_documents（默认巨潮公告）"
+	@echo "  make research-base-pipeline # 历史采集 -> 分类 -> 链接 -> 数据库摘要"
+	@echo "  make company-universe       # 扩 companies 到全A公司池"
+	@echo "  make standard-industries    # 补 companies 一级标准行业（CNInfo/证监会口径）"
+	@echo "  make board-industries       # 补 companies 二级行业/概念标签（东方财富板块）"
+	@echo "  make collect-history        # 历史采集 raw_documents（默认巨潮公告）"
 	@echo "  make backfill-cninfo-fulltext # 用已有 raw_documents URL 回填巨潮正文"
-	@echo "  make classify-pending    # 分类未处理 raw_documents"
-	@echo "  make reclassify-source   # 重跑某个来源的分类规则"
-	@echo "  make event-refresh       # 一条命令串行跑 event 优化（重分类 -> 特征回填 -> 簇统计）"
-	@echo "  make relink              # 重跑 event_company_links，带进度"
-	@echo "  make cluster-stats       # 回填事件簇统计特征（报道量/分歧度等）"
-	@echo "  make backfill-structured-features # 回填结构化事件新增特征列"
-	@echo "  make export-yearly       # 按年导出 structured_events / event_company_links"
-	@echo "  make core-status         # 查看四张核心表规模与质量摘要"
+	@echo "  make events-run             # 实时采集 -> 事件标准化 -> 归并 -> 校验"
+	@echo "  make classify-pending       # 分类未处理 raw_documents"
+	@echo "  make reclassify-source      # 重跑某个来源的分类规则"
+	@echo "  make link-events            # 生成 event_company_links"
+	@echo "  make graph-run              # 导入公司关系并构建传播链接"
+	@echo "  make research-feature       # 事件研究 / 收益标签"
+	@echo "  make research-train-samples # 生成 event_research_samples"
+	@echo "  make research-negative-samples # 生成非事件负样本"
+	@echo "  make quality-summary        # 数据库质量摘要"
 	@echo ""
 	@echo "常用参数："
-	@echo "  make history HISTORY_SOURCE=akshare-news HISTORY_MAX_SYMBOLS=1000 HISTORY_OFFSET=0 HISTORY_LIMIT_PER_SYMBOL=20 HISTORY_WORKERS=12"
-	@echo "  make history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1 HISTORY_CNINFO_FULLTEXT_MAX_CHARS=12000"
+	@echo "  make collect-history HISTORY_SOURCE=akshare-news HISTORY_MAX_SYMBOLS=1000 HISTORY_OFFSET=0 HISTORY_LIMIT_PER_SYMBOL=20 HISTORY_WORKERS=12"
+	@echo "  make collect-history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1 HISTORY_CNINFO_FULLTEXT_MAX_CHARS=12000"
 	@echo "  make backfill-cninfo-fulltext CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01 CNINFO_BACKFILL_MAX_ROWS=5000 CNINFO_BACKFILL_OFFSET=0"
 	@echo "  make backfill-cninfo-fulltext CNINFO_BACKFILL_SHARD_COUNT=100 CNINFO_BACKFILL_SHARD_INDEX=0"
 	@echo "  make standard-industries STANDARD_INDUSTRY_MAX=200 STANDARD_INDUSTRY_OFFSET=0"
-	@echo "  make industries INDUSTRY_MAX=100 INDUSTRY_OFFSET=100"
+	@echo "  make board-industries INDUSTRY_MAX=100 INDUSTRY_OFFSET=100"
 	@echo "  make reclassify-source RECLASSIFY_SOURCE='巨潮资讯网/历史公告'"
-	@echo "  make event-refresh EVENT_START=2025-01-01 EVENT_END=2025-04-01 EVENT_ONLY_NEEDY=1 EVENT_LLM=1 EVENT_LOCAL_LLM_ONLY=1 RECLASSIFY_BATCH_SIZE=50 RECLASSIFY_MAX_BATCHES=0 EVENT_LLM_MAX_ROWS=50"
 	@echo ""
-	@echo "旧目标仍可用：collect link feature train status qa delivery-status stats-import stats-load market-env sentiment"
-	@echo ""
-	@echo "短别名：s=status ds=delivery-status l=relink"
+	@echo "常用组合：full full-with-market trial go"
 
-companies-all:
-	$(PY) src/cli/task2.py import-companies-all-a --db $(DB)
+company-universe:
+	$(PY) src/cli/linking.py import-companies-all-a --db $(DB)
 
 standard-industries:
-	$(PY) src/cli/task2.py import-company-standard-industries \
+	$(PY) src/cli/linking.py import-company-standard-industries \
 		--db $(DB) \
 		--max-symbols $(STANDARD_INDUSTRY_MAX) \
 		--offset $(STANDARD_INDUSTRY_OFFSET) \
@@ -143,16 +141,19 @@ standard-industries:
 		$(STANDARD_INDUSTRY_ONLY_DIRTY) \
 		$(STANDARD_INDUSTRY_SKIP_LEGACY)
 
-industries:
-	$(PY) src/cli/task2.py import-company-industries \
+board-industries:
+	$(PY) src/cli/linking.py import-company-industries \
 		--db $(DB) \
 		--max-industries $(INDUSTRY_MAX) \
 		--offset $(INDUSTRY_OFFSET) \
 		--sleep-sec $(INDUSTRY_SLEEP) \
 		--progress-every 20
 
-history:
-	$(PY) src/cli/task1.py collect-history \
+collect-live:
+	$(PY) src/cli/collect.py collect --limit $(LIMIT)
+
+collect-history:
+	$(PY) src/cli/collect.py collect-history \
 		--db $(DB) \
 		--source $(HISTORY_SOURCE) \
 		--symbol-source $(HISTORY_SYMBOL_SOURCE) \
@@ -169,7 +170,7 @@ history:
 		--cninfo-fulltext-max-chars $(HISTORY_CNINFO_FULLTEXT_MAX_CHARS)
 
 backfill-cninfo-fulltext:
-	$(PY) src/cli/task1.py backfill-cninfo-fulltext \
+	$(PY) src/cli/collect.py backfill-cninfo-fulltext \
 		--db $(DB) \
 		--source '$(CNINFO_BACKFILL_SOURCE)' \
 		--start-date $(CNINFO_BACKFILL_START) \
@@ -186,30 +187,45 @@ backfill-cninfo-fulltext:
 		--db-flush-every $(CNINFO_BACKFILL_DB_FLUSH_EVERY) \
 		--fulltext-max-chars $(CNINFO_BACKFILL_MAX_CHARS)
 
+events-run:
+	$(PY) src/cli/events.py run --limit $(LIMIT) --skip-validate --db $(DB)
+
 classify-pending:
-	$(PY) src/cli/task1.py classify-pending \
+	$(PY) src/cli/events.py classify-pending \
 		--db $(DB) \
 		--batch-size $(CLASSIFY_BATCH_SIZE) \
 		--max-batches $(CLASSIFY_MAX_BATCHES)
 
 reclassify-source:
-	$(PY) src/cli/task1.py reclassify-source \
+	$(PY) src/cli/events.py reclassify-source \
 		--db $(DB) \
 		--source '$(RECLASSIFY_SOURCE)' \
 		--batch-size $(RECLASSIFY_BATCH_SIZE) \
 		--max-batches $(RECLASSIFY_MAX_BATCHES)
 
-relink:
-	$(PY) src/cli/task2.py link-events \
+linking-run:
+	$(PY) src/cli/linking.py run --db $(DB) --top-k $(TOP_K) --min-score $(MIN_SCORE)
+
+link-events:
+	$(PY) src/cli/linking.py link-events \
 		--db $(DB) \
 		--top-k $(TOP_K) \
 		--min-score $(MIN_SCORE) \
 		--progress-every $(LINK_PROGRESS_EVERY)
 
+load-relations:
+	$(PY) src/cli/graph.py load-relations --db $(DB) --input output/seeds/company_relations_seed.csv
+
+propagate:
+	$(PY) src/cli/graph.py propagate --db $(DB) --min-source-score $(MIN_SCORE) --min-propagation-score 0.20
+
+graph-run:
+	$(PY) src/cli/graph.py run --db $(DB) --input output/seeds/company_relations_seed.csv --min-source-score $(MIN_SCORE) --min-propagation-score 0.20
+
 cluster-stats:
 	$(PY) src/modules/events/jobs/cluster_stats_job.py --db $(DB)
 
-backfill-structured-features:
+backfill-event-features:
 	$(PY) src/modules/events/jobs/backfill_structured_features_job.py \
 		--db $(DB) \
 		--batch-size $(RECLASSIFY_BATCH_SIZE) \
@@ -223,13 +239,13 @@ backfill-structured-features:
 		--llm-confidence-threshold $(EVENT_LLM_CONFIDENCE_THRESHOLD) \
 		--llm-progress-every $(EVENT_LLM_PROGRESS_EVERY)
 
-event-refresh:
-	$(PY) src/cli/task1.py reclassify-source \
+refresh-event-features:
+	$(PY) src/cli/events.py reclassify-source \
 		--db $(DB) \
 		--source '$(RECLASSIFY_SOURCE)' \
 		--batch-size $(RECLASSIFY_BATCH_SIZE) \
 		--max-batches $(RECLASSIFY_MAX_BATCHES)
-	$(MAKE) backfill-structured-features \
+	$(MAKE) backfill-event-features \
 		DB=$(DB) \
 		RECLASSIFY_BATCH_SIZE=$(RECLASSIFY_BATCH_SIZE) \
 		RECLASSIFY_MAX_BATCHES=$(RECLASSIFY_MAX_BATCHES) \
@@ -265,97 +281,62 @@ check-export-size:
 		fi; \
 	done
 
-core-status:
+db-summary:
 	psql -d $(DB) -c "select 'companies' as table_name, count(*) as rows from companies union all select 'raw_documents', count(*) from raw_documents union all select 'structured_events', count(*) from structured_events union all select 'event_company_links', count(*) from event_company_links order by table_name;"
 	psql -d $(DB) -c "select count(*) as events, count(*) filter (where event_subject_subtype='未细分') as unrefined_subtype, count(*) filter (where subject_entities='[]'::jsonb) as empty_entities from structured_events;"
 	psql -d $(DB) -c "select count(*) as links, count(distinct structured_event_id) as linked_events, count(distinct company_id) as linked_companies, count(*) filter (where link_type='direct_match') as direct_links, count(*) filter (where link_type='industry_match') as industry_links, round(avg(final_link_score)::numeric, 4) as avg_score from event_company_links;"
 
-core-pipeline: history classify-pending relink core-status
+research-base-pipeline: collect-history classify-pending link-events db-summary
 
-collect:
-	$(PY) src/cli/task1.py run --limit $(LIMIT) --skip-validate --db $(DB)
+research-feature:
+	$(PY) src/cli/research.py feature --db $(DB) --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --time-budget-sec $(TIME_BUDGET) --max-rows $(MAX_ROWS) --api-timeout-sec $(API_TIMEOUT) --progress-every $(PROGRESS_EVERY) $(FEATURE_TOKEN_ARG)
 
-link: relink
-
-feature:
-	$(PY) src/cli/task1.py feature --db $(DB) --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --time-budget-sec $(TIME_BUDGET) --max-rows $(MAX_ROWS) --api-timeout-sec $(API_TIMEOUT) --progress-every $(PROGRESS_EVERY) $(FEATURE_TOKEN_ARG)
-
-train:
-	$(PY) src/cli/task1.py train-samples \
+research-train-samples:
+	$(PY) src/cli/research.py train-samples \
 		--db $(DB) \
 		--min-link-score $(MIN_SCORE) \
-		--label-dataset output/task1_event_return_dataset.csv
+		--label-dataset output/event_return_dataset.csv
 
-status:
-	$(PY) src/cli/task1.py db-status --db $(DB)
-
-qa:
-	$(PY) src/cli/task1.py qa --db $(DB)
-
-delivery-status:
-	$(PY) src/cli/task1.py delivery-status --db $(DB)
+research-negative-samples:
+	$(PY) src/cli/research.py build-negative-samples --db $(DB) --max-per-day $(NEG_MAX_PER_DAY)
 
 stats-import:
-	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(DAYS) --max-symbols $(STATS_MAX_SYMBOLS) --max-rows $(STATS_MAX_ROWS) --tushare-token-file $(TOKEN_FILE)
+	$(PY) src/cli/linking.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(DAYS) --max-symbols $(STATS_MAX_SYMBOLS) --max-rows $(STATS_MAX_ROWS) --tushare-token-file $(TOKEN_FILE)
 
 stats-load:
-	$(PY) src/cli/task2.py load-company-stats --db $(DB)
-
-negatives:
-	$(PY) src/cli/task2.py build-negative-samples --db $(DB) --max-per-day $(NEG_MAX_PER_DAY)
-
-full: collect link sentiment feature train status
-
-full-with-stats: full stats-import stats-load profiles market-env negatives status
-
-text: full
+	$(PY) src/cli/linking.py load-company-stats --db $(DB)
 
 profiles-import:
-	$(PY) src/cli/task2.py import-company-profiles --db $(DB)
+	$(PY) src/cli/linking.py import-company-profiles --db $(DB)
 
-profiles:
-	$(PY) src/cli/task2.py load-company-profiles --db $(DB)
+profiles-load:
+	$(PY) src/cli/linking.py load-company-profiles --db $(DB)
 
 market-env:
-	$(PY) src/cli/task2.py load-market-environment --db $(DB)
+	$(PY) src/cli/linking.py load-market-environment --db $(DB)
 
-sentiment:
-	$(PY) src/cli/task2.py load-sentiment-propagation --db $(DB)
+sentiment-load:
+	$(PY) src/cli/linking.py load-sentiment-propagation --db $(DB)
 
-market: stats-import stats-load profiles market-env sentiment qa
+quality-check:
+	$(PY) src/cli/quality.py check
+
+quality-sample:
+	$(PY) src/cli/quality.py quality --sample-size 50
+
+quality-summary:
+	$(PY) src/cli/quality.py qa --db $(DB)
+
+delivery-status:
+	$(PY) src/cli/quality.py delivery-status --db $(DB)
+
+full: events-run link-events sentiment-load research-feature research-train-samples db-summary
+
+full-with-market: full stats-import stats-load profiles-load market-env research-negative-samples db-summary
 
 llm:
-	$(PY) src/cli/task1.py classify --db $(DB) --use-llm --llm-max-rows 10 --skip-db-load
+	$(PY) src/cli/events.py classify --db $(DB) --use-llm --llm-max-rows 10 --skip-db-load
 
-trial: full stats-import stats-load profiles market-env qa
+trial: full stats-import stats-load profiles-load market-env quality-summary
 
-backfill:
-	@echo "[backfill] rounds=$(BACKFILL_ROUNDS), limit=$(BACKFILL_LIMIT), max_rows=$(BACKFILL_MAX_ROWS)"
-	@i=1; while [ $$i -le $(BACKFILL_ROUNDS) ]; do \
-		echo "[backfill] round $$i/$(BACKFILL_ROUNDS)"; \
-		$(PY) src/cli/task1.py run --limit $(BACKFILL_LIMIT) --skip-validate --db $(DB); \
-		i=$$((i+1)); \
-	done
-	$(PY) src/cli/task2.py run --db $(DB) --top-k $(TOP_K) --min-score $(MIN_SCORE)
-	$(PY) src/cli/task1.py feature --db $(DB) --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --time-budget-sec $(TIME_BUDGET) --max-rows $(BACKFILL_MAX_ROWS) --api-timeout-sec $(API_TIMEOUT) --progress-every $(PROGRESS_EVERY) $(FEATURE_TOKEN_ARG)
-	$(PY) src/cli/task1.py train-samples --db $(DB) --min-link-score $(MIN_SCORE) --label-dataset output/task1_event_return_dataset.csv
-	$(PY) src/cli/task2.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(BACKFILL_DAYS) --max-symbols $(BACKFILL_STATS_MAX_SYMBOLS) --max-rows $(STATS_MAX_ROWS) --tushare-token-file $(TOKEN_FILE)
-	$(PY) src/cli/task2.py load-company-stats --db $(DB)
-	$(PY) src/cli/task2.py build-negative-samples --db $(DB) --max-per-day $(NEG_MAX_PER_DAY)
-	$(PY) src/cli/task2.py load-sentiment-propagation --db $(DB)
-	$(PY) src/cli/task1.py qa --db $(DB)
-
-# Short aliases
 go: full
-r: full-with-stats
-q: collect status
-c: collect
-l: link
-f: feature
-t: train
-s: status
-ds: delivery-status
-si: stats-import
-sl: stats-load
-n: negatives
-bf: backfill

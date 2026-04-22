@@ -34,26 +34,35 @@ This AGENTS.md scopes guidance to `股市预测模型`. Parent AGENTS guidance s
 - Primary stack: Python CLI pipelines under `src/` plus PostgreSQL SQL assets under `sql/`.
 - Default database name is `stock_event_mining`; prefer passing `--db stock_event_mining` unless the user specifies otherwise.
 - Prefer the repo entrypoints over ad hoc module execution:
-  - `./atk go`
+  - `./atk help`
+  - `./atk workflow full`
+  - `./atk collect history`
+  - `./atk research feature`
   - `make go`
   - `make trial`
-  - `python3 src/cli/task1.py ...`
-  - `python3 src/cli/task2.py ...`
-  - `python3 src/cli/task3.py ...`
+  - `python3 src/cli/collect.py ...`
+  - `python3 src/cli/events.py ...`
+  - `python3 src/cli/linking.py ...`
+  - `python3 src/cli/graph.py ...`
+  - `python3 src/cli/research.py ...`
+  - `python3 src/cli/quality.py ...`
 - Start exploration from `README.md`, `Makefile`, and the relevant file under `src/cli/` before editing lower-level capabilities.
 - Treat `.secrets/` as local-only inputs. Never print token contents, never commit secrets, and avoid overwriting token files.
 - Treat `output/` and `env/` as runtime artifacts unless the task is explicitly about generated data or environment files.
 - When changing pipeline behavior, verify with the smallest relevant command first:
-  - `python3 src/cli/task1.py --help`
-  - `python3 src/cli/task2.py --help`
-  - `python3 src/cli/task3.py --help`
+  - `python3 src/cli/collect.py --help`
+  - `python3 src/cli/events.py --help`
+  - `python3 src/cli/linking.py --help`
+  - `python3 src/cli/graph.py --help`
+  - `python3 src/cli/research.py --help`
+  - `python3 src/cli/quality.py --help`
   - `make help`
-- For task-1 workflow changes, prefer validating in this order:
-  - `python3 src/cli/task1.py classify --skip-db-load`
-  - `python3 src/cli/task1.py canonicalize`
-  - `python3 src/cli/task1.py check`
+- For event-normalization changes, prefer validating in this order:
+  - `python3 src/cli/events.py classify --skip-db-load`
+  - `python3 src/cli/events.py canonicalize`
+  - `python3 src/cli/quality.py check`
 - For end-to-end smoke tests, prefer bounded runs such as:
-  - `python3 src/cli/task1.py run --limit 5 --skip-validate --db stock_event_mining`
-  - `python3 src/cli/task2.py run --db stock_event_mining --top-k 3 --min-score 0.35`
+  - `python3 src/cli/events.py run --limit 5 --skip-validate --db stock_event_mining`
+  - `python3 src/cli/linking.py run --db stock_event_mining --top-k 3 --min-score 0.35`
 - If a task requires DB inspection, prefer `psql -d stock_event_mining -c ...` with read-only queries unless the user asked for schema/data changes.
 <!-- OMX:AGENTS-INIT:MANUAL:END -->

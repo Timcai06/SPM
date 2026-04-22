@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parser helpers for Task 2 CLI."""
+"""Parser helpers for company and event-linking commands."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import argparse
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Task 2 command entrypoint.")
+    parser = argparse.ArgumentParser(description="Company master-data and event-linking entrypoint.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run_parser = sub.add_parser("run", help="load companies and generate links")
@@ -148,14 +148,4 @@ def build_parser() -> argparse.ArgumentParser:
     link_parser.add_argument("--canonical-map", default="output/event_canonical_map.csv")
     link_parser.add_argument("--progress-every", type=int, default=250)
 
-    negative_parser = sub.add_parser(
-        "build-negative-samples",
-        help="build non-event training samples",
-    )
-    negative_parser.add_argument("--db", default="stock_event_mining")
-    negative_parser.add_argument("--start-date", default="")
-    negative_parser.add_argument("--end-date", default="")
-    negative_parser.add_argument("--max-per-day", type=int, default=100)
-    negative_parser.add_argument("--min-link-score", type=float, default=0.35)
-    negative_parser.add_argument("--run-id", default="")
     return parser

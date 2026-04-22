@@ -11,11 +11,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from cli import task2
-from cli.task2_parser import build_parser
+from cli import linking
+from cli.linking_parser import build_parser
 
 
-class Task2CliTests(unittest.TestCase):
+class LinkingCliTests(unittest.TestCase):
     def test_parser_supports_link_events_defaults(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["link-events"])
@@ -23,26 +23,28 @@ class Task2CliTests(unittest.TestCase):
         self.assertEqual(args.top_k, 3)
         self.assertEqual(args.min_score, 0.35)
 
-    @patch.dict("cli.task2.COMMAND_HANDLERS", {"run": MagicMock()})
-    @patch("cli.task2.parse_args")
+    @patch.dict("cli.linking.COMMAND_HANDLERS", {"run": MagicMock()})
+    @patch("cli.linking.parse_args")
     def test_main_dispatches_via_command_handlers(self, mock_parse_args: MagicMock) -> None:
         args = MagicMock()
         args.command = "run"
         mock_parse_args.return_value = args
 
-        task2.main()
+        linking.main()
 
-        task2.COMMAND_HANDLERS["run"].assert_called_once_with(args)
+        linking.COMMAND_HANDLERS["run"].assert_called_once_with(args)
 
-    @patch("cli.task2.task2_pipeline.main")
-    def test_run_handler_calls_pipeline_with_explicit_argv(self, mock_pipeline_main: MagicMock) -> None:
+    @patch("cli.linking.logged_run")
+    @patch("cli.linking.linking_pipeline.main")
+    def test_run_handler_calls_pipeline_with_explicit_argv(self, mock_pipeline_main: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "link_run_1"
         args = MagicMock()
         args.db = "stock_event_mining"
         args.top_k = 3
         args.min_score = 0.35
         args.canonical_map = "output/event_canonical_map.csv"
 
-        task2.run_pipeline_command(args)
+        linking.run_pipeline_command(args)
 
         mock_pipeline_main.assert_called_once_with(
             [
@@ -54,11 +56,15 @@ class Task2CliTests(unittest.TestCase):
                 "0.35",
                 "--canonical-map",
                 "output/event_canonical_map.csv",
+                "--run-id",
+                "link_run_1",
             ]
         )
 
-    @patch("cli.task2.relink_job.main")
-    def test_link_events_handler_calls_job_with_explicit_argv(self, mock_relink_main: MagicMock) -> None:
+    @patch("cli.linking.logged_run")
+    @patch("cli.linking.relink_job.main")
+    def test_link_events_handler_calls_job_with_explicit_argv(self, mock_relink_main: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "link_run_2"
         args = MagicMock()
         args.db = "stock_event_mining"
         args.top_k = 5
@@ -66,7 +72,7 @@ class Task2CliTests(unittest.TestCase):
         args.canonical_map = "output/event_canonical_map.csv"
         args.progress_every = 200
 
-        task2.run_link_events_command(args)
+        linking.run_link_events_command(args)
 
         mock_relink_main.assert_called_once_with(
             [
@@ -83,8 +89,10 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.import_companies_job.main")
-    def test_import_companies_all_a_handler_calls_job_with_explicit_argv(self, mock_import_main: MagicMock) -> None:
+    @patch("cli.linking.logged_run")
+    @patch("cli.linking.import_companies_job.main")
+    def test_import_companies_all_a_handler_calls_job_with_explicit_argv(self, mock_import_main: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "link_run_3"
         task2_args = MagicMock()
         task2_args.command = "import-companies-all-a"
         task2_args.db = "stock_event_mining"
@@ -92,8 +100,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.offset = 20
         task2_args.lock_timeout_sec = 120
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_import_main.assert_called_once_with(
             [
@@ -108,7 +116,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.import_companies_tushare_job.main")
+    @patch("cli.linking.import_companies_tushare_job.main")
     def test_import_companies_handler_calls_legacy_main_with_explicit_argv(self, mock_tushare_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "import-companies"
@@ -116,8 +124,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.tushare_token = "token"
         task2_args.tushare_token_file = ""
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_tushare_main.assert_called_once_with(
             [
@@ -128,8 +136,10 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.board_industries_job.main")
-    def test_import_company_industries_handler_calls_job_with_explicit_argv(self, mock_board_main: MagicMock) -> None:
+    @patch("cli.linking.logged_run")
+    @patch("cli.linking.board_industries_job.main")
+    def test_import_company_industries_handler_calls_job_with_explicit_argv(self, mock_board_main: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "link_run_4"
         task2_args = MagicMock()
         task2_args.command = "import-company-industries"
         task2_args.db = "stock_event_mining"
@@ -139,8 +149,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.progress_every = 20
         task2_args.lock_timeout_sec = 120
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_board_main.assert_called_once_with(
             [
@@ -159,8 +169,10 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.standard_industries_job.main")
-    def test_import_standard_industries_handler_calls_job_with_explicit_argv(self, mock_standard_main: MagicMock) -> None:
+    @patch("cli.linking.logged_run")
+    @patch("cli.linking.standard_industries_job.main")
+    def test_import_standard_industries_handler_calls_job_with_explicit_argv(self, mock_standard_main: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "link_run_5"
         task2_args = MagicMock()
         task2_args.command = "import-company-standard-industries"
         task2_args.db = "stock_event_mining"
@@ -176,8 +188,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.only_dirty = True
         task2_args.skip_legacy = True
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_standard_main.assert_called_once()
         argv = mock_standard_main.call_args.args[0]
@@ -185,33 +197,37 @@ class Task2CliTests(unittest.TestCase):
         self.assertIn("--skip-legacy", argv)
         self.assertNotIn("import_company_standard_industries_akshare.py", argv)
 
-    @patch("cli.task2.load_companies_job.main")
-    def test_load_companies_handler_calls_legacy_main_with_explicit_argv(self, mock_load_main: MagicMock) -> None:
+    @patch("cli.linking.logged_run")
+    @patch("cli.linking.load_companies_job.main")
+    def test_load_companies_handler_calls_legacy_main_with_explicit_argv(self, mock_load_main: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "link_run_6"
         task2_args = MagicMock()
         task2_args.command = "load-companies"
         task2_args.db = "stock_event_mining"
         task2_args.input = "output/seeds/companies_seed.csv"
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_load_main.assert_called_once_with(
             ["--db", "stock_event_mining", "--input", "output/seeds/companies_seed.csv"]
         )
 
-    @patch("cli.task2.import_companies_public_job.main")
+    @patch("cli.linking.import_companies_public_job.main")
     def test_import_companies_public_handler_calls_legacy_main_with_explicit_argv(self, mock_public_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "import-companies-public"
         task2_args.output = "output/seeds/companies_public.csv"
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_public_main.assert_called_once_with(["--output", "output/seeds/companies_public.csv"])
 
-    @patch("cli.task2.import_profiles_job.main")
-    def test_import_company_profiles_handler_calls_job_with_explicit_argv(self, mock_profiles_main: MagicMock) -> None:
+    @patch("cli.linking.logged_run")
+    @patch("cli.linking.import_profiles_job.main")
+    def test_import_company_profiles_handler_calls_job_with_explicit_argv(self, mock_profiles_main: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "link_run_7"
         task2_args = MagicMock()
         task2_args.command = "import-company-profiles"
         task2_args.db = "stock_event_mining"
@@ -222,8 +238,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.progress_every = 10
         task2_args.with_holders = True
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_profiles_main.assert_called_once_with(
             [
@@ -243,8 +259,10 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.import_stats_job.run_tushare")
-    def test_import_company_stats_tushare_handler_calls_job_with_explicit_argv(self, mock_run_tushare: MagicMock) -> None:
+    @patch("cli.linking.logged_run")
+    @patch("cli.linking.import_stats_job.run_tushare")
+    def test_import_company_stats_tushare_handler_calls_job_with_explicit_argv(self, mock_run_tushare: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "link_run_8"
         task2_args = MagicMock()
         task2_args.command = "import-company-stats"
         task2_args.source = "tushare"
@@ -264,8 +282,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.tushare_token = "token"
         task2_args.tushare_token_file = ""
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_run_tushare.assert_called_once_with(
             [
@@ -284,7 +302,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.import_stats_job.run_akshare")
+    @patch("cli.linking.import_stats_job.run_akshare")
     def test_import_company_stats_akshare_handler_calls_job_with_explicit_argv(self, mock_run_akshare: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "import-company-stats"
@@ -305,8 +323,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.tushare_token = ""
         task2_args.tushare_token_file = ""
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_run_akshare.assert_called_once_with(
             [
@@ -336,7 +354,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.import_stats_local_job.main")
+    @patch("cli.linking.import_stats_local_job.main")
     def test_import_company_stats_local_handler_calls_job_with_explicit_argv(self, mock_local_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "import-company-stats-local"
@@ -344,8 +362,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.output = "company_stats.csv"
         task2_args.quotes_output = "stock_daily_quotes.csv"
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_local_main.assert_called_once_with(
             [
@@ -358,7 +376,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.load_stats_job.main")
+    @patch("cli.linking.load_stats_job.main")
     def test_load_company_stats_handler_calls_job_with_explicit_argv(self, mock_load_stats_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "load-company-stats"
@@ -366,8 +384,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.input = "company_stats.csv"
         task2_args.quotes_input = "stock_daily_quotes.csv"
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_load_stats_main.assert_called_once_with(
             [
@@ -380,7 +398,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.load_profiles_job.main")
+    @patch("cli.linking.load_profiles_job.main")
     def test_load_company_profiles_handler_calls_job_with_explicit_argv(self, mock_load_profiles_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "load-company-profiles"
@@ -389,8 +407,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.input = "company_profiles_seed.csv"
         task2_args.lock_timeout_sec = 120
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_load_profiles_main.assert_called_once_with(
             [
@@ -405,7 +423,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.load_market_environment_job.main")
+    @patch("cli.linking.load_market_environment_job.main")
     def test_load_market_environment_handler_calls_legacy_main_with_explicit_argv(self, mock_market_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "load-market-environment"
@@ -415,8 +433,8 @@ class Task2CliTests(unittest.TestCase):
         task2_args.timeout_sec = 12.0
         task2_args.lock_timeout_sec = 120
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_market_main.assert_called_once_with(
             [
@@ -433,7 +451,7 @@ class Task2CliTests(unittest.TestCase):
             ]
         )
 
-    @patch("cli.task2.load_sentiment_propagation_job.main")
+    @patch("cli.linking.load_sentiment_propagation_job.main")
     def test_load_sentiment_propagation_handler_calls_legacy_main_with_explicit_argv(self, mock_sentiment_main: MagicMock) -> None:
         task2_args = MagicMock()
         task2_args.command = "load-sentiment-propagation"
@@ -441,44 +459,12 @@ class Task2CliTests(unittest.TestCase):
         task2_args.lock_timeout_sec = 120
         task2_args.quiet = True
 
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
+        with patch("cli.linking.parse_args", return_value=task2_args):
+            linking.main()
 
         mock_sentiment_main.assert_called_once_with(
             ["--db", "stock_event_mining", "--lock-timeout-sec", "120", "--quiet"]
         )
-
-    @patch("cli.task2.negative_samples_job.main")
-    def test_build_negative_samples_handler_calls_job_with_explicit_argv(self, mock_negative_samples_main: MagicMock) -> None:
-        task2_args = MagicMock()
-        task2_args.command = "build-negative-samples"
-        task2_args.db = "stock_event_mining"
-        task2_args.start_date = "2025-01-01"
-        task2_args.end_date = "2025-12-31"
-        task2_args.max_per_day = 50
-        task2_args.min_link_score = 0.35
-        task2_args.run_id = "run_1"
-
-        with patch("cli.task2.parse_args", return_value=task2_args):
-            task2.main()
-
-        mock_negative_samples_main.assert_called_once_with(
-            [
-                "--db",
-                "stock_event_mining",
-                "--start-date",
-                "2025-01-01",
-                "--end-date",
-                "2025-12-31",
-                "--max-per-day",
-                "50",
-                "--min-link-score",
-                "0.35",
-                "--run-id",
-                "run_1",
-            ]
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

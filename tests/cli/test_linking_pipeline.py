@@ -12,18 +12,25 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from pipelines import task2 as task2_pipeline
+from pipelines import linking as linking_pipeline
 
 
-class Task2PipelineTests(unittest.TestCase):
-    @patch("pipelines.task2.relink_job.main")
-    @patch("pipelines.task2.load_companies_job.main")
-    def test_main_loads_seed_then_links(self, mock_load_companies: MagicMock, mock_relink: MagicMock) -> None:
+class LinkingPipelineTests(unittest.TestCase):
+    @patch("pipelines.linking.logged_step")
+    @patch("pipelines.linking.relink_job.main")
+    @patch("pipelines.linking.load_companies_job.main")
+    def test_main_loads_seed_then_links(
+        self,
+        mock_load_companies: MagicMock,
+        mock_relink: MagicMock,
+        mock_logged_step: MagicMock,
+    ) -> None:
+        mock_logged_step.return_value.__enter__.return_value = None
         with tempfile.TemporaryDirectory() as tmpdir:
             seed_path = Path(tmpdir) / "companies_seed.csv"
             seed_path.write_text("ts_code,company_name\n000001.SZ,平安银行\n", encoding="utf-8")
 
-            task2_pipeline.main(
+            linking_pipeline.main(
                 [
                     "--db",
                     "stock_event_mining",
@@ -35,6 +42,8 @@ class Task2PipelineTests(unittest.TestCase):
                     "0.4",
                     "--canonical-map",
                     "output/event_canonical_map.csv",
+                    "--run-id",
+                    "link_pipeline_run_1",
                 ]
             )
 

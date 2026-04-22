@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parser helpers for Task 3 CLI."""
+"""Parser helpers for graph and propagation commands."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import argparse
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Task 3 command entrypoint.")
+    parser = argparse.ArgumentParser(description="Graph-relation and propagation entrypoint.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run_parser = sub.add_parser("run", help="load graph edges and build propagation links")

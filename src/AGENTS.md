@@ -22,8 +22,8 @@ This AGENTS.md scopes guidance to `股市预测模型/src`. Parent AGENTS guidan
 
 <!-- OMX:AGENTS-INIT:MANUAL:START -->
 ## Local Notes
-- `cli/` is the main user-facing surface. Preserve CLI compatibility unless the user explicitly approves breaking changes.
-- `pipelines/` should orchestrate existing capabilities; keep business logic in `capabilities/` rather than growing `pipelines/`.
-- Before editing a capability module, inspect the corresponding `src/cli/task*.py` entrypoint and any downstream SQL/output contract it depends on.
+- `cli/` is the main user-facing surface and now uses domain entrypoints (`collect.py`, `events.py`, `linking.py`, `graph.py`, `research.py`, `quality.py`).
+- `pipelines/` should orchestrate module jobs and services; keep business logic in `modules/` rather than growing `pipelines/`.
+- Before editing a lower-level module, inspect the corresponding domain CLI entrypoint and any downstream SQL/output contract it depends on.
 - Prefer narrow verification against the touched workflow instead of running every pipeline.
 <!-- OMX:AGENTS-INIT:MANUAL:END -->
