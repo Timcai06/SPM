@@ -20,15 +20,30 @@
 ## 一、项目全景
 
 ```mermaid
-flowchart LR
-    A["上游数据源<br/>CNInfo / AKShare / 公共资讯"] --> B["collectors<br/>采集 / 历史回填 / 正文回填"]
-    B --> C["raw_documents<br/>原始事实层"]
-    C --> D["events<br/>候选事件 / 结构化事件 / canonical 聚类"]
-    D --> E["linking<br/>事件-公司关联"]
-    E --> F["graph<br/>公司关系 / 事件传播"]
-    F --> G["analysis / research<br/>特征、标签、训练样本"]
-    G --> H["quality / delivery<br/>质量检查 / 交付检查"]
-    C -. lineage .-> I["etl_runs / etl_run_steps / dataset_versions"]
+flowchart TD
+    subgraph S["上游数据源"]
+        A1["CNInfo"]
+        A2["AKShare"]
+        A3["公共资讯"]
+    end
+
+    subgraph P["主处理链路"]
+        B["collectors<br/>采集 / 回填"]
+        C["raw_documents"]
+        D["events<br/>候选 / 结构化 / canonical"]
+        E["linking"]
+        F["graph"]
+        G["analysis / research"]
+        H["quality / delivery"]
+    end
+
+    I["run metadata<br/>etl_runs / etl_run_steps / dataset_versions"]
+
+    A1 --> B
+    A2 --> B
+    A3 --> B
+    B --> C --> D --> E --> F --> G --> H
+    C -. lineage .-> I
     D -. lineage .-> I
     G -. lineage .-> I
 ```
