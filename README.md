@@ -118,14 +118,21 @@ pie title 2025-2026 巨潮正文覆盖率
 
 ```mermaid
 flowchart TD
-    A["CLI 层<br/>src/cli/*.py"] --> B["Job 层<br/>modules/*/jobs"]
-    B --> C["Service 层<br/>modules/*/services"]
-    C --> D["Domain 层<br/>modules/*/domain"]
-    C --> E["Adapter 层<br/>modules/*/adapters"]
-    E --> F["PostgreSQL / 外部 API / 文件系统"]
-    G["pipelines/*"] --> B
+    A["CLI<br/>src/cli/*.py"]
+    B["jobs"]
+    C["services"]
+    D["domain"]
+    E["adapters"]
+    F["外部边界<br/>PostgreSQL / API / 文件系统"]
+    G["pipelines"]
+    H["runtime services<br/>run metadata / lineage"]
+
+    A --> B --> C
+    C --> D
+    C --> E --> F
+    G --> B
     G --> C
-    H["runtime metadata"] --> F
+    H --> F
 ```
 
 ### 2. 领域模块
@@ -160,12 +167,24 @@ flowchart TD
 ### 1. 当前正式协作模式
 
 ```mermaid
-flowchart LR
-    A["Intel Mac<br/>run 分支<br/>采集 / 回填 / 长任务"] -->|TCP 直连 PostgreSQL| B["M5 Pro<br/>PostgreSQL 主库"]
-    C["M5 Pro<br/>dev 分支<br/>开发 / 清洗 / 研究 / 训练"] -->|本机读写| B
-    A -->|git fetch / reset| D["origin/run"]
-    C -->|git push| E["origin/dev"]
-    C -->|发布稳定运行代码| D
+flowchart TD
+    subgraph M5["M5 Pro"]
+        A["dev 分支<br/>开发 / 清洗 / 研究 / 训练"]
+        B["PostgreSQL 主库"]
+    end
+
+    subgraph Intel["Intel Mac"]
+        C["run 分支<br/>采集 / 历史回填 / 正文回填"]
+    end
+
+    D["origin/dev"]
+    E["origin/run"]
+
+    A -->|本机读写| B
+    C -->|TCP 直连| B
+    A -->|git push| D
+    A -->|发布运行代码| E
+    C -->|git fetch / reset| E
 ```
 
 ### 2. 职责边界
@@ -178,15 +197,12 @@ flowchart LR
 ### 3. Git 工作流
 
 ```mermaid
-gitGraph
-   commit id: "稳定基线"
-   branch dev
-   checkout dev
-   commit id: "功能开发"
-   commit id: "环境修复"
-   branch run
-   checkout run
-   commit id: "同步到运行线"
+flowchart TD
+    A["dev<br/>开发线"] --> B["提交功能与修复"]
+    B --> C["验证通过"]
+    C --> D["同步到 run"]
+    D --> E["run<br/>Intel 运行线"]
+    E --> F["采集 / 回填 / 长任务"]
 ```
 
 实际约束是：
