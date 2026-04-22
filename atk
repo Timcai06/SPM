@@ -14,12 +14,14 @@ Primary groups:
   linking   run | link-events | company-universe | standard-industries | board-industries | stats-import | stats-load | profiles-import | profiles-load | market-env | sentiment-load
   graph     run | load-relations | propagate
   research  feature | train-samples | negative-samples
-  quality   summary | check | sample | delivery-status | db
+  quality   summary | check | sample | delivery-status | db | storage-audit | clean-stage
 
 Shortcuts:
   full                  -> workflow full
   trial                 -> workflow trial
   db                    -> quality db
+  storage               -> quality storage-audit
+  clean-stage           -> quality clean-stage
   quality               -> quality summary
   collect-live          -> collect live
   collect-history       -> collect history
@@ -51,6 +53,8 @@ Examples:
   ./atk events run DB=stock_event_mining LIMIT=20
   ./atk research feature TIME_BUDGET=300 MAX_ROWS=200
   ./atk quality db DB=stock_event_mining
+  ./atk quality storage-audit DB=stock_event_mining
+  ./atk quality clean-stage DB=stock_event_mining --yes
 EOF
 }
 
@@ -75,7 +79,7 @@ is_group_command() {
     linking:run|linking:link-events|linking:company-universe|linking:standard-industries|linking:board-industries|linking:stats-import|linking:stats-load|linking:profiles-import|linking:profiles-load|linking:market-env|linking:sentiment-load) return 0 ;;
     graph:run|graph:load-relations|graph:propagate) return 0 ;;
     research:feature|research:train-samples|research:negative-samples) return 0 ;;
-    quality:summary|quality:check|quality:sample|quality:delivery-status|quality:db) return 0 ;;
+    quality:summary|quality:check|quality:sample|quality:delivery-status|quality:db|quality:storage|quality:storage-audit|quality:clean-stage) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -85,6 +89,8 @@ resolve_shortcut() {
     full) echo "workflow full" ;;
     trial) echo "workflow trial" ;;
     db) echo "quality db" ;;
+    storage) echo "quality storage-audit" ;;
+    clean-stage) echo "quality clean-stage" ;;
     quality) echo "quality summary" ;;
     collect-live) echo "collect live" ;;
     collect-history) echo "collect history" ;;
@@ -187,6 +193,8 @@ case "$group:$command" in
   quality:sample) dispatch_make quality-sample "$@" ;;
   quality:delivery-status) dispatch_make delivery-status "$@" ;;
   quality:db) dispatch_make db-summary "$@" ;;
+  quality:storage|quality:storage-audit) dispatch_make db-storage-audit "$@" ;;
+  quality:clean-stage) dispatch_make db-stage-clean "$@" ;;
 
   *)
     echo "Unknown command: $group $command" >&2

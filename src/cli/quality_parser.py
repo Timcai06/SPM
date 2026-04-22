@@ -27,9 +27,16 @@ def build_parser() -> argparse.ArgumentParser:
     qa_parser.add_argument("--collector-report", default=str(DEFAULT_COLLECTOR_REPORT))
     qa_parser.add_argument("--feature-report", default=str(DEFAULT_FEATURE_REPORT))
 
+    storage_parser = sub.add_parser("storage-audit", help="show database storage footprint")
+    storage_parser.add_argument("--db", default="stock_event_mining")
+
+    clean_stage_parser = sub.add_parser("clean-stage", help="truncate rebuildable stage tables")
+    clean_stage_parser.add_argument("--db", default="stock_event_mining")
+    clean_stage_parser.add_argument("--lock-timeout-sec", type=int, default=120)
+    clean_stage_parser.add_argument("--yes", action="store_true")
+
     delivery_parser = sub.add_parser("delivery-status", help="check formal data-delivery table readiness")
     delivery_parser.add_argument("--db", default="stock_event_mining")
     delivery_parser.add_argument("--output", default="")
     delivery_parser.add_argument("--fail-on-blockers", action="store_true")
     return parser
-

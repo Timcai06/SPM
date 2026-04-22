@@ -14,7 +14,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from cli.quality_parser import build_parser
 from cli.quality_support import print_db_status, print_qa_summary
-from modules.quality.jobs import check_job, delivery_status_job, quality_report_job
+from modules.quality.jobs import check_job, delivery_status_job, quality_report_job, storage_governance_job
 from modules.runtime.services.run_metadata_service import logged_run
 
 
@@ -48,6 +48,31 @@ def run_db_status_command(args: argparse.Namespace) -> None:
         argv=["--db", args.db],
     ):
         print_db_status(args.db)
+
+
+def run_storage_audit_command(args: argparse.Namespace) -> None:
+    argv = ["--db", args.db]
+    with logged_run(
+        db_name=args.db,
+        command_group="quality",
+        command_name="storage-audit",
+        argv=argv,
+    ):
+        storage_governance_job.run_storage_audit(argv)
+
+
+def run_clean_stage_command(args: argparse.Namespace) -> None:
+    argv = ["--db", args.db, "--lock-timeout-sec", str(args.lock_timeout_sec)]
+    if args.yes:
+        argv.append("--yes")
+    with logged_run(
+        db_name=args.db,
+        command_group="quality",
+        command_name="clean-stage",
+        argv=argv,
+        metadata={"destructive": True, "target": "stage_tables"},
+    ):
+        storage_governance_job.run_clean_stage(argv)
 
 
 def run_qa_command(args: argparse.Namespace) -> None:
@@ -94,6 +119,8 @@ COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "check": run_check_command,
     "quality": run_quality_command,
     "db-status": run_db_status_command,
+    "storage-audit": run_storage_audit_command,
+    "clean-stage": run_clean_stage_command,
     "qa": run_qa_command,
     "delivery-status": run_delivery_status_command,
 }

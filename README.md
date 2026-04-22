@@ -43,6 +43,7 @@ make help
 双机协作方案见：
 
 - [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
+- [database_retention_policy.md](/Users/tim/股市预测模型/docs/database_retention_policy.md)
 
 ## 典型工作流
 
@@ -134,6 +135,8 @@ python3 src/cli/quality.py delivery-status --db stock_event_mining
 ./atk events run DB=stock_event_mining LIMIT=20
 ./atk research feature TIME_BUDGET=300 MAX_ROWS=200
 ./atk quality db DB=stock_event_mining
+./atk quality storage-audit DB=stock_event_mining
+./atk quality clean-stage DB=stock_event_mining --yes
 ```
 
 常用目标：

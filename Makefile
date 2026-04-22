@@ -89,7 +89,7 @@ endif
 	linking-run link-events \
 	graph-run load-relations propagate \
 	cluster-stats backfill-event-features refresh-event-features export-yearly check-export-size \
-	db-summary research-base-pipeline \
+	db-summary db-storage-audit db-stage-clean research-base-pipeline \
 	research-feature research-train-samples research-negative-samples \
 	stats-import stats-load profiles-import profiles-load market-env sentiment-load \
 	quality-check quality-sample quality-summary delivery-status \
@@ -285,6 +285,14 @@ db-summary:
 	psql -d $(DB) -c "select 'companies' as table_name, count(*) as rows from companies union all select 'raw_documents', count(*) from raw_documents union all select 'structured_events', count(*) from structured_events union all select 'event_company_links', count(*) from event_company_links order by table_name;"
 	psql -d $(DB) -c "select count(*) as events, count(*) filter (where event_subject_subtype='未细分') as unrefined_subtype, count(*) filter (where subject_entities='[]'::jsonb) as empty_entities from structured_events;"
 	psql -d $(DB) -c "select count(*) as links, count(distinct structured_event_id) as linked_events, count(distinct company_id) as linked_companies, count(*) filter (where link_type='direct_match') as direct_links, count(*) filter (where link_type='industry_match') as industry_links, round(avg(final_link_score)::numeric, 4) as avg_score from event_company_links;"
+
+db-storage-audit:
+	psql -d $(DB) -f sql/inspect_storage_footprint.sql
+
+db-stage-clean:
+	@test "$(YES)" = "1" || (echo "Refusing to truncate stage tables. Re-run with YES=1."; exit 1)
+	psql -d $(DB) -c "TRUNCATE TABLE stg_event_candidates RESTART IDENTITY CASCADE;"
+	psql -d $(DB) -c "TRUNCATE TABLE stg_structured_events RESTART IDENTITY CASCADE;"
 
 research-base-pipeline: collect-history classify-pending link-events db-summary
 
