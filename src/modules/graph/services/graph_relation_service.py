@@ -1,9 +1,9 @@
-"""Graph relation workflows that still bridge to legacy storage scripts."""
+"""Graph relation workflows."""
 
 from __future__ import annotations
 
-from capabilities.storage import load_task3_relations as legacy_load_task3_relations
+from modules.graph.adapters.graph_relation_adapter import run_load_relations as run_load_relations_adapter
 
 
 def run_load_relations(argv: list[str] | None = None) -> None:
-    legacy_load_task3_relations.main(argv)
+    run_load_relations_adapter(argv)

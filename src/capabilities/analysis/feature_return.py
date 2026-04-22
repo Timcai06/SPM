@@ -17,11 +17,11 @@ SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.analysis.tushare_adapter import load_tushare
 from modules.analysis.adapters.db_repository import (
     fetch_security_daily_returns,
     run_query_rows,
 )
+from modules.analysis.adapters.tushare_module_adapter import load_tushare
 from modules.analysis.services.feature_cache_service import load_market_cache, resolve_tushare_token, save_market_cache
 from modules.analysis.services.event_study_service import (
     bucket3,

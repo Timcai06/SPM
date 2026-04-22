@@ -6,6 +6,7 @@ import psycopg
 
 from .config import DB_NAME, LLM_MODEL
 from .load_events import load_all_events
+from modules.runtime.adapters.db import dsn_for
 
 
 def get_llm_response(prompt: str) -> str:
@@ -36,7 +37,7 @@ def get_llm_response(prompt: str) -> str:
 
 def search_events(keywords: str, limit: int = 5) -> list[dict]:
     """Search events by keywords (simple text match)."""
-    conn = psycopg.connect(f"dbname={DB_NAME} user=tim host=127.0.0.1 port=5432")
+    conn = psycopg.connect(dsn_for(DB_NAME))
     try:
         with conn.cursor() as cur:
             cur.execute("""

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Bridge canonical loading into module-owned services."""
+"""Canonical loading workflows."""
 
 from __future__ import annotations
 
 import csv
 from pathlib import Path
 
-from capabilities.storage.load_task1_canonical import run_loading_pipeline
+from modules.events.adapters.canonical_loading_adapter import run_loading_pipeline
 
 
 def read_csv_rows(path: str | Path) -> list[dict[str, str]]:

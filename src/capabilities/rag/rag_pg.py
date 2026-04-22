@@ -8,6 +8,7 @@ from sentence_transformers import SentenceTransformer
 
 from .config import DB_NAME, EMBEDDING_MODEL, LLM_MODEL, CHUNK_SIZE
 from .load_events import load_all_events, EventChunk
+from modules.runtime.adapters.db import dsn_for
 
 
 EMBED_DIM = 384
@@ -136,7 +137,7 @@ def query_with_llm(similar_docs: list[dict], question: str) -> str:
 
 def query_rag(question: str, k: int = 5) -> dict:
     """Complete RAG query."""
-    conn = psycopg.connect(f"dbname={DB_NAME} user=tim host=127.0.0.1 port=5432")
+    conn = psycopg.connect(dsn_for(DB_NAME))
     try:
         similar_docs = similarity_search(conn, question, k)
         answer = query_with_llm(similar_docs, question)
@@ -147,7 +148,7 @@ def query_rag(question: str, k: int = 5) -> dict:
 
 def build_index(clear_first: bool = False):
     """Build RAG index from events."""
-    conn = psycopg.connect(f"dbname={DB_NAME} user=tim host=127.0.0.1 port=5432")
+    conn = psycopg.connect(dsn_for(DB_NAME))
     try:
         ensure_vector_table(conn)
         if clear_first:

@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-"""Bridge service for market and sentiment context loading workflows."""
+"""Market and sentiment context loading workflows."""
 
 from __future__ import annotations
 
-from capabilities.storage import (
-    load_market_environment as legacy_load_market_environment,
-    load_sentiment_propagation as legacy_load_sentiment_propagation,
-)
+from modules.companies.adapters.market_context_adapter import load_market_environment, load_sentiment_propagation
 
 
 def run_load_market_environment(argv: list[str] | None = None) -> None:
-    legacy_load_market_environment.main(argv)
+    load_market_environment(argv)
 
 
 def run_load_sentiment_propagation(argv: list[str] | None = None) -> None:
-    legacy_load_sentiment_propagation.main(argv)
+    load_sentiment_propagation(argv)

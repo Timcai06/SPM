@@ -5,6 +5,7 @@ from typing import Iterator
 from dataclasses import dataclass
 
 from .config import DB_NAME
+from modules.runtime.adapters.db import dsn_for
 
 
 @dataclass
@@ -15,7 +16,7 @@ class EventChunk:
 
 def load_structured_events() -> Iterator[EventChunk]:
     """Load structured_events as text chunks."""
-    conn = psycopg.connect(f"dbname={DB_NAME} user=tim host=127.0.0.1 port=5432")
+    conn = psycopg.connect(dsn_for(DB_NAME))
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -48,7 +49,7 @@ def load_structured_events() -> Iterator[EventChunk]:
 
 def load_canonical_events() -> Iterator[EventChunk]:
     """Load canonical_event_clusters as text chunks."""
-    conn = psycopg.connect(f"dbname={DB_NAME} user=tim host=127.0.0.1 port=5432")
+    conn = psycopg.connect(dsn_for(DB_NAME))
     try:
         with conn.cursor() as cur:
             cur.execute("""

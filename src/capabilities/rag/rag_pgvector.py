@@ -9,6 +9,7 @@ import psycopg
 from .config import DB_NAME, EMBEDDING_MODEL, LLM_MODEL, LLM_BASE_URL, CHUNK_SIZE, VECTOR_TABLE, VECTOR_DIM
 from .load_events import load_all_events, EventChunk
 from .load_pdfs import load_pdf, PDFChunk
+from modules.runtime.adapters.db import dsn_for
 
 
 @dataclass
@@ -175,7 +176,7 @@ def build_index(
     clear_first: bool = False,
 ):
     """Build RAG index from data sources."""
-    conn = psycopg.connect(f"dbname={DB_NAME} user=tim host=127.0.0.1 port=5432")
+    conn = psycopg.connect(dsn_for(DB_NAME))
     try:
         ensure_vector_table(conn)
         if clear_first:

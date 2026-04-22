@@ -14,7 +14,7 @@ from modules.analysis.services.feature_analysis_service import run_feature_retur
 
 
 class AnalysisBridgeServiceTests(unittest.TestCase):
-    @patch("modules.analysis.services.feature_analysis_service.legacy_feature_return.main")
+    @patch("modules.analysis.services.feature_analysis_service.run_feature_return_adapter")
     def test_run_feature_return_passes_argv(self, mock_main) -> None:
         run_feature_return(["--db", "stock_event_mining", "--benchmark", "hs300"])
 
