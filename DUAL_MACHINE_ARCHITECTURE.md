@@ -2,9 +2,17 @@
 
 这份文档只解决一件事：
 
-**让 Intel 老 Mac 负责采集，M5 Pro 负责 PostgreSQL、开发、数据清洗和深度学习，并把外接 SSD 纳入架构。**
+**让 Intel 老 Mac 负责采集与正文回填，M5 Pro 负责 PostgreSQL、开发、数据清洗和深度学习。**
 
 ## 结论
+
+当前正式运行模式是：
+
+- **不使用外接 SSD**
+- **M5 Pro 本机持有 PostgreSQL**
+- **Intel Mac 通过 TCP 直连 M5 Pro**
+
+外接 SSD 仍然是后续可选扩展，不是当前正式部署前提。
 
 推荐方案是：
 
@@ -18,8 +26,8 @@
   - 长时间运行采集和正文回填
   - `./SPM collect history`
   - `./SPM collect backfill-cninfo`
-- **外接 SSD**
-  - 承载 PostgreSQL data directory 或数据库备份
+- **外接 SSD（可选，不是当前正式模式）**
+  - 后续可承载 PostgreSQL data directory 或数据库备份
   - 作为高容量、可迁移的存储层
   - **只能挂载给实际运行 PostgreSQL 的那台机器**
 

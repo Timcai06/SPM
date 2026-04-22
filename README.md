@@ -334,10 +334,11 @@ uv pip install requests aiohttp akshare pandas psycopg pdfplumber python-dotenv 
 2. [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
 3. [docs/PROJECT_STATUS.md](/Users/tim/股市预测模型/docs/PROJECT_STATUS.md)
 4. [docs/TECH_STACK.md](/Users/tim/股市预测模型/docs/TECH_STACK.md)
-5. [docs/KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md)
-6. [docs/database_model.md](/Users/tim/股市预测模型/docs/database_model.md)
-7. [docs/architecture_review.md](/Users/tim/股市预测模型/docs/architecture_review.md)
-8. [docs/engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md)
+5. [docs/OPERATIONS.md](/Users/tim/股市预测模型/docs/OPERATIONS.md)
+6. [docs/KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md)
+7. [docs/database_model.md](/Users/tim/股市预测模型/docs/database_model.md)
+8. [docs/architecture_review.md](/Users/tim/股市预测模型/docs/architecture_review.md)
+9. [docs/engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md)
 
 ---
 

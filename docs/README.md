@@ -13,12 +13,13 @@ flowchart TD
     A["README.md<br/>项目首页 / 总览 / 状态"] --> B["docs/README.md<br/>文档导航"]
     B --> C["PROJECT_STATUS.md<br/>项目状态、进度、数据库快照"]
     B --> D["TECH_STACK.md<br/>技术栈、环境、目录与入口"]
-    B --> E["KNOWN_ISSUES.md<br/>已解决 / 待解决问题库"]
-    B --> F["architecture_review.md<br/>当前架构审查"]
-    B --> G["engineering_backlog.md<br/>工程待办与优先级"]
-    B --> H["database_model.md<br/>核心数据模型"]
-    B --> I["database_retention_policy.md<br/>存储治理"]
-    B --> J["../DUAL_MACHINE_ARCHITECTURE.md<br/>双机协作体系"]
+    B --> E["OPERATIONS.md<br/>日常操作 / 运行手册"]
+    B --> F["KNOWN_ISSUES.md<br/>已解决 / 待解决问题库"]
+    B --> G["architecture_review.md<br/>当前架构审查"]
+    B --> H["engineering_backlog.md<br/>工程待办与优先级"]
+    B --> I["database_model.md<br/>核心数据模型"]
+    B --> J["database_retention_policy.md<br/>存储治理"]
+    B --> K["../DUAL_MACHINE_ARCHITECTURE.md<br/>双机协作体系"]
 ```
 
 ## 推荐阅读顺序
@@ -30,13 +31,15 @@ flowchart TD
 1. [README.md](/Users/tim/股市预测模型/README.md)
 2. [PROJECT_STATUS.md](/Users/tim/股市预测模型/docs/PROJECT_STATUS.md)
 3. [TECH_STACK.md](/Users/tim/股市预测模型/docs/TECH_STACK.md)
-4. [database_model.md](/Users/tim/股市预测模型/docs/database_model.md)
+4. [OPERATIONS.md](/Users/tim/股市预测模型/docs/OPERATIONS.md)
+5. [database_model.md](/Users/tim/股市预测模型/docs/database_model.md)
 
 ### 2. 关注双机协作与运行
 
 1. [../DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
-2. [KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md)
-3. [engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md)
+2. [OPERATIONS.md](/Users/tim/股市预测模型/docs/OPERATIONS.md)
+3. [KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md)
+4. [engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md)
 
 ### 3. 关注工程治理
 
@@ -51,6 +54,7 @@ flowchart TD
 | 首页层 | [README.md](/Users/tim/股市预测模型/README.md) | 面向项目整体的专业化总览 |
 | 状态层 | [PROJECT_STATUS.md](/Users/tim/股市预测模型/docs/PROJECT_STATUS.md) | 记录当前数据库、环境、分支、回填进度与实际状态 |
 | 技术层 | [TECH_STACK.md](/Users/tim/股市预测模型/docs/TECH_STACK.md) | 解释模块、入口、环境与依赖策略 |
+| 操作层 | [OPERATIONS.md](/Users/tim/股市预测模型/docs/OPERATIONS.md) | 日常启动、同步、回填、检查和排障手册 |
 | 问题层 | [KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md) | 记录遇到过的问题、根因与当前处置 |
 | 架构层 | [architecture_review.md](/Users/tim/股市预测模型/docs/architecture_review.md) | 审视架构成熟度、边界与演进方向 |
 | 规划层 | [engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md) | 当前 backlog、优先级和执行顺序 |
