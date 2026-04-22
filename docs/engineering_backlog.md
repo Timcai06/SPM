@@ -1,48 +1,84 @@
 # 工程整改 Backlog
 
-本清单以“事件驱动量化研究平台”为目标，而不是赛题交付。
+本 backlog 只记录**今天仍然值得投入工程精力的事情**，不再重复已经做完的迁移。
+
+## 优先级总览
+
+```mermaid
+flowchart LR
+    A["P0<br/>数据质量与覆盖率"] --> B["P1<br/>研究与治理深化"]
+    B --> C["P2<br/>性能与产品化提升"]
+```
 
 ## P0
 
-1. **正文资产继续做实**
-   - 目标：`raw_documents` 尽可能从标题库转成可挖掘正文库。
-   - 原则：优先回填已有 URL，不用标题量增长替代正文质量增长。
+### 1. 正文资产继续做实
 
-2. **点时研究数据补齐**
-   - 补足市场、估值、换手、停牌、指数与行业环境字段。
-   - 把 `security_features_daily` / `security_forward_labels_daily` / `market_environment_daily` 做成真正可研究的基础面板。
+- 目标：继续提高 `2025-2026` 巨潮公告正文覆盖率
+- 重点：降低空正文与短正文比例
+- 附加判断：评估 `12000` 字上限是否需要调整
 
-3. **run provenance 治理**
-   - 建最小 `run metadata / batch lineage` 结构。
-   - 让回填、分类、研究标签都能追溯到一次具体运行。
+### 2. 真实链路 smoke test 固化
 
-4. **真实链路 smoke test**
-   - 覆盖 `collect -> events -> linking -> graph -> research -> quality` 的小批量链路。
+- 固化最小链路：
+  - `collect`
+  - `events`
+  - `linking`
+  - `quality`
+- 让双机协作不依赖临时人工试跑
+
+### 3. 研究底座继续补齐
+
+- 补足 `security_features_daily`
+- 补足市场、行业、环境维度
+- 提高研究样本表的解释性与覆盖面
 
 ## P1
 
-1. **继续消化 legacy bridge**
-   - 让 `modules/.../jobs|services|adapters` 成为主路径。
-   - `capabilities/...` 只保留过渡实现，不再继续扩张。
+### 1. dataset lineage 进入日常使用
 
-2. **研究命名与输出统一**
-   - 去掉用户可见的 `task1_* / task2_* / task3_*` 输出名。
-   - 统一成领域语义的 dataset/report 名称。
+- 让 `dataset_versions` 不再停留在“表已存在”
+- 对关键研究产物进行稳定登记
 
-3. **公共市场数据工具统一**
-   - 保持 `fetch_sina_kline`、收益率转换和缓存逻辑单一实现。
-   - 避免 analysis / storage 出现行为漂移。
+### 2. 继续压缩 legacy bridge
 
-4. **schema 迁移治理**
-   - 从“大 SQL 文件 + ALTER IF NOT EXISTS”转向显式迁移记录。
+- 主路径继续向 `modules/*` 收口
+- `src/capabilities/*` 只保留必要兼容，不再扩张
+
+### 3. 公司关系与传播层增强
+
+- 扩大 `company_relations` 规模
+- 增强 `event_propagation_edges` 的覆盖面和可解释性
+
+### 4. schema 迁移治理
+
+- 从“单大 SQL + if not exists”逐步转向更明确的迁移记录
 
 ## P2
 
-1. **taxonomy 精修**
-   - 继续拆细公司类二级分类，减少大桶标签。
+### 1. 批量写库性能优化
 
-2. **批量写库优化**
-   - 评估 `COPY`、临时表合并和批量 update/upsert。
+- 评估 `COPY`
+- 评估 staging 合并
+- 评估更高效的批量 upsert/update 策略
 
-3. **研究层与回测层补齐**
-   - 设计更适合量化研究的样本表、标签表和回测结果表。
+### 2. taxonomy 和标签精修
+
+- 继续细化行业与事件类别
+- 降低大桶型标签
+
+### 3. 更完整的研究/回测层设计
+
+- 设计更清晰的研究样本版本体系
+- 补足更贴近回测和训练的数据表设计
+
+## 暂不优先
+
+以下事项现在不是第一优先级：
+
+- 引入更重的分布式调度框架
+- 交易执行层
+- 高复杂度图数据库替代 PostgreSQL
+- 过早追求“完美统一环境”
+
+当前更重要的是让数据底座继续变厚，而不是过早扩张系统边界。
