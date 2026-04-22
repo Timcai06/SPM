@@ -4,8 +4,8 @@ set -euo pipefail
 show_help() {
   cat <<'EOF'
 Usage:
-  ./atk <group> <command> [MAKE_VAR=VALUE ...]
-  ./atk <shortcut> [MAKE_VAR=VALUE ...]
+  ./SPM <group> <command> [MAKE_VAR=VALUE ...]
+  ./SPM <shortcut> [MAKE_VAR=VALUE ...]
 
 Primary groups:
   workflow  full | trial
@@ -48,13 +48,13 @@ Shortcuts:
   negative-samples      -> research negative-samples
 
 Examples:
-  ./atk collect history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1
-  ./atk collect backfill-cninfo CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
-  ./atk events run DB=stock_event_mining LIMIT=20
-  ./atk research feature TIME_BUDGET=300 MAX_ROWS=200
-  ./atk quality db DB=stock_event_mining
-  ./atk quality storage-audit DB=stock_event_mining
-  ./atk quality clean-stage DB=stock_event_mining --yes
+  ./SPM collect history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1
+  ./SPM collect backfill-cninfo CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
+  ./SPM events run DB=stock_event_mining LIMIT=20
+  ./SPM research feature TIME_BUDGET=300 MAX_ROWS=200
+  ./SPM quality db DB=stock_event_mining
+  ./SPM quality storage-audit DB=stock_event_mining
+  ./SPM quality clean-stage DB=stock_event_mining --yes
 EOF
 }
 

@@ -79,7 +79,7 @@ flowchart LR
 负责决定“谁做什么、何时做、失败后怎么认定”：
 
 - Git 仓库
-- CLI 入口和 Makefile / `atk`
+- CLI 入口和 Makefile / `SPM`
 - 任务参数
 - `etl_runs / etl_run_steps`
 - 后续如果引入 Ray，那么 Ray Head 也属于 control plane
@@ -463,7 +463,7 @@ Git 负责的是：
 - 代码状态
 - SQL 迁移脚本
 - 文档
-- Makefile / atk
+- Makefile / SPM
 
 Git **不负责**：
 
@@ -489,8 +489,8 @@ Git **不负责**：
 
 只做网络重、I/O 重、长时运行的任务：
 
-- `./atk collect history ...`
-- `./atk collect backfill-cninfo ...`
+- `./SPM collect history ...`
+- `./SPM collect backfill-cninfo ...`
 - 未来的市场数据抓取
 - 定时任务或守护进程
 
@@ -507,11 +507,11 @@ Git **不负责**：
 
 - PostgreSQL 主库
 - 代码开发与重构
-- `./atk events run ...`
-- `./atk linking run ...`
-- `./atk graph run ...`
-- `./atk research feature ...`
-- `./atk research train-samples ...`
+- `./SPM events run ...`
+- `./SPM linking run ...`
+- `./SPM graph run ...`
+- `./SPM research feature ...`
+- `./SPM research train-samples ...`
 - pandas / polars / DuckDB
 - PyTorch / MPS
 
@@ -535,7 +535,7 @@ Git 只负责：
 - `sql/`
 - `docs/`
 - `Makefile`
-- `atk`
+- `SPM`
 
 ### PostgreSQL 负责什么
 
@@ -935,7 +935,7 @@ cd 股市预测模型
 先确认入口可见：
 
 ```bash
-./atk help
+./SPM help
 make help
 ```
 
@@ -1071,13 +1071,13 @@ Intel Mac 以后只建议跑采集与回填。
 最小版本：
 
 ```bash
-./atk collect history DB=stock_event_mining HISTORY_SOURCE=cninfo-disclosure
+./SPM collect history DB=stock_event_mining HISTORY_SOURCE=cninfo-disclosure
 ```
 
 常用版本：
 
 ```bash
-./atk collect history \
+./SPM collect history \
   DB=stock_event_mining \
   HISTORY_SOURCE=cninfo-disclosure \
   HISTORY_START=2023-01-01 \
@@ -1093,7 +1093,7 @@ Intel Mac 以后只建议跑采集与回填。
 最小版本：
 
 ```bash
-./atk collect backfill-cninfo \
+./SPM collect backfill-cninfo \
   DB=stock_event_mining \
   CNINFO_BACKFILL_START=2025-01-01 \
   CNINFO_BACKFILL_END=2026-01-01
@@ -1102,7 +1102,7 @@ Intel Mac 以后只建议跑采集与回填。
 常用版本：
 
 ```bash
-./atk collect backfill-cninfo \
+./SPM collect backfill-cninfo \
   DB=stock_event_mining \
   CNINFO_BACKFILL_START=2025-01-01 \
   CNINFO_BACKFILL_END=2026-01-01 \
@@ -1118,16 +1118,16 @@ Intel 把数据写进 `raw_documents` 后，M5 Pro 负责后处理和研究。
 #### 9.1 事件标准化和链接
 
 ```bash
-./atk events run DB=stock_event_mining LIMIT=20
-./atk linking run DB=stock_event_mining TOP_K=3 MIN_SCORE=0.35
-./atk graph run DB=stock_event_mining MIN_SCORE=0.35
+./SPM events run DB=stock_event_mining LIMIT=20
+./SPM linking run DB=stock_event_mining TOP_K=3 MIN_SCORE=0.35
+./SPM graph run DB=stock_event_mining MIN_SCORE=0.35
 ```
 
 #### 9.2 研究与质量检查
 
 ```bash
-./atk research feature DB=stock_event_mining TIME_BUDGET=300 MAX_ROWS=200
-./atk quality db DB=stock_event_mining
+./SPM research feature DB=stock_event_mining TIME_BUDGET=300 MAX_ROWS=200
+./SPM quality db DB=stock_event_mining
 ```
 
 如果你想更保守一些，也可以拆开跑：
@@ -1158,7 +1158,7 @@ export PGPORT=5432
 export PGUSER=collector_runner
 export PGPASSWORD='强密码'
 export PGDATABASE=stock_event_mining
-./atk collect history DB=stock_event_mining HISTORY_SOURCE=cninfo-disclosure
+./SPM collect history DB=stock_event_mining HISTORY_SOURCE=cninfo-disclosure
 ```
 
 ## 运行命令建议
@@ -1178,8 +1178,8 @@ export PGDATABASE=stock_event_mining
 然后只跑采集和回填：
 
 ```bash
-./atk collect history DB=stock_event_mining HISTORY_SOURCE=cninfo-disclosure
-./atk collect backfill-cninfo DB=stock_event_mining CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
+./SPM collect history DB=stock_event_mining HISTORY_SOURCE=cninfo-disclosure
+./SPM collect backfill-cninfo DB=stock_event_mining CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
 ```
 
 ### M5 Pro
@@ -1187,10 +1187,10 @@ export PGDATABASE=stock_event_mining
 M5 Pro 本机通常不需要额外配置 DSN，直接跑后处理、研究和训练即可：
 
 ```bash
-./atk events run DB=stock_event_mining LIMIT=20
-./atk linking run DB=stock_event_mining TOP_K=3 MIN_SCORE=0.35
-./atk graph run DB=stock_event_mining MIN_SCORE=0.35
-./atk research feature DB=stock_event_mining TIME_BUDGET=300 MAX_ROWS=200
+./SPM events run DB=stock_event_mining LIMIT=20
+./SPM linking run DB=stock_event_mining TOP_K=3 MIN_SCORE=0.35
+./SPM graph run DB=stock_event_mining MIN_SCORE=0.35
+./SPM research feature DB=stock_event_mining TIME_BUDGET=300 MAX_ROWS=200
 ```
 
 ### 不推荐的运行方式
@@ -1229,7 +1229,7 @@ M5 Pro 本机通常不需要额外配置 DSN，直接跑后处理、研究和训
 3. 在 Intel Mac 上配置 `PGHOST / PGPORT / PGUSER / PGPASSWORD / PGDATABASE`
 4. 在 Intel Mac 上只运行 `collect history` 和 `backfill-cninfo`
 5. 在 M5 Pro 上运行 `events / linking / graph / research / quality`
-6. 两台机器都通过 Git 同步 `src/ / sql/ / docs/ / Makefile / atk`
+6. 两台机器都通过 Git 同步 `src/ / sql/ / docs/ / Makefile / SPM`
 7. 两台机器都不要把 `output/` 当作双机同步主对象
 
 ## 故障排查顺序

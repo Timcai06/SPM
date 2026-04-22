@@ -13,7 +13,7 @@ This AGENTS.md scopes guidance to `股市预测模型`. Parent AGENTS guidance s
 ### Files
 - `.DS_Store`
 - `.gitignore`
-- `atk`
+- `SPM`
 - `Makefile`
 - `README.md`
 - `requirements_rag.txt`
@@ -34,10 +34,10 @@ This AGENTS.md scopes guidance to `股市预测模型`. Parent AGENTS guidance s
 - Primary stack: Python CLI pipelines under `src/` plus PostgreSQL SQL assets under `sql/`.
 - Default database name is `stock_event_mining`; prefer passing `--db stock_event_mining` unless the user specifies otherwise.
 - Prefer the repo entrypoints over ad hoc module execution:
-  - `./atk help`
-  - `./atk workflow full`
-  - `./atk collect history`
-  - `./atk research feature`
+  - `./SPM help`
+  - `./SPM workflow full`
+  - `./SPM collect history`
+  - `./SPM research feature`
   - `make go`
   - `make trial`
   - `python3 src/cli/collect.py ...`

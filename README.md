@@ -30,7 +30,7 @@
 推荐先看：
 
 ```bash
-./atk help
+./SPM help
 python3 src/cli/collect.py --help
 python3 src/cli/events.py --help
 python3 src/cli/linking.py --help
@@ -128,15 +128,15 @@ python3 src/cli/quality.py delivery-status --db stock_event_mining
 
 ## Makefile 入口
 
-`atk` 是更短的领域入口：
+`SPM` 是更短的领域入口：
 
 ```bash
-./atk collect history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1
-./atk events run DB=stock_event_mining LIMIT=20
-./atk research feature TIME_BUDGET=300 MAX_ROWS=200
-./atk quality db DB=stock_event_mining
-./atk quality storage-audit DB=stock_event_mining
-./atk quality clean-stage DB=stock_event_mining --yes
+./SPM collect history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1
+./SPM events run DB=stock_event_mining LIMIT=20
+./SPM research feature TIME_BUDGET=300 MAX_ROWS=200
+./SPM quality db DB=stock_event_mining
+./SPM quality storage-audit DB=stock_event_mining
+./SPM quality clean-stage DB=stock_event_mining --yes
 ```
 
 常用目标：
