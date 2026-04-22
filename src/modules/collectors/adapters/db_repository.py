@@ -12,8 +12,8 @@ from typing import Any
 
 import psycopg
 
-from capabilities.storage.db_guard import dsn_for
-from capabilities.storage.load_task1 import upsert_raw_documents
+from modules.collectors.services.raw_document_loading_service import upsert_raw_documents
+from modules.runtime.adapters.db import dsn_for
 
 
 def upsert_raw_document_rows(db_name: str, rows: list[dict[str, str]]) -> int:

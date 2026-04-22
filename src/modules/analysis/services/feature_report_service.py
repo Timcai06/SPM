@@ -34,7 +34,7 @@ def build_feature_report(
     mean_and_t: Callable[[List[float]], tuple[float, Optional[float]]],
 ) -> str:
     report_lines = [
-        "# 任务1事件研究法（异常收益）报告",
+        "# 事件研究法（异常收益）报告",
         "",
         f"- run_id：{run_id}",
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",

@@ -4,7 +4,7 @@
 可准备一个 CSV，并通过下面的命令加载：
 
 ```bash
-python3 src/cli/task2.py load-company-profiles --db stock_event_mining --input output/seeds/company_profiles_seed.csv
+python3 src/cli/linking.py load-company-profiles --db stock_event_mining --input output/seeds/company_profiles_seed.csv
 ```
 
 ## 建议列名

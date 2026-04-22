@@ -11,40 +11,68 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from modules.companies.services import company_metrics_service, company_seed_service
+from modules.companies.services import (
+    company_profile_service,
+    company_stats_service,
+    company_universe_service,
+    market_context_service,
+)
 
 
-class CompanySeedServiceTests(unittest.TestCase):
-    @patch("modules.companies.services.company_seed_service.legacy_load_companies.main")
+class CompanyUniverseServiceTests(unittest.TestCase):
+    @patch("modules.companies.services.company_universe_service.legacy_load_companies.main")
     def test_run_load_companies_delegates_to_legacy(self, mock_main: MagicMock) -> None:
-        company_seed_service.run_load_companies(["--db", "stock_event_mining"])
+        company_universe_service.run_load_companies(["--db", "stock_event_mining"])
         mock_main.assert_called_once_with(["--db", "stock_event_mining"])
 
-    @patch("modules.companies.services.company_seed_service.legacy_import_companies_public.main")
+    @patch("modules.companies.services.company_universe_service.legacy_import_companies_public.main")
     def test_run_import_companies_public_delegates_to_legacy(self, mock_main: MagicMock) -> None:
-        company_seed_service.run_import_companies_public(["--output", "seed.csv"])
+        company_universe_service.run_import_companies_public(["--output", "seed.csv"])
         mock_main.assert_called_once_with(["--output", "seed.csv"])
 
-    @patch("modules.companies.services.company_seed_service.legacy_import_company_profiles.main")
+    @patch("modules.companies.services.company_universe_service.legacy_import_companies_tushare.main")
+    def test_run_import_companies_tushare_delegates_to_legacy(self, mock_main: MagicMock) -> None:
+        company_universe_service.run_import_companies_tushare(["--db", "stock_event_mining"])
+        mock_main.assert_called_once_with(["--db", "stock_event_mining"])
+
+
+class CompanyProfileServiceTests(unittest.TestCase):
+    @patch("modules.companies.services.company_profile_service.legacy_import_company_profiles.main")
     def test_run_import_profiles_delegates_to_legacy(self, mock_main: MagicMock) -> None:
-        company_seed_service.run_import_profiles(["--db", "stock_event_mining"])
+        company_profile_service.run_import_profiles(["--db", "stock_event_mining"])
         mock_main.assert_called_once_with(["--db", "stock_event_mining"])
 
+    @patch("modules.companies.services.company_profile_service.legacy_load_company_profiles.main")
+    def test_run_load_profiles_delegates_to_legacy(self, mock_main: MagicMock) -> None:
+        company_profile_service.run_load_profiles(["--db", "stock_event_mining"])
+        mock_main.assert_called_once_with(["--db", "stock_event_mining"])
 
-class CompanyMetricsServiceTests(unittest.TestCase):
-    @patch("modules.companies.services.company_metrics_service.legacy_import_stats_sina.main")
+class CompanyStatsServiceTests(unittest.TestCase):
+    @patch("modules.companies.services.company_stats_service.legacy_import_stats_sina.main")
     def test_run_import_stats_sina_delegates_to_legacy(self, mock_main: MagicMock) -> None:
-        company_metrics_service.run_import_stats_sina(["--db", "stock_event_mining"])
+        company_stats_service.run_import_stats_sina(["--db", "stock_event_mining"])
         mock_main.assert_called_once_with(["--db", "stock_event_mining"])
 
-    @patch("modules.companies.services.company_metrics_service.legacy_load_market_environment.main")
+    @patch("modules.companies.services.company_stats_service.legacy_load_company_stats.main")
+    def test_run_load_stats_delegates_to_legacy(self, mock_main: MagicMock) -> None:
+        company_stats_service.run_load_stats(["--db", "stock_event_mining"])
+        mock_main.assert_called_once_with(["--db", "stock_event_mining"])
+
+    @patch("modules.companies.services.company_stats_service.legacy_import_stats_local.main")
+    def test_run_import_stats_local_delegates_to_legacy(self, mock_main: MagicMock) -> None:
+        company_stats_service.run_import_stats_local(["--db", "stock_event_mining"])
+        mock_main.assert_called_once_with(["--db", "stock_event_mining"])
+
+
+class MarketContextServiceTests(unittest.TestCase):
+    @patch("modules.companies.services.market_context_service.legacy_load_market_environment.main")
     def test_run_load_market_environment_delegates_to_legacy(self, mock_main: MagicMock) -> None:
-        company_metrics_service.run_load_market_environment(["--db", "stock_event_mining"])
+        market_context_service.run_load_market_environment(["--db", "stock_event_mining"])
         mock_main.assert_called_once_with(["--db", "stock_event_mining"])
 
-    @patch("modules.companies.services.company_metrics_service.legacy_load_sentiment_propagation.main")
+    @patch("modules.companies.services.market_context_service.legacy_load_sentiment_propagation.main")
     def test_run_load_sentiment_propagation_delegates_to_legacy(self, mock_main: MagicMock) -> None:
-        company_metrics_service.run_load_sentiment_propagation(["--db", "stock_event_mining"])
+        market_context_service.run_load_sentiment_propagation(["--db", "stock_event_mining"])
         mock_main.assert_called_once_with(["--db", "stock_event_mining"])
 
 

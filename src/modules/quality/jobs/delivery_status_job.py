@@ -10,7 +10,7 @@ from typing import Any
 
 import psycopg
 
-from capabilities.storage.db_guard import dsn_for
+from modules.runtime.adapters.db import dsn_for
 
 
 DEFAULT_DB = "stock_event_mining"

@@ -1,21 +1,197 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+show_help() {
+  cat <<'EOF'
+Usage:
+  ./atk <group> <command> [MAKE_VAR=VALUE ...]
+  ./atk <shortcut> [MAKE_VAR=VALUE ...]
+
+Primary groups:
+  workflow  full | trial
+  collect   live | history | backfill-cninfo
+  events    run | classify-pending | reclassify
+  linking   run | link-events | company-universe | standard-industries | board-industries | stats-import | stats-load | profiles-import | profiles-load | market-env | sentiment-load
+  graph     run | load-relations | propagate
+  research  feature | train-samples | negative-samples
+  quality   summary | check | sample | delivery-status | db
+
+Shortcuts:
+  full                  -> workflow full
+  trial                 -> workflow trial
+  db                    -> quality db
+  quality               -> quality summary
+  collect-live          -> collect live
+  collect-history       -> collect history
+  backfill-cninfo       -> collect backfill-cninfo
+  events                -> events run
+  classify-pending      -> events classify-pending
+  reclassify            -> events reclassify
+  linking               -> linking run
+  link-events           -> linking link-events
+  company-universe      -> linking company-universe
+  standard-industries   -> linking standard-industries
+  board-industries      -> linking board-industries
+  stats-import          -> linking stats-import
+  stats-load            -> linking stats-load
+  profiles-import       -> linking profiles-import
+  profiles-load         -> linking profiles-load
+  market-env            -> linking market-env
+  sentiment-load        -> linking sentiment-load
+  graph                 -> graph run
+  load-relations        -> graph load-relations
+  propagate             -> graph propagate
+  feature               -> research feature
+  train-samples         -> research train-samples
+  negative-samples      -> research negative-samples
+
+Examples:
+  ./atk collect history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1
+  ./atk collect backfill-cninfo CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
+  ./atk events run DB=stock_event_mining LIMIT=20
+  ./atk research feature TIME_BUDGET=300 MAX_ROWS=200
+  ./atk quality db DB=stock_event_mining
+EOF
+}
+
+dispatch_make() {
+  local target="$1"
+  shift
+  exec make "$target" "$@"
+}
+
+is_group() {
+  case "$1" in
+    workflow|collect|events|linking|graph|research|quality) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_group_command() {
+  case "$1:$2" in
+    workflow:full|workflow:trial) return 0 ;;
+    collect:live|collect:history|collect:backfill-cninfo) return 0 ;;
+    events:run|events:classify-pending|events:reclassify) return 0 ;;
+    linking:run|linking:link-events|linking:company-universe|linking:standard-industries|linking:board-industries|linking:stats-import|linking:stats-load|linking:profiles-import|linking:profiles-load|linking:market-env|linking:sentiment-load) return 0 ;;
+    graph:run|graph:load-relations|graph:propagate) return 0 ;;
+    research:feature|research:train-samples|research:negative-samples) return 0 ;;
+    quality:summary|quality:check|quality:sample|quality:delivery-status|quality:db) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+resolve_shortcut() {
+  case "$1" in
+    full) echo "workflow full" ;;
+    trial) echo "workflow trial" ;;
+    db) echo "quality db" ;;
+    quality) echo "quality summary" ;;
+    collect-live) echo "collect live" ;;
+    collect-history) echo "collect history" ;;
+    backfill-cninfo) echo "collect backfill-cninfo" ;;
+    events) echo "events run" ;;
+    classify-pending) echo "events classify-pending" ;;
+    reclassify) echo "events reclassify" ;;
+    linking) echo "linking run" ;;
+    link-events) echo "linking link-events" ;;
+    company-universe) echo "linking company-universe" ;;
+    standard-industries) echo "linking standard-industries" ;;
+    board-industries) echo "linking board-industries" ;;
+    stats-import) echo "linking stats-import" ;;
+    stats-load) echo "linking stats-load" ;;
+    profiles-import) echo "linking profiles-import" ;;
+    profiles-load) echo "linking profiles-load" ;;
+    market-env) echo "linking market-env" ;;
+    sentiment-load) echo "linking sentiment-load" ;;
+    graph) echo "graph run" ;;
+    load-relations) echo "graph load-relations" ;;
+    propagate) echo "graph propagate" ;;
+    feature) echo "research feature" ;;
+    train-samples) echo "research train-samples" ;;
+    negative-samples) echo "research negative-samples" ;;
+    *) return 1 ;;
+  esac
+}
+
 if [ $# -eq 0 ]; then
-  echo "Usage: ./atk <go|r|q|c|l|f|t|s|qa|si|sl|n|bf|help> [MAKE_VAR=VALUE ...]"
+  show_help
   exit 0
 fi
 
-cmd="$1"
+if [ "$1" = "help" ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+  show_help
+  exit 0
+fi
+
+group="$1"
 shift
 
-case "$cmd" in
-  go|r|q|c|l|f|t|s|qa|si|sl|n|bf|help)
-    make "$cmd" "$@"
-    ;;
+if is_group "$group"; then
+  if [ $# -gt 0 ] && is_group_command "$group" "$1"; then
+    :
+  elif resolved="$(resolve_shortcut "$group" 2>/dev/null)"; then
+    set -- $resolved "$@"
+    group="$1"
+    shift
+  fi
+elif resolved="$(resolve_shortcut "$group" 2>/dev/null)"; then
+  set -- $resolved "$@"
+  group="$1"
+  shift
+fi
+
+if [ $# -eq 0 ]; then
+  echo "Missing command for group: $group" >&2
+  echo >&2
+  show_help >&2
+  exit 1
+fi
+
+command="$1"
+shift
+
+case "$group:$command" in
+  workflow:full) dispatch_make full "$@" ;;
+  workflow:trial) dispatch_make trial "$@" ;;
+
+  collect:live) dispatch_make collect-live "$@" ;;
+  collect:history) dispatch_make collect-history "$@" ;;
+  collect:backfill-cninfo) dispatch_make backfill-cninfo-fulltext "$@" ;;
+
+  events:run) dispatch_make events-run "$@" ;;
+  events:classify-pending) dispatch_make classify-pending "$@" ;;
+  events:reclassify) dispatch_make reclassify-source "$@" ;;
+
+  linking:run) dispatch_make linking-run "$@" ;;
+  linking:link-events) dispatch_make link-events "$@" ;;
+  linking:company-universe) dispatch_make company-universe "$@" ;;
+  linking:standard-industries) dispatch_make standard-industries "$@" ;;
+  linking:board-industries) dispatch_make board-industries "$@" ;;
+  linking:stats-import) dispatch_make stats-import "$@" ;;
+  linking:stats-load) dispatch_make stats-load "$@" ;;
+  linking:profiles-import) dispatch_make profiles-import "$@" ;;
+  linking:profiles-load) dispatch_make profiles-load "$@" ;;
+  linking:market-env) dispatch_make market-env "$@" ;;
+  linking:sentiment-load) dispatch_make sentiment-load "$@" ;;
+
+  graph:run) dispatch_make graph-run "$@" ;;
+  graph:load-relations) dispatch_make load-relations "$@" ;;
+  graph:propagate) dispatch_make propagate "$@" ;;
+
+  research:feature) dispatch_make research-feature "$@" ;;
+  research:train-samples) dispatch_make research-train-samples "$@" ;;
+  research:negative-samples) dispatch_make research-negative-samples "$@" ;;
+
+  quality:summary) dispatch_make quality-summary "$@" ;;
+  quality:check) dispatch_make quality-check "$@" ;;
+  quality:sample) dispatch_make quality-sample "$@" ;;
+  quality:delivery-status) dispatch_make delivery-status "$@" ;;
+  quality:db) dispatch_make db-summary "$@" ;;
+
   *)
-    echo "Unknown command: $cmd"
-    echo "Allowed: go r q c l f t s qa si sl n bf help"
+    echo "Unknown command: $group $command" >&2
+    echo >&2
+    show_help >&2
     exit 1
     ;;
 esac

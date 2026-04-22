@@ -4,7 +4,7 @@
 可准备一个 seed CSV，并通过下面的命令加载：
 
 ```bash
-python3 src/cli/task2.py load-market-environment --db stock_event_mining --input output/seeds/market_environment_seed.csv
+python3 src/cli/linking.py load-market-environment --db stock_event_mining --input output/seeds/market_environment_seed.csv
 ```
 
 ## 建议列名

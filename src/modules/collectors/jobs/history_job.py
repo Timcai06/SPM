@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Task 1 historical collector job."""
+"""Historical collector job."""
 
 from __future__ import annotations
 

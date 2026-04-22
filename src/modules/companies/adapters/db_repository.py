@@ -7,7 +7,7 @@ from typing import Any
 
 import psycopg
 
-from capabilities.storage.db_guard import dsn_for
+from modules.runtime.adapters.db import dsn_for
 
 
 def load_active_companies(
@@ -39,4 +39,3 @@ def load_active_companies(
                 (max(offset, 0),),
             )
             return [dict(row) for row in cur.fetchall()]
-

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Task 1 collector entrypoint: source plugins -> normalized CSVs."""
+"""Collector entrypoint: source plugins -> normalized CSVs."""
 
 from __future__ import annotations
 
@@ -291,7 +291,7 @@ async def collect_all_async(limit: int, include_non_keyword: bool) -> list[dict]
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Collect live Task 1 source data (Async).")
+    parser = argparse.ArgumentParser(description="Collect live source data (async).")
     parser.add_argument("--limit", type=int, default=10, help="Max rows to fetch per source.")
     parser.add_argument("--include-non-keyword", action="store_true", help="Disable gov title keyword prefilter.")
     parser.add_argument("--db", default=DEFAULT_DB, help="Target PostgreSQL database name.")

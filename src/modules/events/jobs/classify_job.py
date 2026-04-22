@@ -75,7 +75,7 @@ STRUCTURED_BUILDER_CONFIG = {
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run Task 1 event structuring pipeline.")
+    parser = argparse.ArgumentParser(description="Run the event structuring pipeline.")
     parser.add_argument("--input", action="append", dest="inputs")
     parser.add_argument("--output-dir", default=str(ROOT / "output"))
     parser.add_argument("--db", default=DEFAULT_DB_NAME)

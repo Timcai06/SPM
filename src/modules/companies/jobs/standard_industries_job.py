@@ -18,9 +18,9 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage.db_guard import dsn_for, write_guard
 from modules.companies.adapters.db_repository import load_active_companies
 from modules.companies.domain.company_identity import safe_text
+from modules.runtime.adapters.db import dsn_for, write_guard
 
 STANDARD_L1_CODE_PATTERN = re.compile(r"^[A-Y][0-9]{2}$")
 

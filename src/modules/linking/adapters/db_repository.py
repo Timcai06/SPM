@@ -9,7 +9,7 @@ from typing import Iterable
 
 import psycopg
 
-from capabilities.storage.db_guard import dsn_for
+from modules.runtime.adapters.db import dsn_for
 
 
 def load_structured_events(cur) -> list[dict]:
@@ -25,7 +25,7 @@ def load_structured_events(cur) -> list[dict]:
                rd.content AS raw_content,
                rd.symbol_or_subject AS raw_symbol
         FROM structured_events se
-        JOIN int_event_candidates ec ON ec.id = se.candidate_id
+        JOIN event_candidates ec ON ec.id = se.candidate_id
         JOIN raw_documents rd ON rd.id = ec.raw_document_id
         ORDER BY se.id
         """
@@ -130,4 +130,3 @@ def delete_stale_links(cur, touched_structured_event_ids: set[int], current_keys
         (list(touched_structured_event_ids),),
     )
     return cur.rowcount
-

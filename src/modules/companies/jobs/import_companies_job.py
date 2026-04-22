@@ -14,8 +14,8 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage.db_guard import dsn_for, write_guard
 from modules.companies.domain.company_identity import concept_json, exchange_from_code, ts_code_from_code
+from modules.runtime.adapters.db import dsn_for, write_guard
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

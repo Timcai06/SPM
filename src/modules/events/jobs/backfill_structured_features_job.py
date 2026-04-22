@@ -15,7 +15,6 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage.db_guard import dsn_for, write_guard
 from modules.events.domain.classification_rules import SUBTYPE_RULES
 from modules.events.domain.event_taxonomy import IMPACT_SCOPES, SHOCK_SOURCE_TYPES
 from modules.events.domain.industry_mapping import SW_L1_NAMES
@@ -25,6 +24,7 @@ from modules.events.services.llm_enrichment_service import (
     AsyncOllamaClient,
     normalize_llm_choice,
 )
+from modules.runtime.adapters.db import dsn_for, write_guard
 
 
 def parse_args() -> argparse.Namespace:
@@ -81,7 +81,7 @@ def load_batch(
             se.event_subject_subtype, se.sw_l1_industry, se.impact_scope,
             rd.title AS raw_title, rd.content AS raw_content
         FROM structured_events se
-        JOIN int_event_candidates c ON c.id = se.candidate_id
+        JOIN event_candidates c ON c.id = se.candidate_id
         JOIN raw_documents rd ON rd.id = c.raw_document_id
         {where_sql}
         ORDER BY se.id
@@ -265,7 +265,7 @@ def main() -> None:
     args = parse_args()
     with write_guard(
         db_name=args.db,
-        required_tables=["structured_events", "int_event_candidates", "raw_documents"],
+        required_tables=["structured_events", "event_candidates", "raw_documents"],
         lock_timeout_sec=args.lock_timeout_sec,
     ):
         with psycopg.connect(dsn_for(args.db)) as conn:

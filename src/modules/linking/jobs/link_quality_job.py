@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a lightweight Task 2 link quality report."""
+"""Build a lightweight event-link quality report."""
 
 from __future__ import annotations
 
@@ -14,17 +14,17 @@ SRC_ROOT = Path(__file__).resolve().parents[2]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from capabilities.storage.db_guard import dsn_for
+from modules.runtime.adapters.db import dsn_for
 
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = "stock_event_mining"
-DEFAULT_REPORT = ROOT / "output" / "task2_link_quality_report.md"
-DEFAULT_SAMPLE = ROOT / "output" / "task2_link_quality_sample.csv"
+DEFAULT_REPORT = ROOT / "output" / "linking_quality_report.md"
+DEFAULT_SAMPLE = ROOT / "output" / "linking_quality_sample.csv"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate Task 2 link quality report.")
+    parser = argparse.ArgumentParser(description="Generate event-link quality report.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--report-path", default=str(DEFAULT_REPORT))
     parser.add_argument("--sample-path", default=str(DEFAULT_SAMPLE))
@@ -71,7 +71,7 @@ def main() -> None:
                        l.final_link_score
                 from event_company_links l
                 join structured_events e on e.id=l.structured_event_id
-                join int_event_candidates ec on ec.id=e.candidate_id
+                join event_candidates ec on ec.id=e.candidate_id
                 join raw_documents rd on rd.id=ec.raw_document_id
                 join companies c on c.id=l.company_id
                 where rd.symbol_or_subject in ('政策/宏观','政策/通知','行业/市场新闻','行业/股市快讯')
@@ -90,7 +90,7 @@ def main() -> None:
 
     coverage_pct = round(100.0 * covered_events / structured_events, 2) if structured_events else 0.0
     lines = [
-        "# 任务2关联质量报告",
+        "# 事件关联质量报告",
         "",
         f"- companies: {companies}",
         f"- structured_events: {structured_events}",

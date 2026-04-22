@@ -22,7 +22,7 @@
 - `stock_daily_quotes`
 - `market_environment_daily`
 - `sentiment_propagation_daily`
-- `model_event_samples`
+- `event_research_samples`
 
 ### 2.2 内部表（不作为最终交付契约）
 
@@ -44,22 +44,22 @@
 
 | 维度 | 正式字段 | v1 有效值 | 主要表 |
 | --- | --- | --- | --- |
-| 事件驱动主体（一级） | `event_subject_type` | `政策类 / 公司类 / 行业类 / 宏观类 / 地缘类` | `structured_events`, `model_event_samples` |
-| 影响持续周期 | `duration_type` | `脉冲型 / 中期型 / 长尾型` | `structured_events`, `model_event_samples` |
-| 可预测性 | `predictability_type` | `突发型 / 预披露型` | `structured_events`, `model_event_samples` |
-| 事件极性 | `sentiment` | `利好 / 利空 / 中性` | `structured_events`, `model_event_samples` |
-| 时间导向 | `time_orientation` | `future_oriented / current_confirmed / retrospective` | `structured_events`, `model_event_samples` |
-| 事件阶段 | `event_stage` | `预期 / 确认 / 落地/执行 / 反馈` | `structured_events`, `model_event_samples` |
-| 冲击源类型 | `shock_source_type` | `自然灾害 / 公共卫生 / 安全事故 / 地缘政治 / 政策制度 / 技术系统冲击 / 其他` | `structured_events`, `model_event_samples` |
-| 区域范围 | `region_scope` | `domestic / regional / overseas / global` | `structured_events`, `model_event_samples` |
-| 影响范围（粗粒度） | `impact_scope` | `个股链条 / 行业 / 全市场` | `structured_events`, `model_event_samples` |
-| 影响层级数值化 | `impact_level_score` | `1~4`（当前实现） | `model_event_samples` |
-| 事件可信度 | `source_credibility_score` | 数值分，当前建议按 `3/2/1` 对齐 DOCX | `structured_events`, `model_event_samples` |
-| 强触发词得分 | `trigger_word_score` | 非负整数 | `structured_events`, `model_event_samples` |
-| 明确性得分 | `explicitness_score` | 非负整数 | `structured_events`, `model_event_samples` |
-| 不确定性得分 | `uncertainty_score` | 非负整数 | `structured_events`, `model_event_samples` |
-| 新颖度 | `novelty_score` | `0~100` 数值分 | `structured_events`, `model_event_samples` |
-| 金额尺度 | `amount_scale` | 当前为文本枚举位，默认 `none` | `structured_events`, `model_event_samples` |
+| 事件驱动主体（一级） | `event_subject_type` | `政策类 / 公司类 / 行业类 / 宏观类 / 地缘类` | `structured_events`, `event_research_samples` |
+| 影响持续周期 | `duration_type` | `脉冲型 / 中期型 / 长尾型` | `structured_events`, `event_research_samples` |
+| 可预测性 | `predictability_type` | `突发型 / 预披露型` | `structured_events`, `event_research_samples` |
+| 事件极性 | `sentiment` | `利好 / 利空 / 中性` | `structured_events`, `event_research_samples` |
+| 时间导向 | `time_orientation` | `future_oriented / current_confirmed / retrospective` | `structured_events`, `event_research_samples` |
+| 事件阶段 | `event_stage` | `预期 / 确认 / 落地/执行 / 反馈` | `structured_events`, `event_research_samples` |
+| 冲击源类型 | `shock_source_type` | `自然灾害 / 公共卫生 / 安全事故 / 地缘政治 / 政策制度 / 技术系统冲击 / 其他` | `structured_events`, `event_research_samples` |
+| 区域范围 | `region_scope` | `domestic / regional / overseas / global` | `structured_events`, `event_research_samples` |
+| 影响范围（粗粒度） | `impact_scope` | `个股链条 / 行业 / 全市场` | `structured_events`, `event_research_samples` |
+| 影响层级数值化 | `impact_level_score` | `1~4`（当前实现） | `event_research_samples` |
+| 事件可信度 | `source_credibility_score` | 数值分，当前建议按 `3/2/1` 对齐 DOCX | `structured_events`, `event_research_samples` |
+| 强触发词得分 | `trigger_word_score` | 非负整数 | `structured_events`, `event_research_samples` |
+| 明确性得分 | `explicitness_score` | 非负整数 | `structured_events`, `event_research_samples` |
+| 不确定性得分 | `uncertainty_score` | 非负整数 | `structured_events`, `event_research_samples` |
+| 新颖度 | `novelty_score` | `0~100` 数值分 | `structured_events`, `event_research_samples` |
+| 金额尺度 | `amount_scale` | 当前为文本枚举位，默认 `none` | `structured_events`, `event_research_samples` |
 
 ## 5. 需要立即补齐字典、但不必先改主表的口径
 
@@ -96,24 +96,24 @@
 
 | DOCX 模块 | 当前正式字段 | 当前正式表 | 映射方式 | 覆盖情况 |
 | --- | --- | --- | --- | --- |
-| 事件驱动主体（一级） | `event_subject_type` | `structured_events`, `model_event_samples` | 直接映射 | 已覆盖 |
-| 事件驱动主体（二级） | `event_subject_subtype` | `structured_events`, `model_event_samples` | 直接映射，但需冻结枚举 | 部分覆盖 |
-| 信息来源 | `source_type` | `structured_events`, `model_event_samples` | 直接映射 | 部分覆盖 |
-| 权威等级 | `authority_level` | `structured_events`, `model_event_samples` | 直接映射 | 部分覆盖 |
-| 信源可信度 | `source_credibility_score` | `structured_events`, `model_event_samples` | 数值映射，建议按 `3/2/1` | 已有字段，需统一打分口径 |
-| 影响持续周期 | `duration_type` | `structured_events`, `model_event_samples` | 直接映射 | 已覆盖 |
-| 可预测性 | `predictability_type` | `structured_events`, `model_event_samples` | 直接映射 | 已覆盖 |
-| 事件极性 | `sentiment` | `structured_events`, `model_event_samples` | 直接映射 | 已覆盖 |
-| 时间导向 | `time_orientation` | `structured_events`, `model_event_samples` | 直接映射 | 已覆盖 |
-| 事件阶段 | `event_stage` | `structured_events`, `model_event_samples` | 直接映射 | 已覆盖 |
-| 冲击源类型 | `shock_source_type` | `structured_events`, `model_event_samples` | 直接映射 | 已覆盖 |
-| 强触发词 / 明确性 / 不确定性 / 新颖度 | `trigger_word_score / explicitness_score / uncertainty_score / novelty_score` | `structured_events`, `model_event_samples` | 数值特征映射 | 已覆盖 |
-| 金额规模 / 金额相对规模 | `amount_scale` | `structured_events`, `model_event_samples` | 当前仅保留尺度位，未完整细化 | 部分覆盖 |
-| 影响层级 | `impact_scope + impact_level_score` | `structured_events`, `model_event_samples` | 粗粒度文本 + 数值化 | 部分覆盖 |
-| 涉及公司数量 | `affected_company_count` | `model_event_samples` | 训练样本层承载 | 已覆盖 |
-| 涉及行业数量 | `affected_industry_count` | `model_event_samples` | 训练样本层承载 | 已覆盖 |
+| 事件驱动主体（一级） | `event_subject_type` | `structured_events`, `event_research_samples` | 直接映射 | 已覆盖 |
+| 事件驱动主体（二级） | `event_subject_subtype` | `structured_events`, `event_research_samples` | 直接映射，但需冻结枚举 | 部分覆盖 |
+| 信息来源 | `source_type` | `structured_events`, `event_research_samples` | 直接映射 | 部分覆盖 |
+| 权威等级 | `authority_level` | `structured_events`, `event_research_samples` | 直接映射 | 部分覆盖 |
+| 信源可信度 | `source_credibility_score` | `structured_events`, `event_research_samples` | 数值映射，建议按 `3/2/1` | 已有字段，需统一打分口径 |
+| 影响持续周期 | `duration_type` | `structured_events`, `event_research_samples` | 直接映射 | 已覆盖 |
+| 可预测性 | `predictability_type` | `structured_events`, `event_research_samples` | 直接映射 | 已覆盖 |
+| 事件极性 | `sentiment` | `structured_events`, `event_research_samples` | 直接映射 | 已覆盖 |
+| 时间导向 | `time_orientation` | `structured_events`, `event_research_samples` | 直接映射 | 已覆盖 |
+| 事件阶段 | `event_stage` | `structured_events`, `event_research_samples` | 直接映射 | 已覆盖 |
+| 冲击源类型 | `shock_source_type` | `structured_events`, `event_research_samples` | 直接映射 | 已覆盖 |
+| 强触发词 / 明确性 / 不确定性 / 新颖度 | `trigger_word_score / explicitness_score / uncertainty_score / novelty_score` | `structured_events`, `event_research_samples` | 数值特征映射 | 已覆盖 |
+| 金额规模 / 金额相对规模 | `amount_scale` | `structured_events`, `event_research_samples` | 当前仅保留尺度位，未完整细化 | 部分覆盖 |
+| 影响层级 | `impact_scope + impact_level_score` | `structured_events`, `event_research_samples` | 粗粒度文本 + 数值化 | 部分覆盖 |
+| 涉及公司数量 | `affected_company_count` | `event_research_samples` | 训练样本层承载 | 已覆盖 |
+| 涉及行业数量 | `affected_industry_count` | `event_research_samples` | 训练样本层承载 | 已覆盖 |
 | 产业链覆盖环节数 | 暂无正式字段 | - | 需落到图谱/样本增强层 | 缺口 |
-| 区域覆盖范围 | `region_scope` | `structured_events`, `model_event_samples` | 当前仅粗粒度文本 | 部分覆盖 |
+| 区域覆盖范围 | `region_scope` | `structured_events`, `event_research_samples` | 当前仅粗粒度文本 | 部分覆盖 |
 | 市场覆盖范围 | 暂无正式字段 | - | 需在 v2 补充 | 缺口 |
 | 舆情热度 | `mention_count / media_count / heat_score / heat_growth_rate / heat_duration_days` | `sentiment_propagation_daily` | 直接映射 | 已覆盖 |
 | 舆情情绪分歧 | `disagreement_score / sentiment_std / source_stance_divergence` | `sentiment_propagation_daily` | 直接映射 | 已覆盖 |
@@ -140,7 +140,7 @@
 ## 8. 当前库状态对应的结论（2026-04-16 快照）
 
 1. `structured_events` 已经承载了大部分事件分类主字段。
-2. `model_event_samples` 已把多数事件分类字段带入训练样本层。
+2. `event_research_samples` 已把多数事件分类字段带入训练样本层。
 3. `sentiment_propagation_daily` 已能承接 DOCX 中“热度/分歧度”这部分口径。
 4. `company_relations`、`event_company_links` 已形成图边骨架，但仍偏轻量。
 5. 当前最需要先做的不是大改主表，而是：

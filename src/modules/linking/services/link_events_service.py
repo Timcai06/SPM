@@ -8,7 +8,6 @@ from pathlib import Path
 
 import psycopg
 
-from capabilities.storage.db_guard import dsn_for, write_guard
 from modules.events.domain.canonical_matching import load_canonical_map_from_csv, load_canonical_map_from_db
 from modules.linking.adapters.db_repository import (
     delete_stale_links,
@@ -18,6 +17,7 @@ from modules.linking.adapters.db_repository import (
 )
 from modules.linking.domain.scoring import is_generic_event, score_link
 from modules.linking.services.cluster_service import build_cluster_events
+from modules.runtime.adapters.db import dsn_for, write_guard
 
 
 def run_linking(db: str, top_k: int, min_score: float, canonical_map_path: str, progress_every: int, lock_timeout_sec: int) -> tuple[int, int]:
@@ -70,4 +70,3 @@ def run_linking(db: str, top_k: int, min_score: float, canonical_map_path: str, 
                 stale_deleted = delete_stale_links(cur, touched_structured_event_ids, current_keys)
             conn.commit()
     return upserted, stale_deleted
-

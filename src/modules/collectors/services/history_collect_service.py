@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Historical document backfill collectors for Task 1."""
+"""Historical document backfill collectors."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from modules.collectors.adapters import cninfo
 from modules.collectors.adapters.db_repository import upsert_raw_document_rows
-from capabilities.storage.db_guard import dsn_for
+from modules.runtime.adapters.db import dsn_for
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -31,7 +31,7 @@ DEFAULT_OUTPUT = ROOT / "output" / "history"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Collect historical raw documents for Task 1.")
+    parser = argparse.ArgumentParser(description="Collect historical raw documents.")
     parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--source", choices=["akshare-news", "cninfo-disclosure"], default="akshare-news")
     parser.add_argument("--symbol-source", choices=["db", "all-a"], default="db")

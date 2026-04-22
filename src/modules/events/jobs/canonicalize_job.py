@@ -19,7 +19,7 @@ INPUT_PATH = ROOT / "output" / "structured_events.csv"
 OUTPUT_DIR = ROOT / "output"
 CANONICAL_EVENTS_PATH = OUTPUT_DIR / "canonical_events.csv"
 CANONICAL_MAP_PATH = OUTPUT_DIR / "event_canonical_map.csv"
-REPORT_PATH = ROOT / "report" / "task1_canonicalization_report.md"
+REPORT_PATH = ROOT / "report" / "event_canonicalization_report.md"
 
 TOKEN_PATTERN = re.compile(r"[\u4e00-\u9fffA-Za-z0-9\-]+")
 GENERIC_TOKENS = {
@@ -249,7 +249,7 @@ def write_report(path: Path, canonical_rows: List[Dict[str, object]], mapping_ro
     cluster_sizes = Counter(int(row["cluster_size"]) for row in canonical_rows)
     multi_source = sum(1 for row in canonical_rows if int(row["cluster_size"]) > 1)
     lines = [
-        "# 任务1事件归并报告",
+        "# 事件归并报告",
         "",
         f"- 归并后标准事件簇数：{len(canonical_rows)}",
         f"- 原始结构化事件数：{len(mapping_rows)}",
@@ -285,10 +285,10 @@ def run_canonicalization_pipeline(db: str = None, input_rows: List[Dict[str, str
         rows = input_rows
     elif db:
         import psycopg
-        from capabilities.storage.db_guard import dsn_for
+        from modules.runtime.adapters.db import dsn_for
         with psycopg.connect(dsn_for(db)) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT * FROM int_structured_events_stage")
+                cur.execute("SELECT * FROM stg_structured_events")
                 columns = [desc[0] for desc in cur.description]
                 rows = [dict(zip(columns, row)) for row in cur.fetchall()]
     else:
@@ -304,7 +304,7 @@ def run_canonicalization_pipeline(db: str = None, input_rows: List[Dict[str, str
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build canonical event clusters from structured events.")
-    parser.add_argument("--db", help="Database name to read int_structured_events_stage from.")
+    parser.add_argument("--db", help="Database name to read stg_structured_events from.")
     parser.add_argument("--input", default=str(INPUT_PATH), help="Structured events CSV path (if not using --db).")
     parser.add_argument("--canonical_output", default=str(CANONICAL_EVENTS_PATH), help="Canonical events CSV output path.")
     parser.add_argument("--mapping_output", default=str(CANONICAL_MAP_PATH), help="Event to canonical mapping CSV output path.")

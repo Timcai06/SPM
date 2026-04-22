@@ -10,7 +10,7 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from modules.analysis.services.legacy_analysis_service import run_feature_return
+from modules.analysis.services.feature_analysis_service import run_feature_return
 
 
 def main(argv: list[str] | None = None) -> None:

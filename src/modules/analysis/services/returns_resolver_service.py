@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Callable, Dict, Optional
 
-from capabilities.analysis.tushare_adapter import fetch_index_returns, fetch_stock_returns
+from modules.analysis.adapters.tushare_returns_adapter import fetch_index_returns, fetch_stock_returns
 from modules.analysis.services.feature_cache_service import get_cached_series, put_cached_series
 from modules.analysis.services.market_data_service import (
     close_series_to_returns,
@@ -105,7 +105,7 @@ def resolve_stock_returns(
     market_max_rows: int,
     enable_eastmoney_fallback: bool,
     reason_counts: Dict[str, int],
-    fetch_company_stats_returns_fn: Callable[[str, str], Dict[str, float]],
+    fetch_security_daily_returns_fn: Callable[[str, str], Dict[str, float]],
 ) -> tuple[Dict[str, float], str]:
     def add_reason(key: str) -> None:
         reason_counts[key] = reason_counts.get(key, 0) + 1
@@ -114,12 +114,12 @@ def resolve_stock_returns(
     returns: Dict[str, float] = {}
     source_name = "none"
     try:
-        returns = fetch_company_stats_returns_fn(db, ts_code)
+        returns = fetch_security_daily_returns_fn(db, ts_code)
     except Exception as exc:
         returns = {}
-        add_reason(f"int_company_stats_error:{exc.__class__.__name__}")
+        add_reason(f"security_features_daily_error:{exc.__class__.__name__}")
     if returns:
-        source_name = "int_company_stats"
+        source_name = "security_features_daily"
     elif not disable_cache:
         returns, source_name = get_cached_series(cache_payload, stock_cache_key)
         if returns:

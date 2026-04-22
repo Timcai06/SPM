@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Task 1 quality sampling file and quality report."""
+"""Generate event-quality sampling files and a quality report."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 RAW_PATH = ROOT / "output" / "raw_event_candidates.csv"
 STRUCTURED_PATH = ROOT / "output" / "structured_events.csv"
 SAMPLE_PATH = ROOT / "output" / "quality_sample.csv"
-REPORT_PATH = ROOT / "output" / "task1_quality_report.md"
+REPORT_PATH = ROOT / "output" / "event_quality_report.md"
 
 STRUCTURED_REQUIRED_FIELDS = [
     "event_id",
@@ -144,7 +144,7 @@ def write_report(
     avg_intensity = sum(int(r.get("intensity_score", "0") or 0) for r in structured_rows) / len(structured_rows) if structured_rows else 0.0
 
     lines = [
-        "# 任务1质量评估报告",
+        "# 事件质量评估报告",
         "",
         "## 一、样本规模",
         f"- run_id：{run_id}",
@@ -194,7 +194,7 @@ def write_report(
             f"- 平均 `intensity_score`：{avg_intensity:.2f}",
             "",
             "## 七、结论",
-            "- 本报告用于任务1质量闭环，重点关注识别准确率、标签稳定性、字段完整率。",
+            "- 本报告用于事件质量闭环，重点关注识别准确率、标签稳定性、字段完整率。",
             "- 建议每次规则版本升级后重跑本报告并对比历史结果。",
         ]
     )
@@ -203,7 +203,7 @@ def write_report(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate quality sample and Task 1 quality report.")
+    parser = argparse.ArgumentParser(description="Generate quality sample and event quality report.")
     parser.add_argument("--sample-size", type=int, default=50, help="Manual review sample size (recommended 20-50).")
     parser.add_argument("--seed", type=int, default=42, help="Sampling random seed.")
     parser.add_argument("--sample-path", default=str(SAMPLE_PATH), help="Output CSV path for manual review sample.")
