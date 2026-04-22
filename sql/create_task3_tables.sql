@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_company_relations_type
 CREATE INDEX IF NOT EXISTS idx_company_relations_strength
     ON company_relations (relation_strength DESC);
 
-CREATE TABLE IF NOT EXISTS int_event_propagation_links (
+CREATE TABLE IF NOT EXISTS event_propagation_edges (
     id BIGSERIAL PRIMARY KEY,
     structured_event_id BIGINT NOT NULL REFERENCES structured_events(id) ON DELETE CASCADE,
     source_company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -42,14 +42,14 @@ CREATE TABLE IF NOT EXISTS int_event_propagation_links (
     UNIQUE (structured_event_id, source_company_id, target_company_id, propagation_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_int_event_propagation_links_event
-    ON int_event_propagation_links (structured_event_id);
+CREATE INDEX IF NOT EXISTS idx_event_propagation_edges_event
+    ON event_propagation_edges (structured_event_id);
 
-CREATE INDEX IF NOT EXISTS idx_int_event_propagation_links_source
-    ON int_event_propagation_links (source_company_id);
+CREATE INDEX IF NOT EXISTS idx_event_propagation_edges_source
+    ON event_propagation_edges (source_company_id);
 
-CREATE INDEX IF NOT EXISTS idx_int_event_propagation_links_target
-    ON int_event_propagation_links (target_company_id);
+CREATE INDEX IF NOT EXISTS idx_event_propagation_edges_target
+    ON event_propagation_edges (target_company_id);
 
-CREATE INDEX IF NOT EXISTS idx_int_event_propagation_links_score
-    ON int_event_propagation_links (propagation_score DESC);
+CREATE INDEX IF NOT EXISTS idx_event_propagation_edges_score
+    ON event_propagation_edges (propagation_score DESC);

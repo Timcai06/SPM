@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> None:
 
     with write_guard(
         db_name=args.db,
-        required_tables=["companies", "model_event_samples"],
+        required_tables=["companies", "event_research_samples"],
         lock_timeout_sec=args.lock_timeout_sec,
     ) as conn:
         with conn.cursor() as cur:
@@ -107,19 +107,19 @@ def main(argv: list[str] | None = None) -> None:
             for row in rows:
                 cur.execute(
                     """
-                    INSERT INTO int_company_stats (
+                    INSERT INTO security_features_daily (
                         ts_code, trade_date, total_mv, circ_mv, pe_ttm, pb,
                         turnover_rate, volume_ratio, daily_return,
                         trailing_return_5d, trailing_return_20d, trailing_return_60d,
                         volatility_5d, volatility_20d, volatility_60d, up_days_20d,
-                        forward_return_1d, forward_return_3d, forward_return_5d, data_source
+                        data_source
                     )
                     VALUES (
                         %s, %s, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
                         NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
                         NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric,
                         NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::int,
-                        NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, %s
+                        %s
                     )
                     ON CONFLICT (ts_code, trade_date) DO UPDATE
                     SET
@@ -137,9 +137,6 @@ def main(argv: list[str] | None = None) -> None:
                         volatility_20d = EXCLUDED.volatility_20d,
                         volatility_60d = EXCLUDED.volatility_60d,
                         up_days_20d = EXCLUDED.up_days_20d,
-                        forward_return_1d = EXCLUDED.forward_return_1d,
-                        forward_return_3d = EXCLUDED.forward_return_3d,
-                        forward_return_5d = EXCLUDED.forward_return_5d,
                         data_source = EXCLUDED.data_source,
                         updated_at = NOW()
                     """,
@@ -160,6 +157,28 @@ def main(argv: list[str] | None = None) -> None:
                         row.get("volatility_20d", ""),
                         row.get("volatility_60d", ""),
                         row.get("up_days_20d", ""),
+                        row.get("data_source", "tushare"),
+                    ),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO security_forward_labels_daily (
+                        ts_code, trade_date, forward_return_1d, forward_return_3d, forward_return_5d, data_source
+                    )
+                    VALUES (
+                        %s, %s, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, NULLIF(%s, '')::numeric, %s
+                    )
+                    ON CONFLICT (ts_code, trade_date) DO UPDATE
+                    SET
+                        forward_return_1d = EXCLUDED.forward_return_1d,
+                        forward_return_3d = EXCLUDED.forward_return_3d,
+                        forward_return_5d = EXCLUDED.forward_return_5d,
+                        data_source = EXCLUDED.data_source,
+                        updated_at = NOW()
+                    """,
+                    (
+                        row["ts_code"],
+                        row["trade_date"],
                         row.get("forward_return_1d", ""),
                         row.get("forward_return_3d", ""),
                         row.get("forward_return_5d", ""),

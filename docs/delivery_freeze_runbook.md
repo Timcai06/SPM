@@ -26,7 +26,7 @@
 - `collect-history`：发现新数据，按 source/symbol/date 拉取原始记录。
 - `backfill-cninfo-fulltext`：基于已有 `raw_documents.url` 回填巨潮正文。
 - `classify` / `classify-pending` / `reclassify-source`：把 `raw_documents` 转成 `structured_events`。
-- `task2/task3`：基于结构化事件继续构建 `event_company_links` 与传播关系。
+- `linking/graph`：基于结构化事件继续构建 `event_company_links` 与传播关系。
 
 ## 交付口径
 
@@ -53,7 +53,7 @@
 ### 运行进程
 
 ```bash
-pgrep -f "task1.py collect-history|task1.py backfill-cninfo-fulltext" | wc -l
+pgrep -f "collect.py collect-history|collect.py backfill-cninfo-fulltext" | wc -l
 ```
 
 ### 2025 巨潮正文合格率

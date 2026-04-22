@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Task 1 event-study analysis with benchmark abnormal returns."""
+"""Event-study analysis with benchmark abnormal returns."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from capabilities.analysis.tushare_adapter import load_tushare
 from modules.analysis.adapters.db_repository import (
-    fetch_company_stats_returns,
+    fetch_security_daily_returns,
     run_query_rows,
 )
 from modules.analysis.services.feature_cache_service import load_market_cache, resolve_tushare_token, save_market_cache
@@ -40,8 +40,8 @@ from modules.analysis.services.returns_resolver_service import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_REPORT = ROOT / "output" / "task1_feature_return_report.md"
-DEFAULT_DATASET = ROOT / "output" / "task1_event_return_dataset.csv"
+DEFAULT_REPORT = ROOT / "output" / "feature_return_report.md"
+DEFAULT_DATASET = ROOT / "output" / "event_return_dataset.csv"
 DEFAULT_CACHE = ROOT / "output" / "meta" / "feature_market_cache.json"
 INDEX_CODE_MAP = {"hs300": "000300.SH"}
 INDEX_SINA_SYMBOL_MAP = {"hs300": "sh000300"}
@@ -49,7 +49,7 @@ INDEX_EASTMONEY_SECID_MAP = {"hs300": "1.000300"}
 ENABLE_EASTMONEY_FALLBACK = os.getenv("USE_EASTMONEY", "0") == "1"
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Task1 event-study analysis.")
+    parser = argparse.ArgumentParser(description="Event-study analysis.")
     parser.add_argument("--db", default="stock_event_mining", help="PostgreSQL database name.")
     parser.add_argument("--min-link-score", type=float, default=0.35, help="Minimum event-company link score.")
     parser.add_argument("--analysis-mode", default="event-study", help="Analysis mode, currently only event-study.")
@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> None:
             END AS ts_code,
             1.0::text AS final_link_score
         FROM structured_events e
-        JOIN int_event_candidates c ON c.id = e.candidate_id
+        JOIN event_candidates c ON c.id = e.candidate_id
         JOIN raw_documents d ON d.id = c.raw_document_id
         WHERE d.symbol_or_subject ~ '^[0-9]{6}$'
         ORDER BY e.event_date DESC
@@ -212,7 +212,7 @@ def main(argv: list[str] | None = None) -> None:
                 market_max_rows=args.market_max_rows,
                 enable_eastmoney_fallback=ENABLE_EASTMONEY_FALLBACK,
                 reason_counts=reason_counts,
-                fetch_company_stats_returns_fn=fetch_company_stats_returns,
+                fetch_security_daily_returns_fn=fetch_security_daily_returns,
             )
             stock_cache[ts_code] = returns
             stock_source_map[ts_code] = source_name

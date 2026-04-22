@@ -59,10 +59,10 @@ class ReturnsResolverServiceTests(unittest.TestCase):
             market_max_rows=10,
             enable_eastmoney_fallback=False,
             reason_counts={},
-            fetch_company_stats_returns_fn=lambda db, ts: {"2025-01-01": 0.2},
+            fetch_security_daily_returns_fn=lambda db, ts: {"2025-01-01": 0.2},
         )
         self.assertEqual(returns["2025-01-01"], 0.2)
-        self.assertEqual(source, "int_company_stats")
+        self.assertEqual(source, "security_features_daily")
 
     def test_resolve_stock_returns_falls_back_to_sina(self) -> None:
         with (
@@ -86,7 +86,7 @@ class ReturnsResolverServiceTests(unittest.TestCase):
                 market_max_rows=10,
                 enable_eastmoney_fallback=True,
                 reason_counts={},
-                fetch_company_stats_returns_fn=lambda db, ts: {},
+                fetch_security_daily_returns_fn=lambda db, ts: {},
             )
         self.assertEqual(source, "sina_stock_fallback")
         self.assertIn("2025-01-02", returns)

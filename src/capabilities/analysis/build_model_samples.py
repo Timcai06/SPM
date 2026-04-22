@@ -22,7 +22,7 @@ from capabilities.storage.db_guard import write_guard
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = "stock_event_mining"
-DEFAULT_LABEL_DATASET = ROOT / "output" / "task1_event_return_dataset.csv"
+DEFAULT_LABEL_DATASET = ROOT / "output" / "event_return_dataset.csv"
 CREATE_SQL_PATH = ROOT / "sql" / "create_model_training_tables.sql"
 SUPPORT_SQL_PATH = ROOT / "sql" / "create_training_support_tables.sql"
 
@@ -34,7 +34,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--label-dataset",
         default=str(DEFAULT_LABEL_DATASET),
-        help="Optional event-study dataset CSV (task1 feature output).",
+        help="Optional event-study dataset CSV.",
     )
     parser.add_argument("--run-id", default="", help="Optional run id for traceability.")
     parser.add_argument("--lock-timeout-sec", type=int, default=120, help="Write lock timeout in seconds.")
@@ -61,8 +61,8 @@ def resolve_label_dataset(path: Path) -> Path:
     if path.exists():
         return path
     candidates = [
-        ROOT.parent / f"{ROOT.name}-main-run" / "output" / "task1_event_return_dataset.csv",
-        ROOT.parent / f"{ROOT.name}-run" / "output" / "task1_event_return_dataset.csv",
+        ROOT.parent / f"{ROOT.name}-main-run" / "output" / "event_return_dataset.csv",
+        ROOT.parent / f"{ROOT.name}-run" / "output" / "event_return_dataset.csv",
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -177,10 +177,10 @@ def fetch_base_rows(conn: psycopg.Connection, min_link_score: float) -> list[dic
             JOIN companies comp ON comp.id = ecl.company_id
             GROUP BY ecl.structured_event_id
         ) ls ON ls.structured_event_id = se.id
-        LEFT JOIN int_event_canonical_links cl ON cl.structured_event_id = se.id
+        LEFT JOIN canonical_event_memberships cl ON cl.structured_event_id = se.id
         LEFT JOIN LATERAL (
             SELECT *
-            FROM int_company_stats cs
+            FROM security_features_daily cs
             WHERE cs.ts_code = c.ts_code
               AND cs.trade_date <= se.event_date
             ORDER BY cs.trade_date DESC
@@ -214,7 +214,7 @@ def main(argv: list[str] | None = None) -> None:
 
     with write_guard(
         db_name=args.db,
-        required_tables=["structured_events", "event_company_links", "companies"],
+        required_tables=["structured_events", "event_company_links", "companies", "security_features_daily"],
         lock_timeout_sec=args.lock_timeout_sec,
     ) as conn:
         ensure_tables(conn)
@@ -328,7 +328,7 @@ def main(argv: list[str] | None = None) -> None:
                 placeholders = ", ".join(["%s"] * len(payload))
                 cur.execute(
                     f"""
-                    INSERT INTO model_event_samples (
+                    INSERT INTO event_research_samples (
                         sample_key, sample_run_id, structured_event_id, company_id, canonical_event_id,
                         event_id, event_date, ts_code, company_name,
                         event_subject_type, event_subject_subtype, source_type, authority_level, source_credibility_score,
@@ -416,7 +416,7 @@ def main(argv: list[str] | None = None) -> None:
             if active_sample_keys:
                 cur.execute(
                     """
-                    DELETE FROM model_event_samples ms
+                    DELETE FROM event_research_samples ms
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM current_model_event_sample_keys keys
@@ -428,7 +428,7 @@ def main(argv: list[str] | None = None) -> None:
         conn.commit()
 
     print(
-        f"Built model_event_samples for db={args.db}: "
+        f"Built event_research_samples for db={args.db}: "
         f"upserted={upserted}, deleted_stale={deleted}, labels_loaded={len(label_map)}, label_path={label_path_used}"
     )
     print(f"run_id={run_id}")

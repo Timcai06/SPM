@@ -260,14 +260,14 @@ def load_stage_tables(db: str, raw_documents: list[dict[str, str]], raw_candidat
         db,
         build_candidate_stage_rows(raw_candidates),
         CANDIDATE_STAGE_FIELDS,
-        "int_event_candidates_stage",
+        "stg_event_candidates",
         truncate=True,
     )
     copy_csv_to_table(
         db,
         build_structured_stage_rows(structured_events),
         STRUCTURED_STAGE_FIELDS,
-        "int_structured_events_stage",
+        "stg_structured_events",
         truncate=True,
     )
 
@@ -276,7 +276,7 @@ def insert_final_tables(db: str) -> None:
     run_psql(
         db,
         """
-        INSERT INTO int_event_candidates (raw_document_id, dedup_key, duplicate_group_size, is_event, filter_reason, evidence, score_hint)
+        INSERT INTO event_candidates (raw_document_id, dedup_key, duplicate_group_size, is_event, filter_reason, evidence, score_hint)
         SELECT d.id,
                s.dedup_key,
                s.duplicate_group_size::integer,
@@ -284,7 +284,7 @@ def insert_final_tables(db: str) -> None:
                s.filter_reason,
                s.evidence,
                NULLIF(s.score_hint, '')::integer
-        FROM int_event_candidates_stage s
+        FROM stg_event_candidates s
         JOIN raw_documents d ON d.url = s.raw_document_url
         ORDER BY d.id
         ON CONFLICT (raw_document_id) DO UPDATE
@@ -362,9 +362,9 @@ def insert_final_tables(db: str) -> None:
                s.subject_entities::jsonb,
                s.raw_text_ref,
                s.classification_evidence
-        FROM int_structured_events_stage s
+        FROM stg_structured_events s
         JOIN raw_documents d ON d.url = s.raw_text_ref
-        JOIN int_event_candidates c ON c.raw_document_id = d.id
+        JOIN event_candidates c ON c.raw_document_id = d.id
         ORDER BY c.id
         ON CONFLICT (candidate_id) DO UPDATE
         SET event_id = EXCLUDED.event_id,
@@ -422,13 +422,13 @@ def insert_final_tables(db: str) -> None:
         db,
         """
         DELETE FROM structured_events se
-        USING int_event_candidates ec
+        USING event_candidates ec
         WHERE se.candidate_id = ec.id
           AND ec.id IN (
               SELECT c.id
-              FROM int_event_candidates_stage s
+              FROM stg_event_candidates s
               JOIN raw_documents d ON d.url = s.raw_document_url
-              JOIN int_event_candidates c ON c.raw_document_id = d.id
+              JOIN event_candidates c ON c.raw_document_id = d.id
           )
           AND ec.is_event = false;
         """,
@@ -443,10 +443,10 @@ def main() -> None:
         db_name=db,
         required_tables=[
             "raw_documents",
-            "int_event_candidates",
+            "event_candidates",
             "structured_events",
-            "int_event_candidates_stage",
-            "int_structured_events_stage",
+            "stg_event_candidates",
+            "stg_structured_events",
         ],
         lock_timeout_sec=args.lock_timeout_sec,
     ):

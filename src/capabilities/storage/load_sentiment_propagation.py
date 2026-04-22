@@ -117,10 +117,10 @@ def load_source_rows(conn: psycopg.Connection) -> list[dict[str, object]]:
                 rd.source AS raw_source,
                 rd.title AS raw_title
             FROM structured_events se
-            JOIN int_event_candidates ec ON ec.id = se.candidate_id
+            JOIN event_candidates ec ON ec.id = se.candidate_id
             JOIN raw_documents rd ON rd.id = ec.raw_document_id
-            LEFT JOIN int_event_canonical_links ecl ON ecl.structured_event_id = se.id
-            LEFT JOIN int_canonical_events ce ON ce.canonical_event_id = ecl.canonical_event_id
+            LEFT JOIN canonical_event_memberships ecl ON ecl.structured_event_id = se.id
+            LEFT JOIN canonical_event_clusters ce ON ce.canonical_event_id = ecl.canonical_event_id
             ORDER BY canonical_event_id, stat_date, se.source_type, rd.source, rd.title
             """
         )
@@ -253,8 +253,8 @@ def main(argv: list[str] | None = None) -> None:
         required_tables=[
             "raw_documents",
             "structured_events",
-            "int_canonical_events",
-            "int_event_canonical_links",
+            "canonical_event_clusters",
+            "canonical_event_memberships",
             "sentiment_propagation_daily",
         ],
         lock_timeout_sec=args.lock_timeout_sec,

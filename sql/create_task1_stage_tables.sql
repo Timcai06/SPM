@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS int_event_candidates_stage (
+CREATE TABLE IF NOT EXISTS stg_event_candidates (
     raw_document_url TEXT NOT NULL,
     dedup_key TEXT NOT NULL,
     duplicate_group_size TEXT NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS int_event_candidates_stage (
     score_hint TEXT
 );
 
-CREATE TABLE IF NOT EXISTS int_structured_events_stage (
+CREATE TABLE IF NOT EXISTS stg_structured_events (
     event_id TEXT NOT NULL,
     raw_text_ref TEXT NOT NULL,
     event_name TEXT NOT NULL,
@@ -60,36 +60,36 @@ CREATE TABLE IF NOT EXISTS int_structured_events_stage (
     classification_evidence TEXT
 );
 
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS source_type TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS authority_level TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS source_credibility_score TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS event_subject_subtype TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS time_orientation TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS event_stage TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS shock_source_type TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS region_scope TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS trigger_word_score TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS explicitness_score TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS uncertainty_score TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS novelty_score TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS amount_scale TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS amount_max_rmb TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS amount_log_rmb TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS event_code TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS sw_l1_industry TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS sw_l1_industry_code TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS sentiment_score_0_100 TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS source_credibility_type TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS company_count TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS industry_count TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS province_count TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS city_count TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS country_count TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS chain_stage_count TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS chain_stages TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS report_count TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS media_coverage_count TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS heat_growth_rate TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS heat_duration_days TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS disagreement_score TEXT;
-ALTER TABLE int_structured_events_stage ADD COLUMN IF NOT EXISTS classification_confidence TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS source_type TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS authority_level TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS source_credibility_score TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS event_subject_subtype TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS time_orientation TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS event_stage TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS shock_source_type TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS region_scope TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS trigger_word_score TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS explicitness_score TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS uncertainty_score TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS novelty_score TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS amount_scale TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS amount_max_rmb TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS amount_log_rmb TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS event_code TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS sw_l1_industry TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS sw_l1_industry_code TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS sentiment_score_0_100 TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS source_credibility_type TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS company_count TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS industry_count TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS province_count TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS city_count TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS country_count TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS chain_stage_count TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS chain_stages TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS report_count TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS media_coverage_count TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS heat_growth_rate TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS heat_duration_days TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS disagreement_score TEXT;
+ALTER TABLE stg_structured_events ADD COLUMN IF NOT EXISTS classification_confidence TEXT;

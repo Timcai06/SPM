@@ -27,7 +27,7 @@ CREATE INDEX IF NOT EXISTS idx_raw_documents_title_trgm
     ON raw_documents
     USING gin (title gin_trgm_ops);
 
-CREATE TABLE IF NOT EXISTS int_event_candidates (
+CREATE TABLE IF NOT EXISTS event_candidates (
     id BIGSERIAL PRIMARY KEY,
     raw_document_id BIGINT NOT NULL REFERENCES raw_documents(id) ON DELETE CASCADE,
     dedup_key TEXT NOT NULL,
@@ -40,16 +40,16 @@ CREATE TABLE IF NOT EXISTS int_event_candidates (
     UNIQUE (raw_document_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_int_event_candidates_is_event
-    ON int_event_candidates (is_event);
+CREATE INDEX IF NOT EXISTS idx_event_candidates_is_event
+    ON event_candidates (is_event);
 
-CREATE INDEX IF NOT EXISTS idx_int_event_candidates_dedup_key
-    ON int_event_candidates (dedup_key);
+CREATE INDEX IF NOT EXISTS idx_event_candidates_dedup_key
+    ON event_candidates (dedup_key);
 
 CREATE TABLE IF NOT EXISTS structured_events (
     id BIGSERIAL PRIMARY KEY,
     event_id TEXT NOT NULL,
-    candidate_id BIGINT NOT NULL REFERENCES int_event_candidates(id) ON DELETE CASCADE,
+    candidate_id BIGINT NOT NULL REFERENCES event_candidates(id) ON DELETE CASCADE,
     event_name TEXT NOT NULL,
     event_date DATE NOT NULL,
     source TEXT NOT NULL,

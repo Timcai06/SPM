@@ -7,7 +7,7 @@ from typing import Dict, List
 
 import psycopg
 
-from capabilities.storage.db_guard import dsn_for
+from modules.runtime.adapters.db import dsn_for
 
 
 def run_query_rows(db: str, sql: str) -> List[Dict[str, str]]:
@@ -21,10 +21,10 @@ def run_query_rows(db: str, sql: str) -> List[Dict[str, str]]:
     return normalized
 
 
-def fetch_company_stats_returns(db: str, ts_code: str) -> Dict[str, float]:
+def fetch_security_daily_returns(db: str, ts_code: str) -> Dict[str, float]:
     sql = """
         SELECT trade_date::text AS trade_date, daily_return
-        FROM int_company_stats
+        FROM security_features_daily
         WHERE ts_code = %s
           AND daily_return IS NOT NULL
         ORDER BY trade_date

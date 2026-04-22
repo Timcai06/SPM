@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS model_event_samples (
+CREATE TABLE IF NOT EXISTS event_research_samples (
     id BIGSERIAL PRIMARY KEY,
     sample_key TEXT NOT NULL UNIQUE,
     sample_run_id TEXT NOT NULL,
@@ -55,14 +55,14 @@ CREATE TABLE IF NOT EXISTS model_event_samples (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_model_event_samples_event_date
-    ON model_event_samples (event_date DESC);
+CREATE INDEX IF NOT EXISTS idx_event_research_samples_event_date
+    ON event_research_samples (event_date DESC);
 
-CREATE INDEX IF NOT EXISTS idx_model_event_samples_ts_code
-    ON model_event_samples (ts_code);
+CREATE INDEX IF NOT EXISTS idx_event_research_samples_ts_code
+    ON event_research_samples (ts_code);
 
-CREATE INDEX IF NOT EXISTS idx_model_event_samples_subject
-    ON model_event_samples (event_subject_type);
+CREATE INDEX IF NOT EXISTS idx_event_research_samples_subject
+    ON event_research_samples (event_subject_type);
 
-CREATE INDEX IF NOT EXISTS idx_model_event_samples_final_link
-    ON model_event_samples (final_link_score DESC);
+CREATE INDEX IF NOT EXISTS idx_event_research_samples_final_link
+    ON event_research_samples (final_link_score DESC);

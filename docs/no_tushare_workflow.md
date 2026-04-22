@@ -13,8 +13,8 @@
 ### 1.1 用公共源生成公司 seed
 
 ```bash
-python3 src/cli/task2.py import-companies-public --output output/seeds/companies_public.csv
-python3 src/cli/task2.py load-companies --db stock_event_mining --input output/seeds/companies_public.csv
+python3 src/cli/linking.py import-companies-public --output output/seeds/companies_public.csv
+python3 src/cli/linking.py load-companies --db stock_event_mining --input output/seeds/companies_public.csv
 ```
 
 ### 1.2 导入公司画像快照
@@ -22,7 +22,7 @@ python3 src/cli/task2.py load-companies --db stock_event_mining --input output/s
 如果你有更完整的画像 CSV：
 
 ```bash
-python3 src/cli/task2.py load-company-profiles --db stock_event_mining --input output/seeds/company_profiles_seed.csv
+python3 src/cli/linking.py load-company-profiles --db stock_event_mining --input output/seeds/company_profiles_seed.csv
 ```
 
 如果没有，加载器会自动尝试：
@@ -38,8 +38,8 @@ python3 src/cli/task2.py load-company-profiles --db stock_event_mining --input o
 ## 2. 生成公司统计特征 + 正式行情表
 
 ```bash
-python3 src/cli/task2.py import-company-stats --db stock_event_mining --source auto --days 120 --max-symbols 300
-python3 src/cli/task2.py load-company-stats --db stock_event_mining
+python3 src/cli/linking.py import-company-stats --db stock_event_mining --source auto --days 120 --max-symbols 300
+python3 src/cli/linking.py load-company-stats --db stock_event_mining
 ```
 
 这一步现在会按下面顺序尝试：
@@ -55,7 +55,8 @@ python3 src/cli/task2.py load-company-stats --db stock_event_mining
 
 随后写入：
 
-- `int_company_stats`
+- `security_features_daily`
+- `security_forward_labels_daily`
 - `stock_daily_quotes`
 
 ## 3. 生成市场环境日表
@@ -63,13 +64,13 @@ python3 src/cli/task2.py load-company-stats --db stock_event_mining
 无 seed 时：
 
 ```bash
-python3 src/cli/task2.py load-market-environment --db stock_event_mining
+python3 src/cli/linking.py load-market-environment --db stock_event_mining
 ```
 
 如果你另外整理了北向资金或基准信息：
 
 ```bash
-python3 src/cli/task2.py load-market-environment --db stock_event_mining --input output/seeds/market_environment_seed.csv
+python3 src/cli/linking.py load-market-environment --db stock_event_mining --input output/seeds/market_environment_seed.csv
 ```
 
 模板参考：
@@ -78,8 +79,8 @@ python3 src/cli/task2.py load-market-environment --db stock_event_mining --input
 ## 4. 导入公司关系边
 
 ```bash
-python3 src/cli/task3.py load-relations --db stock_event_mining --input output/seeds/company_relations_seed.csv
-python3 src/cli/task3.py propagate --db stock_event_mining
+python3 src/cli/graph.py load-relations --db stock_event_mining --input output/seeds/company_relations_seed.csv
+python3 src/cli/graph.py propagate --db stock_event_mining
 ```
 
 模板参考：
@@ -88,22 +89,22 @@ python3 src/cli/task3.py propagate --db stock_event_mining
 ## 5. 回归样本链路
 
 ```bash
-python3 src/cli/task2.py link-events --db stock_event_mining --top-k 3 --min-score 0.35
-python3 src/cli/task1.py train-samples --db stock_event_mining --min-link-score 0.35 --label-dataset output/task1_event_return_dataset.csv
+python3 src/cli/linking.py link-events --db stock_event_mining --top-k 3 --min-score 0.35
+python3 src/cli/research.py train-samples --db stock_event_mining --min-link-score 0.35 --label-dataset output/event_return_dataset.csv
 ```
 
 ## 6. 推荐执行顺序
 
 ```bash
-python3 src/cli/task2.py import-companies-public --output output/seeds/companies_public.csv
-python3 src/cli/task2.py load-companies --db stock_event_mining --input output/seeds/companies_public.csv
-python3 src/cli/task2.py load-company-profiles --db stock_event_mining --input output/seeds/company_profiles_seed.csv
-python3 src/cli/task2.py import-company-stats --db stock_event_mining --source akshare --days 120 --max-symbols 300
-python3 src/cli/task2.py load-company-stats --db stock_event_mining
-python3 src/cli/task2.py load-market-environment --db stock_event_mining --input output/seeds/market_environment_seed.csv
-python3 src/cli/task3.py load-relations --db stock_event_mining --input output/seeds/company_relations_seed.csv
-python3 src/cli/task3.py propagate --db stock_event_mining
-python3 src/cli/task1.py train-samples --db stock_event_mining --min-link-score 0.35 --label-dataset output/task1_event_return_dataset.csv
+python3 src/cli/linking.py import-companies-public --output output/seeds/companies_public.csv
+python3 src/cli/linking.py load-companies --db stock_event_mining --input output/seeds/companies_public.csv
+python3 src/cli/linking.py load-company-profiles --db stock_event_mining --input output/seeds/company_profiles_seed.csv
+python3 src/cli/linking.py import-company-stats --db stock_event_mining --source akshare --days 120 --max-symbols 300
+python3 src/cli/linking.py load-company-stats --db stock_event_mining
+python3 src/cli/linking.py load-market-environment --db stock_event_mining --input output/seeds/market_environment_seed.csv
+python3 src/cli/graph.py load-relations --db stock_event_mining --input output/seeds/company_relations_seed.csv
+python3 src/cli/graph.py propagate --db stock_event_mining
+python3 src/cli/research.py train-samples --db stock_event_mining --min-link-score 0.35 --label-dataset output/event_return_dataset.csv
 ```
 
 ## 7. 当前已知限制
@@ -115,13 +116,13 @@ python3 src/cli/task1.py train-samples --db stock_event_mining --min-link-score 
 如果你明确想只走 Sina，可用：
 
 ```bash
-python3 src/cli/task2.py import-company-stats --db stock_event_mining --source sina --days 120 --max-symbols 300
+python3 src/cli/linking.py import-company-stats --db stock_event_mining --source sina --days 120 --max-symbols 300
 ```
 
 如果你明确想只走 AKShare，可用：
 
 ```bash
-python3 src/cli/task2.py import-company-stats --db stock_event_mining --source akshare --days 120 --max-symbols 300
+python3 src/cli/linking.py import-company-stats --db stock_event_mining --source akshare --days 120 --max-symbols 300
 ```
 
 但 AKShare 上游偶尔会拒绝请求，因此在无 token 环境下，`source auto` 往往更稳。
@@ -129,8 +130,8 @@ python3 src/cli/task2.py import-company-stats --db stock_event_mining --source a
 ### 2.1 如果你已有本地行情 CSV
 
 ```bash
-python3 src/cli/task2.py import-company-stats-local --input docs/local_market_prices_template.csv
-python3 src/cli/task2.py load-company-stats --db stock_event_mining
+python3 src/cli/linking.py import-company-stats-local --input docs/local_market_prices_template.csv
+python3 src/cli/linking.py load-company-stats --db stock_event_mining
 ```
 
 这条路线现在也会同时生成：

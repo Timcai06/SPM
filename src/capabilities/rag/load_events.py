@@ -47,7 +47,7 @@ def load_structured_events() -> Iterator[EventChunk]:
 
 
 def load_canonical_events() -> Iterator[EventChunk]:
-    """Load int_canonical_events as text chunks."""
+    """Load canonical_event_clusters as text chunks."""
     conn = psycopg.connect(f"dbname={DB_NAME} user=tim host=127.0.0.1 port=5432")
     try:
         with conn.cursor() as cur:
@@ -60,8 +60,8 @@ def load_canonical_events() -> Iterator[EventChunk]:
                     ce.last_date,
                     ce.event_count,
                     COALESCE(string_agg(DISTINCT c.name, ', '), '') as companies
-                FROM int_canonical_events ce
-                LEFT JOIN int_event_canonical_links ecl ON ecl.canonical_event_id = ce.id
+                FROM canonical_event_clusters ce
+                LEFT JOIN canonical_event_memberships ecl ON ecl.canonical_event_id = ce.id
                 LEFT JOIN structured_events se ON se.id = ecl.event_id
                 LEFT JOIN event_company_links ecl2 ON ecl2.event_id = se.id
                 LEFT JOIN companies c ON c.id = ecl2.company_id

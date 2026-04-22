@@ -7,8 +7,8 @@ from typing import Dict, List
 
 import psycopg
 
-from capabilities.storage.load_task1 import insert_final_tables, load_stage_tables
-from capabilities.storage.db_guard import dsn_for
+from modules.events.services.event_persistence_service import insert_final_rows, load_stage_rows
+from modules.runtime.adapters.db import dsn_for
 
 
 def load_rows_from_db(db: str) -> List[Dict[str, str]]:
@@ -36,7 +36,7 @@ def load_pending_raw_documents(db_name: str, batch_size: int) -> List[Dict[str, 
                        d.url,
                        COALESCE(d.symbol_or_subject, '') AS symbol_or_subject
                 FROM raw_documents d
-                LEFT JOIN int_event_candidates c ON c.raw_document_id = d.id
+                LEFT JOIN event_candidates c ON c.raw_document_id = d.id
                 WHERE c.id IS NULL
                 ORDER BY d.publish_time, d.id
                 LIMIT %s
@@ -76,8 +76,8 @@ def load_event_stage_rows(
     raw_candidates: list[dict[str, str]],
     structured_events: list[dict[str, str]],
 ) -> None:
-    load_stage_tables(db_name, raw_documents, raw_candidates, structured_events)
+    load_stage_rows(db_name, raw_documents, raw_candidates, structured_events)
 
 
 def insert_event_final_rows(db_name: str) -> None:
-    insert_final_tables(db_name)
+    insert_final_rows(db_name)
