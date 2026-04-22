@@ -14,13 +14,36 @@ from modules.runtime.adapters.db import dsn_for
 
 ROOT = Path(__file__).resolve().parents[4]
 RUN_METADATA_SQL_PATH = ROOT / "sql" / "create_run_metadata_tables.sql"
+RUN_METADATA_TABLES = ("etl_runs", "etl_run_steps", "dataset_versions")
+
+
+def _run_metadata_tables_exist(cur: psycopg.Cursor[Any]) -> bool:
+    cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = ANY(%s)
+        """,
+        (list(RUN_METADATA_TABLES),),
+    )
+    return int(cur.fetchone()[0]) == len(RUN_METADATA_TABLES)
 
 
 def ensure_run_metadata_tables(db_name: str) -> None:
     sql = RUN_METADATA_SQL_PATH.read_text(encoding="utf-8")
     with psycopg.connect(dsn_for(db_name)) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql)
+            if _run_metadata_tables_exist(cur):
+                return
+            try:
+                cur.execute(sql)
+            except psycopg.errors.InsufficientPrivilege:
+                conn.rollback()
+                with conn.cursor() as retry_cur:
+                    if _run_metadata_tables_exist(retry_cur):
+                        return
+                raise
         conn.commit()
 
 
