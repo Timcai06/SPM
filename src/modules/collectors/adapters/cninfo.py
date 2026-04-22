@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import subprocess
+import shutil
 import tempfile
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -214,23 +214,68 @@ def extract_pdf_text(pdf_url: str, max_chars: int = 12000) -> str:
     with tempfile.TemporaryDirectory(prefix="cninfo_pdf_") as tmpdir:
         pdf_path = Path(tmpdir) / "notice.pdf"
         txt_path = Path(tmpdir) / "notice.txt"
-        subprocess.run(
-            ["curl", "-L", "--fail", "--silent", "--show-error", "--max-time", "30", pdf_url, "-o", str(pdf_path)],
-            check=True,
-            capture_output=True,
-            text=False,
+        response = requests.get(
+            pdf_url,
+            headers={"User-Agent": CNINFO_HEADERS["User-Agent"]},
+            timeout=30,
         )
-        subprocess.run(
-            ["/opt/homebrew/bin/pdftotext", "-q", "-nopgbrk", str(pdf_path), str(txt_path)],
-            check=True,
-            capture_output=True,
-            text=False,
-        )
-        text = txt_path.read_text(encoding="utf-8", errors="ignore")
+        response.raise_for_status()
+        pdf_path.write_bytes(response.content)
+
+        text = _extract_pdf_text_with_pdftotext(pdf_path, txt_path)
+        if not text:
+            text = _extract_pdf_text_with_pdfplumber(pdf_path, max_chars=max_chars)
     text = " ".join(text.split())
     if max_chars > 0:
         return text[:max_chars]
     return text
+
+
+def _extract_pdf_text_with_pdftotext(pdf_path: Path, txt_path: Path) -> str:
+    import subprocess
+
+    candidates = [
+        shutil.which("pdftotext"),
+        "/opt/homebrew/bin/pdftotext",
+        "/usr/local/bin/pdftotext",
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        binary = Path(candidate)
+        if not binary.exists():
+            continue
+        try:
+            subprocess.run(
+                [str(binary), "-q", "-nopgbrk", str(pdf_path), str(txt_path)],
+                check=True,
+                capture_output=True,
+                text=False,
+            )
+            return txt_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+    return ""
+
+
+def _extract_pdf_text_with_pdfplumber(pdf_path: Path, max_chars: int = 12000) -> str:
+    import pdfplumber
+
+    chunks: list[str] = []
+    remaining = max_chars if max_chars > 0 else None
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text() or ""
+            if not page_text.strip():
+                continue
+            if remaining is None:
+                chunks.append(page_text)
+                continue
+            if remaining <= 0:
+                break
+            chunks.append(page_text[:remaining])
+            remaining -= len(chunks[-1])
+    return "\n".join(chunks)
 
 
 def collect_history(

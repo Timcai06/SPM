@@ -137,6 +137,7 @@ python3 src/cli/quality.py delivery-status --db stock_event_mining
 ./SPM quality db DB=stock_event_mining
 ./SPM quality storage-audit DB=stock_event_mining
 ./SPM quality clean-stage DB=stock_event_mining --yes
+make db-stage-clean DB=stock_event_mining YES=1
 ```
 
 常用目标：

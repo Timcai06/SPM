@@ -16,8 +16,8 @@
   - PyTorch / notebook / 实验
 - **Intel 老 Mac**
   - 长时间运行采集和正文回填
-  - `collect history`
-  - `collect backfill-cninfo`
+  - `./SPM collect history`
+  - `./SPM collect backfill-cninfo`
 - **外接 SSD**
   - 承载 PostgreSQL data directory 或数据库备份
   - 作为高容量、可迁移的存储层
@@ -51,6 +51,42 @@ flowchart LR
   A -->|git pull / push| D["Git Remote"]
   C -->|git pull / push| D
 ```
+
+## 当前项目语境
+
+这份文档要以仓库当前现实为准，而不是抽象地讨论“双机系统”。
+
+当前项目的主路径已经收口到 `src/modules/...`：
+
+- `src/modules/collectors/`
+- `src/modules/events/`
+- `src/modules/companies/`
+- `src/modules/linking/`
+- `src/modules/graph/`
+- `src/modules/analysis/`
+- `src/modules/quality/`
+
+命令入口当前也是明确的：
+
+- 用户入口：`./SPM`
+- 直接 CLI：`python3 src/cli/collect.py ...`
+- 直接 CLI：`python3 src/cli/events.py ...`
+- 直接 CLI：`python3 src/cli/linking.py ...`
+- 直接 CLI：`python3 src/cli/graph.py ...`
+- 直接 CLI：`python3 src/cli/research.py ...`
+- 直接 CLI：`python3 src/cli/quality.py ...`
+
+所以这份文档后面统一采用两层说法：
+
+- 日常操作优先写 `./SPM`
+- 解释底层能力时写真实 CLI
+
+例如：
+
+- `./SPM collect backfill-cninfo`
+- 实际映射到底层 `python3 src/cli/collect.py backfill-cninfo-fulltext`
+
+这样既贴近当前仓库入口，也能避免把包装层和底层 CLI 混为一谈。
 
 ## 这份设计真正解决的是什么
 
@@ -107,7 +143,7 @@ flowchart LR
 负责临时产物和可交付物：
 
 - `output/`
-- `report/`
+- 研究/质量报告输出
 - 导出的 csv / parquet
 - 数据集版本登记
 
@@ -512,6 +548,8 @@ Git **不负责**：
 - `./SPM graph run ...`
 - `./SPM research feature ...`
 - `./SPM research train-samples ...`
+- `./SPM research negative-samples ...`
+- `./SPM quality db ...`
 - pandas / polars / DuckDB
 - PyTorch / MPS
 
@@ -534,8 +572,11 @@ Git 只负责：
 - `src/`
 - `sql/`
 - `docs/`
+- `README.md`
 - `Makefile`
 - `SPM`
+- `requirements.txt`
+- `environment.m5pro.yml`
 
 ### PostgreSQL 负责什么
 
@@ -732,6 +773,11 @@ grant usage, select on all sequences in schema public to collector_runner;
 - 采集依赖
 - `.secrets/` 中仅采集相关 token
 
+建议优先用：
+
+- `.venv`
+- `requirements.txt`
+
 ### M5 Pro
 
 保留完整研究环境：
@@ -743,6 +789,11 @@ grant usage, select on all sequences in schema public to collector_runner;
 - Jupyter / notebook
 - PyTorch
 - 本地开发工具链
+
+建议优先用：
+
+- `environment.m5pro.yml`
+- 本机 PostgreSQL 服务
 
 ## 外接 SSD 上建议放什么
 
@@ -775,7 +826,8 @@ ExternalSSD/
 - `src/`、`sql/`、`docs/`：都同步
 - `.secrets/`：各自本地维护，不进 Git
 - `output/`：各自产生日志，不当作同步主对象
-- `env/`：各自机器本地环境
+- `.venv/`：Intel Mac 这类轻量运行机的本地虚拟环境
+- `environment.m5pro.yml`：M5 Pro 当前的 conda 环境定义
 
 ## 最新双机协作系统
 
@@ -936,6 +988,12 @@ cd 股市预测模型
 
 ```bash
 ./SPM help
+python3 src/cli/collect.py --help
+python3 src/cli/events.py --help
+python3 src/cli/linking.py --help
+python3 src/cli/graph.py --help
+python3 src/cli/research.py --help
+python3 src/cli/quality.py --help
 make help
 ```
 
@@ -957,7 +1015,12 @@ python -m pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 ```
 
-如果 Intel 老机器因为 `torch` 或其他重依赖导致失败，再退回“采集最小集”路线。但优先还是先试完整依赖，因为仓库里的采集链路可能会共用一部分公共包。
+当前仓库的 `requirements.txt` 覆盖了研究侧依赖，包含 `torch` 等重包；Intel 老机器如果装完整依赖失败，不要硬顶着装研究环境，直接收敛成“采集机最小环境”即可。
+
+换句话说：
+
+- M5 Pro 负责完整研究环境
+- Intel Mac 只需要满足 `collect-history` / `backfill-cninfo-fulltext` 能跑起来
 
 #### 4.3 验证采集 CLI
 
@@ -1201,7 +1264,7 @@ M5 Pro 本机通常不需要额外配置 DSN，直接跑后处理、研究和训
 - `make go`
 - `make research-base-pipeline`
 
-原因是这些组合目标默认把采集、分类、链接、研究混在一起，更适合单机串行执行，不适合你现在的双机分工。
+原因是这些组合目标默认把采集、分类、链接、研究混在一起，更适合单机串行执行或在主研究机上执行，不适合你现在的双机分工。
 
 同样也不推荐：
 
@@ -1229,7 +1292,7 @@ M5 Pro 本机通常不需要额外配置 DSN，直接跑后处理、研究和训
 3. 在 Intel Mac 上配置 `PGHOST / PGPORT / PGUSER / PGPASSWORD / PGDATABASE`
 4. 在 Intel Mac 上只运行 `collect history` 和 `backfill-cninfo`
 5. 在 M5 Pro 上运行 `events / linking / graph / research / quality`
-6. 两台机器都通过 Git 同步 `src/ / sql/ / docs/ / Makefile / SPM`
+6. 两台机器都通过 Git 同步 `src/ / sql/ / docs/ / README.md / Makefile / SPM / requirements.txt / environment.m5pro.yml`
 7. 两台机器都不要把 `output/` 当作双机同步主对象
 
 ## 故障排查顺序

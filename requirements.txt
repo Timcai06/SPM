@@ -1,6 +1,7 @@
 aiohappyeyeballs==2.6.1
 aiohttp==3.13.5
 aiosignal==1.4.0
+akshare
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
@@ -69,7 +70,8 @@ opentelemetry-semantic-conventions==0.62b0
 orjson==3.11.8
 ormsgpack==1.12.2
 overrides==7.7.0
-packaging @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_packaging_1769093650/work
+packaging==26.1
+pandas
 pdfminer.six==20251230
 pdfplumber==0.11.9
 pgvector==0.4.2

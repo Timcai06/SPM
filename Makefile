@@ -112,6 +112,8 @@ help:
 	@echo "  make research-train-samples # 生成 event_research_samples"
 	@echo "  make research-negative-samples # 生成非事件负样本"
 	@echo "  make quality-summary        # 数据库质量摘要"
+	@echo "  ./SPM quality clean-stage DB=stock_event_mining --yes  # 用户入口"
+	@echo "  make db-stage-clean DB=stock_event_mining YES=1        # 底层 make 入口"
 	@echo ""
 	@echo "常用参数："
 	@echo "  make collect-history HISTORY_SOURCE=akshare-news HISTORY_MAX_SYMBOLS=1000 HISTORY_OFFSET=0 HISTORY_LIMIT_PER_SYMBOL=20 HISTORY_WORKERS=12"

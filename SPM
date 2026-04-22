@@ -64,6 +64,22 @@ dispatch_make() {
   exec make "$target" "$@"
 }
 
+normalize_make_args() {
+  local group="$1"
+  local command="$2"
+  shift 2
+  local normalized=()
+  local arg
+  for arg in "$@"; do
+    if [ "$group:$command" = "quality:clean-stage" ] && [ "$arg" = "--yes" ]; then
+      normalized+=("YES=1")
+    else
+      normalized+=("$arg")
+    fi
+  done
+  printf '%s\n' "${normalized[@]}"
+}
+
 is_group() {
   case "$1" in
     workflow|collect|events|linking|graph|research|quality) return 0 ;;
@@ -79,7 +95,7 @@ is_group_command() {
     linking:run|linking:link-events|linking:company-universe|linking:standard-industries|linking:board-industries|linking:stats-import|linking:stats-load|linking:profiles-import|linking:profiles-load|linking:market-env|linking:sentiment-load) return 0 ;;
     graph:run|graph:load-relations|graph:propagate) return 0 ;;
     research:feature|research:train-samples|research:negative-samples) return 0 ;;
-    quality:summary|quality:check|quality:sample|quality:delivery-status|quality:db|quality:storage|quality:storage-audit|quality:clean-stage) return 0 ;;
+  quality:summary|quality:check|quality:sample|quality:delivery-status|quality:db|quality:storage|quality:storage-audit|quality:clean-stage) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -155,6 +171,12 @@ fi
 
 command="$1"
 shift
+
+normalized_args=()
+while IFS= read -r line; do
+  normalized_args+=("$line")
+done < <(normalize_make_args "$group" "$command" "$@")
+set -- "${normalized_args[@]}"
 
 case "$group:$command" in
   workflow:full) dispatch_make full "$@" ;;
