@@ -10,6 +10,7 @@
 | Intel 无法跑正文回填 | `pdftotext` 在 Intel 上难安装或路径不兼容 | 代码写死 `/opt/homebrew/bin/pdftotext` | 优先自动找 `pdftotext`，找不到时回退到 `pdfplumber` |
 | Intel 回填启动时报 schema 权限错误 | `permission denied for schema public` | 运行元数据初始化需要建表 | 已授予 `collector_runner` 对 `public` 的必要权限 |
 | Intel 回填又报 owner 错误 | `must be owner of table etl_runs` | 每次运行都在执行建表 DDL，非 owner 也去触发表/索引创建 | 先检查治理表是否已存在；已存在则跳过 DDL |
+| 事件落库存在中间态不一致风险 | `event_candidates` 与 `structured_events` 可能部分提交 | final load 依赖 3 次独立 `psql -c` 提交，stage 装载也分开执行 | 已改为 `psycopg` 单连接事务；stage 与 final load 都收敛为原子边界 |
 | Intel 全量装依赖失败 | `onnxruntime` 在 macOS 13 x86_64 无 wheel | Intel 本来不适合承担全量研究依赖 | Intel 改成最小采集依赖策略，M5 保留全量环境 |
 | Git 分支与 worktree 过多 | `main/dev/run/backup` 混在一起 | 历史分支残留与旧 worktree 未清理 | 收敛到 `dev` / `run` 两分支，并清理 stale worktree |
 | M5 运行环境不清晰 | 实际跑的是 Homebrew 全局 Python | 仓库内旧 `env/` 不再是事实环境，但仍残留 | 建立 `spm-m5pro`，删除旧 repo-local env |
@@ -23,6 +24,7 @@
 | `dataset_versions` 规模仍很小 | 当前为 0 | 数据集 lineage 尚未形成稳定使用习惯 |
 | 传播图谱规模较小 | `company_relations` 当前为 205 | 传播推断覆盖面有限 |
 | 研究层表规模仍偏初期 | 样本量已形成，但仍不算大 | 训练与验证空间还有限 |
+| `run` 分支可能落后于 `dev` | Intel 拉到的代码不包含最新修复 | 当前采用 `dev` 开发、`run` 运行的双分支模型，发布需要显式同步 | 每次发布前确认 `run...dev` 差异为 `0 0`，否则先将 `run` 推进到目标 `dev` 提交 |
 
 ## 三、问题时间线
 
@@ -36,6 +38,7 @@ flowchart TD
     F --> G["运行元数据权限问题暴露"]
     G --> H["跳过已存在治理表的 owner-only DDL"]
     H --> I["Intel 正文回填链路跑通"]
+    I --> J["事件落库改为 stage/final 单事务"]
 ```
 
 ## 四、当前建议处理顺序
@@ -64,6 +67,7 @@ flowchart TD
 - 数据库连接层
 - Intel 正文回填路径
 - 运行元数据 owner-only DDL 问题
+- 事件落库的 stage/final 原子性边界
 - M5 主环境事实源
 - Git 分支结构混乱
 

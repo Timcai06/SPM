@@ -10,6 +10,7 @@
 - 以 `dev` / `run` 两分支支撑开发与运行分离
 - 以 `M5 Pro + Intel Mac` 支撑双机协作
 - 以 `etl_runs / etl_run_steps / dataset_versions` 支撑运行治理
+- 以 `psycopg` 事务边界保障事件 stage/final 落库原子性
 
 但项目仍处于“数据底座持续做实”的阶段，最主要的工作仍是：
 
@@ -29,6 +30,7 @@
 | 研究样本 | 初步可用 | 已能生成样本，但规模和字段还可继续补强 |
 | 运行治理 | 已建立 | run metadata 与 dataset lineage 已接入主链 |
 | 双机协作 | 已跑通 | TCP 直连 PostgreSQL 已验证成功 |
+| 事件落库一致性 | 已加强 | stage 装载与 final load 已收敛到单事务边界 |
 
 ## 核心数据库快照
 
@@ -112,7 +114,7 @@ pie title 2025-2026 巨潮正文状态
 |---|---|
 | 主开发分支 | `dev` |
 | 主运行分支 | `run` |
-| 当前提交 | `6c5d49f` |
+| 当前发布状态 | `run` 当前落后 `dev` 4 个提交 |
 | 远端分支 | `origin/dev`, `origin/run` |
 | 已清理分支 | `main`, `backup/run-pre-sync-20260404` |
 
@@ -124,6 +126,7 @@ pie title 2025-2026 巨潮正文状态
 - Intel 已能在 `run` 分支执行正文回填
 - `collector_runner` 已能正常写运行元数据，不再被 owner-only DDL 卡住
 - 项目环境已经分层：M5 负责全量研究环境，Intel 负责轻量运行环境
+- `events` 的 stage 装载与 final load 已不再依赖多次独立 `psql -c` 提交
 
 ### 还未完成的事情
 
@@ -131,6 +134,7 @@ pie title 2025-2026 巨潮正文状态
 - `dataset_versions` 尚未形成稳定产物登记规模
 - 传播图谱与研究样本层仍有进一步扩展空间
 - 市场与基本面维度仍需要继续补齐
+- `run` 分支还未包含最新 4 个修复提交，因此 Intel 若只拉 `origin/run`，部分新命令/修复不会生效
 
 ## 当前建议
 
