@@ -6,8 +6,8 @@
 
 | 文档 | 作用 |
 |---|---|
-| [project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md) | 当前真实状态快照：数据库规模、回填进度、环境与分支状态 |
-| [tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md) | 技术栈、目录结构、入口、环境分层 |
+| [project-status.md](project-status.md) | 当前真实状态快照：数据库规模、回填进度、环境与分支状态 |
+| [tech-stack.md](tech-stack.md) | 技术栈、目录结构、入口、环境分层 |
 
 ## 适合什么时候看
 

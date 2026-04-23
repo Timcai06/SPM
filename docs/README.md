@@ -27,45 +27,45 @@ flowchart TD
 
 | 目录 | 作用 | 你什么时候该看 |
 |---|---|---|
-| [overview/](/Users/tim/股市预测模型/docs/overview/README.md) | 项目现状、技术栈、环境和入口 | 先理解项目是什么、当前到了哪一步 |
-| [architecture/](/Users/tim/股市预测模型/docs/architecture/README.md) | 系统结构、数据模型、双机架构关联 | 想看模块边界、数据库层次、架构演化 |
-| [operations/](/Users/tim/股市预测模型/docs/operations/README.md) | 日常运行、回填、冻结期、无 Tushare 路线 | 想真正执行任务、排障或交付 |
-| [governance/](/Users/tim/股市预测模型/docs/governance/README.md) | 已知问题、空间治理、工程优先级 | 想知道坑点、约束和下一步做什么 |
-| [data/](/Users/tim/股市预测模型/docs/data/README.md) | 分类口径、seed 模板、数据补录说明 | 想补数据、理解交付字段或准备 seed |
+| [overview/](overview/README.md) | 项目现状、技术栈、环境和入口 | 先理解项目是什么、当前到了哪一步 |
+| [architecture/](architecture/README.md) | 系统结构、数据模型、双机架构关联 | 想看模块边界、数据库层次、架构演化 |
+| [operations/](operations/README.md) | 日常运行、回填、冻结期、无 Tushare 路线 | 想真正执行任务、排障或交付 |
+| [governance/](governance/README.md) | 已知问题、空间治理、工程优先级 | 想知道坑点、约束和下一步做什么 |
+| [data/](data/README.md) | 分类口径、seed 模板、数据补录说明 | 想补数据、理解交付字段或准备 seed |
 
 ## 推荐阅读顺序
 
 ### 1. 第一次进入项目
 
-1. [README.md](/Users/tim/股市预测模型/README.md)
-2. [overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md)
-3. [overview/tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md)
-4. [architecture/system-architecture.md](/Users/tim/股市预测模型/docs/architecture/system-architecture.md)
-5. [operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
+1. [README.md](../README.md)
+2. [overview/project-status.md](overview/project-status.md)
+3. [overview/tech-stack.md](overview/tech-stack.md)
+4. [architecture/system-architecture.md](architecture/system-architecture.md)
+5. [operations/runbook.md](operations/runbook.md)
 
 ### 2. 想理解双机协作和运行分工
 
-1. [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
-2. [operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
-3. [governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md)
-4. [governance/engineering-roadmap.md](/Users/tim/股市预测模型/docs/governance/engineering-roadmap.md)
+1. [DUAL_MACHINE_ARCHITECTURE.md](../DUAL_MACHINE_ARCHITECTURE.md)
+2. [operations/runbook.md](operations/runbook.md)
+3. [governance/known-issues.md](governance/known-issues.md)
+4. [governance/engineering-roadmap.md](governance/engineering-roadmap.md)
 
 ### 3. 想快速找某份文档的用途
 
 | 文档 | 作用 |
 |---|---|
-| [overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md) | 今天的系统快照，包含数据库规模、回填进度、分支状态 |
-| [overview/tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md) | 技术栈、目录、运行环境、模块边界 |
-| [architecture/system-architecture.md](/Users/tim/股市预测模型/docs/architecture/system-architecture.md) | 架构优缺点、当前边界、演进方向 |
-| [architecture/database-model.md](/Users/tim/股市预测模型/docs/architecture/database-model.md) | 核心数据表和数据层次 |
-| [operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md) | 每天实际执行命令和检查命令 |
-| [operations/no-tushare-workflow.md](/Users/tim/股市预测模型/docs/operations/no-tushare-workflow.md) | 无 Tushare 时怎么跑完整数据路线 |
-| [operations/delivery-freeze-runbook.md](/Users/tim/股市预测模型/docs/operations/delivery-freeze-runbook.md) | 冻结期能做什么、不能做什么 |
-| [governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md) | 已踩过的坑、根因和当前解法 |
-| [governance/storage-retention-policy.md](/Users/tim/股市预测模型/docs/governance/storage-retention-policy.md) | 哪些表占空间、哪些表能删、哪些不能碰 |
-| [governance/engineering-roadmap.md](/Users/tim/股市预测模型/docs/governance/engineering-roadmap.md) | 今天真正值得做的事 |
-| [data/classification-contract.md](/Users/tim/股市预测模型/docs/data/classification-contract.md) | 交付分类口径与字段契约 |
-| [data/templates/README.md](/Users/tim/股市预测模型/docs/data/templates/README.md) | 所有 seed 模板的目录和说明 |
+| [overview/project-status.md](overview/project-status.md) | 今天的系统快照，包含数据库规模、回填进度、分支状态 |
+| [overview/tech-stack.md](overview/tech-stack.md) | 技术栈、目录、运行环境、模块边界 |
+| [architecture/system-architecture.md](architecture/system-architecture.md) | 架构优缺点、当前边界、演进方向 |
+| [architecture/database-model.md](architecture/database-model.md) | 核心数据表和数据层次 |
+| [operations/runbook.md](operations/runbook.md) | 每天实际执行命令和检查命令 |
+| [operations/no-tushare-workflow.md](operations/no-tushare-workflow.md) | 无 Tushare 时怎么跑完整数据路线 |
+| [operations/delivery-freeze-runbook.md](operations/delivery-freeze-runbook.md) | 冻结期能做什么、不能做什么 |
+| [governance/known-issues.md](governance/known-issues.md) | 已踩过的坑、根因和当前解法 |
+| [governance/storage-retention-policy.md](governance/storage-retention-policy.md) | 哪些表占空间、哪些表能删、哪些不能碰 |
+| [governance/engineering-roadmap.md](governance/engineering-roadmap.md) | 今天真正值得做的事 |
+| [data/classification-contract.md](data/classification-contract.md) | 交付分类口径与字段契约 |
+| [data/templates/README.md](data/templates/README.md) | 所有 seed 模板的目录和说明 |
 
 ## 命名约定
 

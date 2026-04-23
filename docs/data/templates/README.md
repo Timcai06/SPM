@@ -6,9 +6,9 @@
 
 | 模板 | 用途 |
 |---|---|
-| [company-profiles-seed-template.md](/Users/tim/股市预测模型/docs/data/templates/company-profiles-seed-template.md) | 公司画像、上市日期、员工、股本、国企标签等 |
-| [company-relations-seed-template.md](/Users/tim/股市预测模型/docs/data/templates/company-relations-seed-template.md) | 公司关系边、供应链、同概念、同实控人等 |
-| [market-environment-seed-template.md](/Users/tim/股市预测模型/docs/data/templates/market-environment-seed-template.md) | 市场环境、北向资金、基准信息等 |
+| [company-profiles-seed-template.md](company-profiles-seed-template.md) | 公司画像、上市日期、员工、股本、国企标签等 |
+| [company-relations-seed-template.md](company-relations-seed-template.md) | 公司关系边、供应链、同概念、同实控人等 |
+| [market-environment-seed-template.md](market-environment-seed-template.md) | 市场环境、北向资金、基准信息等 |
 
 ## 使用原则
 

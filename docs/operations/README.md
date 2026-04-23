@@ -6,9 +6,9 @@
 
 | 文档 | 作用 |
 |---|---|
-| [runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md) | 每日运行手册、标准命令、检查 SQL |
-| [no-tushare-workflow.md](/Users/tim/股市预测模型/docs/operations/no-tushare-workflow.md) | 没有 Tushare 时的数据工作流 |
-| [delivery-freeze-runbook.md](/Users/tim/股市预测模型/docs/operations/delivery-freeze-runbook.md) | 冻结期的交付约束与核验步骤 |
+| [runbook.md](runbook.md) | 每日运行手册、标准命令、检查 SQL |
+| [no-tushare-workflow.md](no-tushare-workflow.md) | 没有 Tushare 时的数据工作流 |
+| [delivery-freeze-runbook.md](delivery-freeze-runbook.md) | 冻结期的交付约束与核验步骤 |
 
 ## 适合什么时候看
 

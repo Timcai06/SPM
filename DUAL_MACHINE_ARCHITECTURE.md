@@ -273,8 +273,8 @@ Intel 能工作，必须满足下面这些条件：
 
 日常用：
 
-- [README.md](/Users/tim/股市预测模型/README.md)
-- [docs/operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
+- [README.md](README.md)
+- [docs/operations/runbook.md](docs/operations/runbook.md)
 - `conda activate spm-m5pro`
 
 ### Intel
@@ -288,9 +288,9 @@ Intel 能工作，必须满足下面这些条件：
 
 ### 文档阅读顺序
 
-1. [README.md](/Users/tim/股市预测模型/README.md)
-2. [docs/overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md)
-3. [docs/operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
+1. [README.md](README.md)
+2. [docs/overview/project-status.md](docs/overview/project-status.md)
+3. [docs/operations/runbook.md](docs/operations/runbook.md)
 4. 本文档
 
 ## 十一、演进方向

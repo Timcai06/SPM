@@ -97,7 +97,7 @@ pie title 2025-2026 巨潮正文状态
 | 主角色 | 数据库主库、开发、清洗、研究、训练 |
 | Python 环境 | `spm-m5pro` |
 | 环境管理 | Conda |
-| 环境定义文件 | [environment.m5pro.yml](/Users/tim/股市预测模型/environment.m5pro.yml) |
+| 环境定义文件 | [environment.m5pro.yml](../../environment.m5pro.yml) |
 
 ### Intel Mac
 

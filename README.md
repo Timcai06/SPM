@@ -158,7 +158,7 @@ flowchart TD
 | 研究样本层 | `security_features_daily`, `security_forward_labels_daily`, `event_research_samples`, `control_research_samples` |
 | 治理层 | `etl_runs`, `etl_run_steps`, `dataset_versions` |
 
-详细说明见 [docs/architecture/database-model.md](/Users/tim/股市预测模型/docs/architecture/database-model.md)。
+详细说明见 [docs/architecture/database-model.md](docs/architecture/database-model.md)。
 
 ---
 
@@ -212,7 +212,7 @@ flowchart TD
 - Intel 不承担主开发职责
 - 数据库不靠 Git 同步，仍只认 M5 上 PostgreSQL 主库
 
-完整说明见 [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)。
+完整说明见 [DUAL_MACHINE_ARCHITECTURE.md](DUAL_MACHINE_ARCHITECTURE.md)。
 
 ---
 
@@ -278,7 +278,7 @@ python3 src/cli/quality.py qa --db stock_event_mining
 ### M5 Pro
 
 - 环境名：`spm-m5pro`
-- 环境文件：[environment.m5pro.yml](/Users/tim/股市预测模型/environment.m5pro.yml)
+- 环境文件：[environment.m5pro.yml](environment.m5pro.yml)
 - 适用范围：开发、数据处理、研究、深度学习
 
 ```bash
@@ -310,7 +310,7 @@ uv pip install requests aiohttp akshare pandas psycopg pdfplumber python-dotenv 
 | Intel 无法安装全量研究依赖 | `onnxruntime` 在 macOS 13 x86_64 无可用 wheel | Intel 改用“最小采集依赖”，研究依赖留给 M5 |
 | 分支与 worktree 过多 | 开发线、运行线、旧分支混杂 | 收敛为 `dev` / `run` 两条分支 |
 
-更多细节见 [docs/governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md)。
+更多细节见 [docs/governance/known-issues.md](docs/governance/known-issues.md)。
 
 ---
 
@@ -349,15 +349,15 @@ flowchart TD
 
 建议阅读顺序：
 
-1. [docs/README.md](/Users/tim/股市预测模型/docs/README.md)
-2. [docs/overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md)
-3. [docs/overview/tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md)
-4. [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
-5. [docs/operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
-6. [docs/architecture/system-architecture.md](/Users/tim/股市预测模型/docs/architecture/system-architecture.md)
-7. [docs/architecture/database-model.md](/Users/tim/股市预测模型/docs/architecture/database-model.md)
-8. [docs/governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md)
-9. [docs/governance/engineering-roadmap.md](/Users/tim/股市预测模型/docs/governance/engineering-roadmap.md)
+1. [docs/README.md](docs/README.md)
+2. [docs/overview/project-status.md](docs/overview/project-status.md)
+3. [docs/overview/tech-stack.md](docs/overview/tech-stack.md)
+4. [DUAL_MACHINE_ARCHITECTURE.md](DUAL_MACHINE_ARCHITECTURE.md)
+5. [docs/operations/runbook.md](docs/operations/runbook.md)
+6. [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md)
+7. [docs/architecture/database-model.md](docs/architecture/database-model.md)
+8. [docs/governance/known-issues.md](docs/governance/known-issues.md)
+9. [docs/governance/engineering-roadmap.md](docs/governance/engineering-roadmap.md)
 
 ---
 

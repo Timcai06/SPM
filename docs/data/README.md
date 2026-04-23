@@ -6,8 +6,8 @@
 
 | 文档 | 作用 |
 |---|---|
-| [classification-contract.md](/Users/tim/股市预测模型/docs/data/classification-contract.md) | 交付分类口径、字段映射、冻结语义 |
-| [templates/README.md](/Users/tim/股市预测模型/docs/data/templates/README.md) | seed 模板导航页 |
+| [classification-contract.md](classification-contract.md) | 交付分类口径、字段映射、冻结语义 |
+| [templates/README.md](templates/README.md) | seed 模板导航页 |
 
 ## 适合什么时候看
 
