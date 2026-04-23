@@ -22,6 +22,8 @@ class CollectCliTests(unittest.TestCase):
         self.assertEqual(args.command, "backfill-cninfo-fulltext")
         self.assertEqual(args.source, "巨潮资讯网/历史公告")
         self.assertEqual(args.db_flush_every, 100)
+        self.assertEqual(args.progress_every, 10)
+        self.assertEqual(args.heartbeat_sec, 5.0)
 
     @patch.dict("cli.collect.COMMAND_HANDLERS", {"collect": MagicMock()})
     @patch("cli.collect.parse_args")
@@ -91,13 +93,21 @@ class CollectCliTests(unittest.TestCase):
         args.workers = 4
         args.retries = 2
         args.sleep_sec = 0.1
+        args.progress_every = 10
+        args.heartbeat_sec = 5.0
+        args.detail_timeout_sec = 20.0
+        args.pdf_timeout_sec = 20.0
         args.db_flush_every = 10
         args.fulltext_max_chars = 9000
         args.skip_db_load = False
 
         collect.run_cninfo_backfill_command(args)
 
-        mock_backfill_main.assert_called_once()
+        argv = mock_backfill_main.call_args.args[0]
+        self.assertIn("--progress-every", argv)
+        self.assertIn("--heartbeat-sec", argv)
+        self.assertIn("--detail-timeout-sec", argv)
+        self.assertIn("--pdf-timeout-sec", argv)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+import threading
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Any, Dict, List
 from urllib.parse import parse_qs, urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
 
 from modules.collectors.domain.common import fetch_json_post, strip_tags
 
@@ -21,6 +23,18 @@ CNINFO_HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "X-Requested-With": "XMLHttpRequest",
 }
+_THREAD_LOCAL = threading.local()
+
+
+def get_session() -> requests.Session:
+    session = getattr(_THREAD_LOCAL, "session", None)
+    if session is None:
+        session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=32, pool_maxsize=32, max_retries=0)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        _THREAD_LOCAL.session = session
+    return session
 
 
 async def collect(limit: int = 20, lookback_days: int = 5) -> List[Dict[str, str]]:
@@ -82,7 +96,7 @@ async def collect(limit: int = 20, lookback_days: int = 5) -> List[Dict[str, str
 
 @lru_cache()
 def get_stock_org_map() -> dict[str, str]:
-    response = requests.get(CNINFO_STOCKS_URL, timeout=20)
+    response = get_session().get(CNINFO_STOCKS_URL, timeout=20)
     response.raise_for_status()
     data = response.json()
     stock_list = data.get("stockList", [])
@@ -147,6 +161,7 @@ def fetch_bulletin_detail(
     stock_code: str,
     announcement_id: str,
     announcement_time: str,
+    timeout_sec: float = 20.0,
 ) -> dict[str, Any]:
     params = {
         "announceId": announcement_id,
@@ -161,7 +176,12 @@ def fetch_bulletin_detail(
         org_id="",
         announcement_time=announcement_time,
     )
-    response = requests.post(CNINFO_DETAIL_API_URL, params=params, headers=headers, timeout=30)
+    response = get_session().post(
+        CNINFO_DETAIL_API_URL,
+        params=params,
+        headers=headers,
+        timeout=timeout_sec,
+    )
     response.raise_for_status()
     payload = response.json()
     announcement = payload.get("announcement") or {}
@@ -170,7 +190,12 @@ def fetch_bulletin_detail(
     return payload
 
 
-def extract_fulltext_from_detail_url(detail_url: str, max_chars: int = 12000) -> str:
+def extract_fulltext_from_detail_url(
+    detail_url: str,
+    max_chars: int = 12000,
+    detail_timeout_sec: float = 20.0,
+    pdf_timeout_sec: float = 20.0,
+) -> str:
     parsed = parse_detail_url(detail_url)
     stock_code = parsed["stock_code"]
     announcement_id = parsed["announcement_id"]
@@ -184,6 +209,7 @@ def extract_fulltext_from_detail_url(detail_url: str, max_chars: int = 12000) ->
             stock_code=stock_code,
             announcement_id=announcement_id,
             announcement_time=announcement_time,
+            timeout_sec=detail_timeout_sec,
         )
         direct_url = str(payload.get("fileUrl") or "").strip()
         if direct_url:
@@ -200,7 +226,7 @@ def extract_fulltext_from_detail_url(detail_url: str, max_chars: int = 12000) ->
             continue
         seen.add(pdf_url)
         try:
-            extracted = extract_pdf_text(pdf_url, max_chars=max_chars)
+            extracted = extract_pdf_text(pdf_url, max_chars=max_chars, request_timeout_sec=pdf_timeout_sec)
             if extracted:
                 return extracted
         except Exception:
@@ -208,16 +234,16 @@ def extract_fulltext_from_detail_url(detail_url: str, max_chars: int = 12000) ->
     return ""
 
 
-def extract_pdf_text(pdf_url: str, max_chars: int = 12000) -> str:
+def extract_pdf_text(pdf_url: str, max_chars: int = 12000, request_timeout_sec: float = 20.0) -> str:
     if not pdf_url:
         return ""
     with tempfile.TemporaryDirectory(prefix="cninfo_pdf_") as tmpdir:
         pdf_path = Path(tmpdir) / "notice.pdf"
         txt_path = Path(tmpdir) / "notice.txt"
-        response = requests.get(
+        response = get_session().get(
             pdf_url,
             headers={"User-Agent": CNINFO_HEADERS["User-Agent"]},
-            timeout=30,
+            timeout=request_timeout_sec,
         )
         response.raise_for_status()
         pdf_path.write_bytes(response.content)

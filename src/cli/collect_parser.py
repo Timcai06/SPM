@@ -51,8 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
     backfill_parser.add_argument("--workers", type=int, default=8)
     backfill_parser.add_argument("--retries", type=int, default=3)
     backfill_parser.add_argument("--sleep-sec", type=float, default=0.02)
+    backfill_parser.add_argument("--progress-every", type=int, default=10)
+    backfill_parser.add_argument("--heartbeat-sec", type=float, default=5.0)
+    backfill_parser.add_argument("--detail-timeout-sec", type=float, default=20.0)
+    backfill_parser.add_argument("--pdf-timeout-sec", type=float, default=20.0)
     backfill_parser.add_argument("--db-flush-every", type=int, default=100)
     backfill_parser.add_argument("--fulltext-max-chars", type=int, default=12000)
     backfill_parser.add_argument("--skip-db-load", action="store_true")
     return parser
-

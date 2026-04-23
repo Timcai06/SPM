@@ -7,7 +7,7 @@ import argparse
 import hashlib
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -42,6 +42,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--sleep-sec", type=float, default=0.02)
+    parser.add_argument("--progress-every", type=int, default=10)
+    parser.add_argument("--heartbeat-sec", type=float, default=5.0)
+    parser.add_argument("--detail-timeout-sec", type=float, default=20.0)
+    parser.add_argument("--pdf-timeout-sec", type=float, default=20.0)
     parser.add_argument("--db-flush-every", type=int, default=100)
     parser.add_argument("--fulltext-max-chars", type=int, default=12000)
     parser.add_argument("--skip-db-load", action="store_true")
@@ -84,14 +88,26 @@ def load_candidates(
     )
 
 
-def fetch_with_retry(row: dict[str, Any], retries: int, sleep_sec: float, max_chars: int) -> tuple[int, str, str]:
+def fetch_with_retry(
+    row: dict[str, Any],
+    retries: int,
+    sleep_sec: float,
+    max_chars: int,
+    detail_timeout_sec: float,
+    pdf_timeout_sec: float,
+) -> tuple[int, str, str]:
     row_id = int(row["id"])
     title = str(row["title"] or "")
     url = str(row["url"] or "")
     last_error = ""
     for attempt in range(retries + 1):
         try:
-            content = cninfo.extract_fulltext_from_detail_url(url, max_chars=max_chars)
+            content = cninfo.extract_fulltext_from_detail_url(
+                url,
+                max_chars=max_chars,
+                detail_timeout_sec=detail_timeout_sec,
+                pdf_timeout_sec=pdf_timeout_sec,
+            )
             if content and content.strip() and content.strip() != title.strip():
                 return row_id, content, ""
             return row_id, "", "empty_fulltext"
@@ -146,32 +162,57 @@ def main(argv: list[str] | None = None) -> None:
     updated_rows = 0
     flushes = 0
     success_rows = 0
+    progress_every = max(1, int(args.progress_every))
+    heartbeat_sec = max(0.5, float(args.heartbeat_sec))
 
     with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
-        futures = [
-            pool.submit(fetch_with_retry, row, args.retries, args.sleep_sec, args.fulltext_max_chars)
+        futures = {
+            pool.submit(
+                fetch_with_retry,
+                row,
+                args.retries,
+                args.sleep_sec,
+                args.fulltext_max_chars,
+                args.detail_timeout_sec,
+                args.pdf_timeout_sec,
+            )
             for row in candidates
-        ]
-        for idx, future in enumerate(as_completed(futures), start=1):
-            row_id, content, error = future.result()
-            if error:
-                failures.append((row_id, error))
-            elif content:
-                success_rows += 1
-                pending_updates.append(make_update(by_id[row_id], content))
-            if not args.skip_db_load and len(pending_updates) >= max(1, args.db_flush_every):
-                flushed = update_raw_document_contents(args.db, pending_updates)
-                flushes += 1
-                updated_rows += flushed
-                print(f"[cninfo-backfill] db_flush {flushes} rows={flushed} cumulative={updated_rows}", flush=True)
-                pending_updates.clear()
-            if idx == 1 or idx % 50 == 0 or idx == len(futures):
+        }
+        total = len(futures)
+        completed = 0
+        while futures:
+            done, futures = wait(futures, timeout=heartbeat_sec, return_when=FIRST_COMPLETED)
+            if not done:
                 elapsed = int(time.time() - started)
                 print(
-                    f"[cninfo-backfill] progress {idx}/{len(futures)} success={success_rows} "
-                    f"updated={updated_rows} failures={len(failures)} elapsed={elapsed}s",
+                    f"[cninfo-backfill] heartbeat completed={completed}/{total} success={success_rows} "
+                    f"updated={updated_rows} failures={len(failures)} inflight={len(futures)} "
+                    f"pending_updates={len(pending_updates)} elapsed={elapsed}s",
                     flush=True,
                 )
+                continue
+
+            for future in done:
+                completed += 1
+                row_id, content, error = future.result()
+                if error:
+                    failures.append((row_id, error))
+                elif content:
+                    success_rows += 1
+                    pending_updates.append(make_update(by_id[row_id], content))
+                if not args.skip_db_load and len(pending_updates) >= max(1, args.db_flush_every):
+                    flushed = update_raw_document_contents(args.db, pending_updates)
+                    flushes += 1
+                    updated_rows += flushed
+                    print(f"[cninfo-backfill] db_flush {flushes} rows={flushed} cumulative={updated_rows}", flush=True)
+                    pending_updates.clear()
+                if completed == 1 or completed % progress_every == 0 or completed == total:
+                    elapsed = int(time.time() - started)
+                    print(
+                        f"[cninfo-backfill] progress {completed}/{total} success={success_rows} "
+                        f"updated={updated_rows} failures={len(failures)} inflight={len(futures)} elapsed={elapsed}s",
+                        flush=True,
+                    )
 
     if not args.skip_db_load and pending_updates:
         flushed = update_raw_document_contents(args.db, pending_updates)

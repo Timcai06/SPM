@@ -44,7 +44,11 @@ class CninfoAdapterTests(unittest.TestCase):
     ) -> None:
         mock_fetch_bulletin_detail.side_effect = RuntimeError("403")
 
-        def fake_extract(pdf_url: str, max_chars: int = 12000) -> str:
+        def fake_extract(
+            pdf_url: str,
+            max_chars: int = 12000,
+            request_timeout_sec: float = 20.0,
+        ) -> str:
             if pdf_url.endswith(".PDF"):
                 return "这是正文内容"
             return ""
