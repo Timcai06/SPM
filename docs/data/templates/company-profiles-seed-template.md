@@ -1,4 +1,4 @@
-# company_profiles seed 模板
+# 公司画像 Seed 模板
 
 当你希望给 `company_profiles` 补充上市日期、地区、国企标签、员工、股本等字段时，
 可准备一个 CSV，并通过下面的命令加载：

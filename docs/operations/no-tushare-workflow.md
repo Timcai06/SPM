@@ -33,7 +33,7 @@ python3 src/cli/linking.py load-company-profiles --db stock_event_mining --input
 - `output/seeds/companies_seed.csv`
 
 模板参考：
-- `docs/company_profiles_seed_template.md`
+- [公司画像 Seed 模板](/Users/tim/股市预测模型/docs/data/templates/company-profiles-seed-template.md)
 
 ## 2. 生成公司统计特征 + 正式行情表
 
@@ -74,7 +74,7 @@ python3 src/cli/linking.py load-market-environment --db stock_event_mining --inp
 ```
 
 模板参考：
-- `docs/market_environment_seed_template.md`
+- [市场环境 Seed 模板](/Users/tim/股市预测模型/docs/data/templates/market-environment-seed-template.md)
 
 ## 4. 导入公司关系边
 
@@ -84,7 +84,7 @@ python3 src/cli/graph.py propagate --db stock_event_mining
 ```
 
 模板参考：
-- `docs/company_relations_seed_template.md`
+- [公司关系 Seed 模板](/Users/tim/股市预测模型/docs/data/templates/company-relations-seed-template.md)
 
 ## 5. 回归样本链路
 

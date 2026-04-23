@@ -1,73 +1,87 @@
-# 文档总览
+# 文档中心
 
-这份索引页负责回答三件事：
+`docs/` 现在不再是平铺的 Markdown 堆，而是按职责分层的文档系统。
 
-1. 这个项目现在到底是什么
-2. 项目文档应该从哪里开始看
-3. 哪些文档讲“结构”，哪些文档讲“状态”，哪些文档讲“操作”
+这份索引页回答四件事：
 
-## 文档地图
+1. 文档现在分成了哪些类别
+2. 每个目录到底负责什么
+3. 初次进入项目应该先看什么
+4. 哪些文档是状态、哪些是架构、哪些是操作手册
+
+## 文档拓扑
 
 ```mermaid
 flowchart TD
-    A["README.md<br/>项目首页 / 总览 / 状态"] --> B["docs/README.md<br/>文档导航"]
-    B --> C["PROJECT_STATUS.md<br/>项目状态、进度、数据库快照"]
-    B --> D["TECH_STACK.md<br/>技术栈、环境、目录与入口"]
-    B --> E["OPERATIONS.md<br/>日常操作 / 运行手册"]
-    B --> F["KNOWN_ISSUES.md<br/>已解决 / 待解决问题库"]
-    B --> G["architecture_review.md<br/>当前架构审查"]
-    B --> H["engineering_backlog.md<br/>工程待办与优先级"]
-    B --> I["database_model.md<br/>核心数据模型"]
-    B --> J["database_retention_policy.md<br/>存储治理"]
-    B --> K["../DUAL_MACHINE_ARCHITECTURE.md<br/>双机协作体系"]
+    A["README.md<br/>项目首页 / 摘要 / 当前状态"] --> B["docs/README.md<br/>文档中心"]
+
+    B --> C["overview/<br/>项目状态与技术总览"]
+    B --> D["architecture/<br/>系统结构与数据模型"]
+    B --> E["operations/<br/>运行手册与执行路线"]
+    B --> F["governance/<br/>问题、存储治理、工程路线"]
+    B --> G["data/<br/>分类口径与 seed 模板"]
+    B --> H["DUAL_MACHINE_ARCHITECTURE.md<br/>双机协作主说明"]
 ```
+
+## 目录说明
+
+| 目录 | 作用 | 你什么时候该看 |
+|---|---|---|
+| [overview/](/Users/tim/股市预测模型/docs/overview/README.md) | 项目现状、技术栈、环境和入口 | 先理解项目是什么、当前到了哪一步 |
+| [architecture/](/Users/tim/股市预测模型/docs/architecture/README.md) | 系统结构、数据模型、双机架构关联 | 想看模块边界、数据库层次、架构演化 |
+| [operations/](/Users/tim/股市预测模型/docs/operations/README.md) | 日常运行、回填、冻结期、无 Tushare 路线 | 想真正执行任务、排障或交付 |
+| [governance/](/Users/tim/股市预测模型/docs/governance/README.md) | 已知问题、空间治理、工程优先级 | 想知道坑点、约束和下一步做什么 |
+| [data/](/Users/tim/股市预测模型/docs/data/README.md) | 分类口径、seed 模板、数据补录说明 | 想补数据、理解交付字段或准备 seed |
 
 ## 推荐阅读顺序
 
-### 1. 初次进入项目
-
-如果你要快速理解项目全貌，按这个顺序看：
+### 1. 第一次进入项目
 
 1. [README.md](/Users/tim/股市预测模型/README.md)
-2. [PROJECT_STATUS.md](/Users/tim/股市预测模型/docs/PROJECT_STATUS.md)
-3. [TECH_STACK.md](/Users/tim/股市预测模型/docs/TECH_STACK.md)
-4. [OPERATIONS.md](/Users/tim/股市预测模型/docs/OPERATIONS.md)
-5. [database_model.md](/Users/tim/股市预测模型/docs/database_model.md)
+2. [overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md)
+3. [overview/tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md)
+4. [architecture/system-architecture.md](/Users/tim/股市预测模型/docs/architecture/system-architecture.md)
+5. [operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
 
-### 2. 关注双机协作与运行
+### 2. 想理解双机协作和运行分工
 
-1. [../DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
-2. [OPERATIONS.md](/Users/tim/股市预测模型/docs/OPERATIONS.md)
-3. [KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md)
-4. [engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md)
+1. [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
+2. [operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
+3. [governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md)
+4. [governance/engineering-roadmap.md](/Users/tim/股市预测模型/docs/governance/engineering-roadmap.md)
 
-### 3. 关注工程治理
+### 3. 想快速找某份文档的用途
 
-1. [architecture_review.md](/Users/tim/股市预测模型/docs/architecture_review.md)
-2. [engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md)
-3. [database_retention_policy.md](/Users/tim/股市预测模型/docs/database_retention_policy.md)
+| 文档 | 作用 |
+|---|---|
+| [overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md) | 今天的系统快照，包含数据库规模、回填进度、分支状态 |
+| [overview/tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md) | 技术栈、目录、运行环境、模块边界 |
+| [architecture/system-architecture.md](/Users/tim/股市预测模型/docs/architecture/system-architecture.md) | 架构优缺点、当前边界、演进方向 |
+| [architecture/database-model.md](/Users/tim/股市预测模型/docs/architecture/database-model.md) | 核心数据表和数据层次 |
+| [operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md) | 每天实际执行命令和检查命令 |
+| [operations/no-tushare-workflow.md](/Users/tim/股市预测模型/docs/operations/no-tushare-workflow.md) | 无 Tushare 时怎么跑完整数据路线 |
+| [operations/delivery-freeze-runbook.md](/Users/tim/股市预测模型/docs/operations/delivery-freeze-runbook.md) | 冻结期能做什么、不能做什么 |
+| [governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md) | 已踩过的坑、根因和当前解法 |
+| [governance/storage-retention-policy.md](/Users/tim/股市预测模型/docs/governance/storage-retention-policy.md) | 哪些表占空间、哪些表能删、哪些不能碰 |
+| [governance/engineering-roadmap.md](/Users/tim/股市预测模型/docs/governance/engineering-roadmap.md) | 今天真正值得做的事 |
+| [data/classification-contract.md](/Users/tim/股市预测模型/docs/data/classification-contract.md) | 交付分类口径与字段契约 |
+| [data/templates/README.md](/Users/tim/股市预测模型/docs/data/templates/README.md) | 所有 seed 模板的目录和说明 |
 
-## 文档分层
+## 命名约定
 
-| 层级 | 文档 | 作用 |
-|---|---|---|
-| 首页层 | [README.md](/Users/tim/股市预测模型/README.md) | 面向项目整体的专业化总览 |
-| 状态层 | [PROJECT_STATUS.md](/Users/tim/股市预测模型/docs/PROJECT_STATUS.md) | 记录当前数据库、环境、分支、回填进度与实际状态 |
-| 技术层 | [TECH_STACK.md](/Users/tim/股市预测模型/docs/TECH_STACK.md) | 解释模块、入口、环境与依赖策略 |
-| 操作层 | [OPERATIONS.md](/Users/tim/股市预测模型/docs/OPERATIONS.md) | 日常启动、同步、回填、检查和排障手册 |
-| 问题层 | [KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md) | 记录遇到过的问题、根因与当前处置 |
-| 架构层 | [architecture_review.md](/Users/tim/股市预测模型/docs/architecture_review.md) | 审视架构成熟度、边界与演进方向 |
-| 规划层 | [engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md) | 当前 backlog、优先级和执行顺序 |
-| 数据层 | [database_model.md](/Users/tim/股市预测模型/docs/database_model.md) | 数据分层与主表语义 |
+文档目录现在遵守两条规则：
 
-## 当前文档约束
+- 目录名表达职责：`overview / architecture / operations / governance / data`
+- 文件名表达用途：`project-status / runbook / known-issues / database-model`
 
-- `README.md` 必须反映项目真实状态，而不是理想状态
-- `PROJECT_STATUS.md` 记录的是“今天”的系统快照
-- `TECH_STACK.md` 描述“如何组成”
-- `KNOWN_ISSUES.md` 描述“踩过哪些坑、现在怎么处理”
-- `engineering_backlog.md` 只写还没完成、但值得做的事情
+也就是说，今后默认避免：
 
-## 当前一句话总结
+- 含糊的 `review / backlog / policy / workflow` 平铺堆在根目录
+- 只有作者自己知道用途的文件名
 
-这个项目已经不是“收集一些脚本去跑公告”的仓库，而是一套围绕 `PostgreSQL + 事件链路 + 双机协作 + 研究样本` 组织起来的工程化研究系统。
+## 当前维护原则
+
+- `README.md`：面向项目整体，像论文首页一样给出摘要和全景
+- `docs/README.md`：面向文档系统本身，负责导航和分层
+- 各分类目录的 `README.md`：负责解释该目录下的文档职责
+- 业务文档：只讲一个主题，不兼做索引页

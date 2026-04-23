@@ -1,4 +1,4 @@
-# company_relations seed 模板
+# 公司关系 Seed 模板
 
 当你需要给 `company_relations` 补充供应链、持股、同实控人、同概念等关系边时，
 可准备一个 seed CSV，并通过下面的命令加载：

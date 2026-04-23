@@ -1,4 +1,4 @@
-# market_environment seed 模板
+# 市场环境 Seed 模板
 
 当你需要给 `market_environment_daily` 回填 `northbound_net_flow` 或替换基准信息时，
 可准备一个 seed CSV，并通过下面的命令加载：

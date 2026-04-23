@@ -158,7 +158,7 @@ flowchart TD
 | 研究样本层 | `security_features_daily`, `security_forward_labels_daily`, `event_research_samples`, `control_research_samples` |
 | 治理层 | `etl_runs`, `etl_run_steps`, `dataset_versions` |
 
-详细说明见 [docs/database_model.md](/Users/tim/股市预测模型/docs/database_model.md)。
+详细说明见 [docs/architecture/database-model.md](/Users/tim/股市预测模型/docs/architecture/database-model.md)。
 
 ---
 
@@ -301,7 +301,7 @@ uv pip install requests aiohttp akshare pandas psycopg pdfplumber python-dotenv 
 | Intel 无法安装全量研究依赖 | `onnxruntime` 在 macOS 13 x86_64 无可用 wheel | Intel 改用“最小采集依赖”，研究依赖留给 M5 |
 | 分支与 worktree 过多 | 开发线、运行线、旧分支混杂 | 收敛为 `dev` / `run` 两条分支 |
 
-更多细节见 [docs/KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md)。
+更多细节见 [docs/governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md)。
 
 ---
 
@@ -332,13 +332,13 @@ uv pip install requests aiohttp akshare pandas psycopg pdfplumber python-dotenv 
 
 1. [docs/README.md](/Users/tim/股市预测模型/docs/README.md)
 2. [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
-3. [docs/PROJECT_STATUS.md](/Users/tim/股市预测模型/docs/PROJECT_STATUS.md)
-4. [docs/TECH_STACK.md](/Users/tim/股市预测模型/docs/TECH_STACK.md)
-5. [docs/OPERATIONS.md](/Users/tim/股市预测模型/docs/OPERATIONS.md)
-6. [docs/KNOWN_ISSUES.md](/Users/tim/股市预测模型/docs/KNOWN_ISSUES.md)
-7. [docs/database_model.md](/Users/tim/股市预测模型/docs/database_model.md)
-8. [docs/architecture_review.md](/Users/tim/股市预测模型/docs/architecture_review.md)
-9. [docs/engineering_backlog.md](/Users/tim/股市预测模型/docs/engineering_backlog.md)
+3. [docs/overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md)
+4. [docs/overview/tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md)
+5. [docs/operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
+6. [docs/governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md)
+7. [docs/architecture/database-model.md](/Users/tim/股市预测模型/docs/architecture/database-model.md)
+8. [docs/architecture/system-architecture.md](/Users/tim/股市预测模型/docs/architecture/system-architecture.md)
+9. [docs/governance/engineering-roadmap.md](/Users/tim/股市预测模型/docs/governance/engineering-roadmap.md)
 
 ---
 
