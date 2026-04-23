@@ -17,7 +17,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     history_parser = sub.add_parser("collect-history", help="historically backfill raw documents")
     history_parser.add_argument("--db", default="stock_event_mining")
-    history_parser.add_argument("--source", choices=["akshare-news", "cninfo-disclosure"], default="akshare-news")
+    history_parser.add_argument(
+        "--source",
+        choices=[
+            "akshare-news",
+            "cninfo-disclosure",
+            "gov-news",
+            "ndrc-policy",
+            "csrc-policy",
+            "miit-policy",
+            "sse-announcements",
+            "szse-announcements",
+            "szse-suspension",
+            "eastmoney-industry",
+            "kr36-flash",
+            "caixin-mini",
+            "yicai-news",
+        ],
+        default="akshare-news",
+    )
     history_parser.add_argument("--symbol-source", choices=["db", "all-a"], default="db")
     history_parser.add_argument("--symbol-file", default="")
     history_parser.add_argument("--start-date", default="2020-01-01")
@@ -33,6 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
     history_parser.add_argument("--db-flush-every", type=int, default=100)
     history_parser.add_argument("--cninfo-fulltext", action="store_true")
     history_parser.add_argument("--cninfo-fulltext-max-chars", type=int, default=12000)
+    history_parser.add_argument("--max-pages", type=int, default=20)
+    history_parser.add_argument("--page-size", type=int, default=50)
 
     backfill_parser = sub.add_parser(
         "backfill-cninfo-fulltext",

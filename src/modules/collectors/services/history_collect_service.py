@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import csv
 import hashlib
+import json
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -20,20 +23,48 @@ SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from modules.collectors.adapters import cninfo
+from modules.collectors.adapters import cninfo, csrc, kr36, miit
 from modules.collectors.adapters.db_repository import upsert_raw_document_rows
+from modules.collectors.domain.common import fetch_text, strip_tags
+from modules.collectors.domain.raw_event_categories import (
+    COMPANY_EVENT,
+    INDUSTRY_EVENT,
+    MACRO_EVENT,
+    POLICY_EVENT,
+)
 from modules.runtime.adapters.db import dsn_for
 
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB = "stock_event_mining"
 DEFAULT_OUTPUT = ROOT / "output" / "history"
+SYMBOL_HISTORY_SOURCES = ("akshare-news", "cninfo-disclosure")
+DIRECT_HISTORY_SOURCES = (
+    "gov-news",
+    "ndrc-policy",
+    "csrc-policy",
+    "miit-policy",
+    "sse-announcements",
+    "szse-announcements",
+    "szse-suspension",
+    "eastmoney-industry",
+    "kr36-flash",
+    "caixin-mini",
+    "yicai-news",
+)
+NDRC_BASE_URL = "https://www.ndrc.gov.cn/xxgk/zcfb/tz/"
+SSE_HISTORY_URL = "https://www.sse.com.cn/disclosure/listedinfo/announcement/json/stock_bulletin_publish_order.json"
+SZSE_HISTORY_URL = "https://www.szse.cn/api/disc/announcement/detailinfo"
+EASTMONEY_PAGE_1 = "https://finance.eastmoney.com/a/cywjh.html"
+CAIXIN_PAGE_1 = "https://mini.caixin.com/"
+YICAI_PAGE_1 = "https://www.yicai.com/news/"
+SUSPENSION_KEYWORDS = ("停牌", "复牌", "停复牌")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect historical raw documents.")
     parser.add_argument("--db", default=DEFAULT_DB)
-    parser.add_argument("--source", choices=["akshare-news", "cninfo-disclosure"], default="akshare-news")
+    parser.add_argument("--source", choices=list(SYMBOL_HISTORY_SOURCES + DIRECT_HISTORY_SOURCES), default="akshare-news")
     parser.add_argument("--symbol-source", choices=["db", "all-a"], default="db")
     parser.add_argument("--symbol-file", default="", help="Optional CSV/text file with ts_code/code and optional company_name/name columns.")
     parser.add_argument("--start-date", default="2020-01-01")
@@ -49,6 +80,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--cninfo-fulltext", action="store_true", help="Download CNInfo PDF attachments and extract text into content.")
     parser.add_argument("--cninfo-fulltext-max-chars", type=int, default=12000)
     parser.add_argument("--db-flush-every", type=int, default=100, help="Incrementally upsert every N collected rows.")
+    parser.add_argument("--max-pages", type=int, default=20, help="For direct source history collectors, cap page iterations.")
+    parser.add_argument("--page-size", type=int, default=50, help="For direct source history collectors, cap rows per page or total page fetch size.")
     return parser.parse_args(argv)
 
 
@@ -189,6 +222,756 @@ def in_date_range(value: str, start_date: str, end_date: str) -> bool:
     return start_date <= date_text <= end_date
 
 
+def in_date_window_exclusive(value: str, start_date: str, end_date_exclusive: str) -> bool:
+    date_text = normalize_date(value)
+    if not date_text:
+        return False
+    return start_date <= date_text < end_date_exclusive
+
+
+def direct_history_limit(max_pages: int, page_size: int) -> int:
+    return max(1, max_pages) * max(1, page_size)
+
+
+def chunked_rows(rows: list[dict[str, str]], chunk_size: int) -> list[list[dict[str, str]]]:
+    size = max(1, chunk_size)
+    return [rows[idx : idx + size] for idx in range(0, len(rows), size)]
+
+
+def is_symbol_history_source(source: str) -> bool:
+    return source in SYMBOL_HISTORY_SOURCES
+
+
+def build_ndrc_page_url(page_index: int) -> str:
+    return NDRC_BASE_URL + ("index.html" if page_index == 0 else f"index_{page_index}.html")
+
+
+def build_eastmoney_page_url(page_index: int) -> str:
+    return EASTMONEY_PAGE_1 if page_index == 0 else f"https://finance.eastmoney.com/a/cywjh_{page_index + 1}.html"
+
+
+def build_caixin_page_url(page_index: int) -> str:
+    return CAIXIN_PAGE_1 if page_index == 0 else f"https://mini.caixin.com/index-{page_index + 1}.html"
+
+
+def build_yicai_page_url(page_index: int) -> str:
+    return YICAI_PAGE_1 if page_index == 0 else f"https://www.yicai.com/news?page={page_index + 1}"
+
+
+def build_csrc_page_url(page_index: int) -> str:
+    return csrc.CSRC_LIST_URL if page_index == 0 else f"https://www.csrc.gov.cn/csrc/c100028/common_list_{page_index + 1}.shtml"
+
+
+def _chunk_direct_adapter_rows(
+    rows: list[dict[str, str]],
+    *,
+    start_date: str,
+    end_date: str,
+    page_size: int,
+) -> list[list[dict[str, str]]]:
+    filtered = [row for row in rows if row and in_date_range(row.get("publish_time", ""), start_date, end_date)]
+    deduped = dedupe_rows(filtered)
+    return [dedupe_rows(batch) for batch in chunked_rows(deduped, page_size)]
+
+
+def iter_single_fetch_history_batches(
+    collect_func,
+    *,
+    limit: int,
+    start_date: str,
+    end_date: str,
+    page_size: int,
+) -> list[list[dict[str, str]]]:
+    rows = asyncio.run(collect_func(limit=limit))
+    return _chunk_direct_adapter_rows(
+        rows,
+        start_date=start_date,
+        end_date=end_date,
+        page_size=page_size,
+    )
+
+
+def _publish_time_from_eastmoney_url(url: str) -> str:
+    match = re.search(r"/a/(20[0-9]{2})([01][0-9])([0-3][0-9])[0-9]+\.html", url)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}-{match.group(3)} 00:00:00"
+    return ""
+
+
+def _parse_gov_publish_time(url: str) -> str:
+    m = re.search(r"/(20[0-9]{2})([01][0-9])/", url)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-01 00:00:00"
+    return ""
+
+
+def parse_gov_article_sync(item: dict[str, Any]) -> dict[str, str] | None:
+    url = str(item.get("URL") or "").strip()
+    if not url:
+        return None
+    html = fetch_text(url)
+    title_match = re.search(r'<h1 id="ti">\s*(.*?)\s*</h1>', html, re.S)
+    date_match = re.search(r'<div class="pages-date">\s*([0-9\-:\s]+)', html, re.S)
+    source_match = re.search(r"来源：\s*([^<\s]+)", html)
+    content_match = re.search(r'<div class="pages_content"[^>]*>([\s\S]*?)</div>\s*<div class="editor">', html)
+    if not (title_match and content_match):
+        return None
+    title = strip_tags(title_match.group(1))
+    publish_time = re.sub(r"\s+", " ", date_match.group(1)).strip() if date_match else _parse_gov_publish_time(url)
+    source_name = strip_tags(source_match.group(1)) if source_match else "中国政府网"
+    content = strip_tags(content_match.group(1))
+    if not content:
+        return None
+    return {
+        "source": f"中国政府网/{source_name}",
+        "title": title,
+        "content": content,
+        "publish_time": normalize_datetime(publish_time),
+        "url": url,
+        "symbol_or_subject": POLICY_EVENT,
+    }
+
+
+def collect_gov_news_history(start_date: str, end_date: str, max_pages: int, page_size: int, workers: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_gov_news_history_batches(start_date, end_date, max_pages, page_size, workers):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_gov_news_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+    workers: int,
+) -> list[list[dict[str, str]]]:
+    payload = json.loads(fetch_text("https://www.gov.cn/yaowen/liebiao/YAOWENLIEBIAO.json"))
+    selected = payload[: direct_history_limit(max_pages, page_size)]
+    batches: list[list[dict[str, str]]] = []
+    for items in chunked_rows(selected, page_size):
+        rows: list[dict[str, str]] = []
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            futures = [pool.submit(parse_gov_article_sync, item) for item in items]
+            for future in as_completed(futures):
+                row = future.result()
+                if row and in_date_range(row["publish_time"], start_date, end_date):
+                    rows.append(row)
+        batches.append(dedupe_rows(rows))
+    return batches
+
+
+def parse_ndrc_list_page(page_index: int, page_size: int) -> list[dict[str, str]]:
+    html = fetch_text(build_ndrc_page_url(page_index))
+    pattern = re.compile(
+        r'<li>\s*<a href="(?P<href>[^"]+)"[^>]*title="(?P<title>[^"]+)">.*?</a>[\s\S]*?<span>(?P<date>[0-9/]+)</span>\s*</li>',
+        re.S,
+    )
+    rows: list[dict[str, str]] = []
+    for match in pattern.finditer(html):
+        href = match.group("href").strip()
+        title = strip_tags(match.group("title"))
+        publish_time = match.group("date").replace("/", "-")
+        if href.startswith("./"):
+            url = NDRC_BASE_URL + href[2:]
+        elif href.startswith("/"):
+            url = "https://www.ndrc.gov.cn" + href
+        else:
+            url = href
+        rows.append({"title": title, "publish_time": publish_time, "url": url})
+        if len(rows) >= page_size:
+            break
+    return rows
+
+
+def parse_ndrc_article_sync(item: dict[str, str]) -> dict[str, str] | None:
+    url = item["url"]
+    html = fetch_text(url)
+    title_match = re.search(r'<meta name="ArticleTitle" content="([^"]+)">', html) or re.search(r"<h2[^>]*>\s*(.*?)\s*</h2>", html, re.S)
+    date_match = re.search(r'<meta name="PubDate" content="([0-9:\-\s]+)">', html) or re.search(r"发布时间[:：]?\s*([0-9]{4}[/-][0-9]{2}[/-][0-9]{2})", html)
+    content_match = re.search(r'<div class=TRS_Editor>([\s\S]*?)</div>\s*</div>\s*</div>', html) or re.search(r'<div class="article_con">\s*<div class=TRS_Editor>([\s\S]*?)</div>', html)
+    source_match = re.search(r'<meta name="ContentSource" content="([^"]*)">', html) or re.search(r"来源[:：]?\s*([^<\s]+)", html)
+    if not (title_match and date_match and content_match):
+        return None
+    title = strip_tags(title_match.group(1))
+    publish_time = date_match.group(1).strip().replace("/", "-")
+    source_name = strip_tags(source_match.group(1)) if source_match else "国家发展改革委"
+    content = strip_tags(content_match.group(1))
+    if not content:
+        return None
+    return {
+        "source": f"国家发改委/{source_name}",
+        "title": title,
+        "content": content,
+        "publish_time": normalize_datetime(publish_time),
+        "url": url,
+        "symbol_or_subject": POLICY_EVENT,
+    }
+
+
+def parse_csrc_list_page(page_index: int, page_size: int) -> list[dict[str, str]]:
+    html = fetch_text(build_csrc_page_url(page_index))
+    pattern = re.compile(
+        r'<li>\s*<a href="(?P<href>/csrc/c100028/[^"]+/content\.shtml)"[^>]*>(?P<title>.*?)</a>\s*<span class="date">(?P<date>[0-9\-]+)</span>',
+        re.S,
+    )
+    rows: list[dict[str, str]] = []
+    for match in pattern.finditer(html):
+        title = strip_tags(match.group("title"))
+        publish_time = match.group("date").strip()
+        url = "https://www.csrc.gov.cn" + match.group("href").strip()
+        if not title:
+            continue
+        rows.append({"title": title, "publish_time": publish_time, "url": url})
+        if len(rows) >= page_size:
+            break
+    return rows
+
+
+def parse_csrc_article_sync(item: dict[str, str]) -> dict[str, str] | None:
+    html = fetch_text(item["url"])
+    title = csrc.extract_meta_content(html, "ArticleTitle")
+    publish_time = csrc.extract_meta_content(html, "PubDate")
+    source_name = csrc.extract_meta_content(html, "ContentSource") or "中国证监会"
+    description = csrc.extract_meta_content(html, "Description")
+    content_match = re.search(r'<div class="detail-news">([\s\S]*?)<div\s+id="files"', html, re.I)
+    if not content_match:
+        content_match = re.search(r'<div class="detail-news">([\s\S]*?)</div>\s*</div>\s*</div>', html, re.I)
+    if not title:
+        title_match = re.search(r"<title>(.*?)_中国证券监督管理委员会</title>", html, re.S)
+        title = strip_tags(title_match.group(1)) if title_match else item["title"]
+    if not publish_time:
+        date_match = re.search(r"页面生成时间\s*([0-9:\-\s]+)", html)
+        publish_time = date_match.group(1).strip() if date_match else item["publish_time"]
+    content = strip_tags(content_match.group(1)) if content_match else ""
+    if not content:
+        content = description or item["title"]
+    if not title or not publish_time:
+        return None
+    return {
+        "source": f"中国证监会/{source_name}",
+        "title": title,
+        "content": content,
+        "publish_time": normalize_datetime(publish_time),
+        "url": item["url"],
+        "symbol_or_subject": POLICY_EVENT,
+    }
+
+
+def collect_ndrc_policy_history(start_date: str, end_date: str, max_pages: int, page_size: int, workers: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_ndrc_policy_history_batches(start_date, end_date, max_pages, page_size, workers):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_ndrc_policy_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+    workers: int,
+) -> list[list[dict[str, str]]]:
+    batches: list[list[dict[str, str]]] = []
+    for page_index in range(max(1, max_pages)):
+        items = parse_ndrc_list_page(page_index, page_size)
+        if not items:
+            break
+        selected = [item for item in items if in_date_range(item["publish_time"], start_date, end_date)]
+        rows: list[dict[str, str]] = []
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            futures = [pool.submit(parse_ndrc_article_sync, item) for item in selected]
+            for future in as_completed(futures):
+                row = future.result()
+                if row and in_date_range(row["publish_time"], start_date, end_date):
+                    rows.append(row)
+        batches.append(dedupe_rows(rows))
+        oldest = min(normalize_date(item["publish_time"]) for item in items if item.get("publish_time"))
+        if oldest and oldest < start_date:
+            break
+    return batches
+
+
+def collect_csrc_policy_history(start_date: str, end_date: str, max_pages: int, page_size: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_csrc_policy_history_batches(start_date, end_date, max_pages, page_size):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_csrc_policy_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+) -> list[list[dict[str, str]]]:
+    batches: list[list[dict[str, str]]] = []
+    total_rows = 0
+    for page_index in range(max(1, max_pages)):
+        items = parse_csrc_list_page(page_index, page_size)
+        if not items:
+            break
+        page_rows: list[dict[str, str]] = []
+        for item in items:
+            row = parse_csrc_article_sync(item)
+            if row and in_date_range(row["publish_time"], start_date, end_date):
+                page_rows.append(row)
+        deduped_page_rows = dedupe_rows(page_rows)
+        if deduped_page_rows:
+            batches.append(deduped_page_rows)
+            total_rows += len(deduped_page_rows)
+            oldest = min(normalize_date(row["publish_time"]) for row in deduped_page_rows)
+            if oldest and oldest < start_date:
+                break
+        if total_rows >= direct_history_limit(max_pages, page_size):
+            break
+    return batches
+
+
+def collect_miit_policy_history(start_date: str, end_date: str, max_pages: int, page_size: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_miit_policy_history_batches(start_date, end_date, max_pages, page_size):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_miit_policy_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+) -> list[list[dict[str, str]]]:
+    return iter_single_fetch_history_batches(
+        miit.collect,
+        limit=direct_history_limit(max_pages, page_size),
+        start_date=start_date,
+        end_date=end_date,
+        page_size=page_size,
+    )
+
+
+def collect_sse_announcements_history(start_date: str, end_date: str, max_pages: int, page_size: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_sse_announcements_history_batches(start_date, end_date, max_pages, page_size):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_sse_announcements_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+) -> list[list[dict[str, str]]]:
+    text = fetch_text(f"{SSE_HISTORY_URL}?pageHelp.pageSize={max(200, direct_history_limit(max_pages, page_size))}&pageHelp.pageNo=1")
+    payload = json.loads(text)
+    rows: list[dict[str, str]] = []
+    for item in payload.get("publishData", []):
+        disclose_date = str(item.get("discloseDate") or "").strip()
+        if not in_date_range(disclose_date, start_date, end_date):
+            continue
+        title = str(item.get("bulletinTitle") or "").strip()
+        if not title:
+            continue
+        url = str(item.get("bulletinUrl") or "").strip()
+        if url.startswith("/"):
+            url = "https://www.sse.com.cn" + url
+        content_parts = [
+            title,
+            f"证券代码：{str(item.get('securityCode') or '').strip()}",
+            f"证券简称：{str(item.get('securityAbbr') or '').strip()}",
+            f"公告类型：{str(item.get('bulletinClassic') or '').strip()}",
+        ]
+        rows.append(
+            {
+                "source": "上交所/最新公告",
+                "title": title,
+                "content": "；".join([part for part in content_parts if part and not part.endswith("：")]),
+                "publish_time": disclose_date,
+                "url": url,
+                "symbol_or_subject": COMPANY_EVENT,
+            }
+        )
+        if len(rows) >= direct_history_limit(max_pages, page_size):
+            break
+    return [dedupe_rows(batch) for batch in chunked_rows(rows, page_size)]
+
+
+def fetch_szse_page(page_num: int, page_size: int) -> dict[str, Any]:
+    url = f"{SZSE_HISTORY_URL}?random=0.1&pageSize={page_size}&pageNum={page_num}&plateCode=szse"
+    return json.loads(fetch_text(url))
+
+
+def collect_szse_history(start_date: str, end_date: str, max_pages: int, page_size: int, suspension_only: bool) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_szse_history_batches(start_date, end_date, max_pages, page_size, suspension_only):
+        rows.extend(batch)
+    return dedupe_rows(rows)[: direct_history_limit(max_pages, page_size)]
+
+
+def iter_szse_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+    suspension_only: bool,
+) -> list[list[dict[str, str]]]:
+    batches: list[list[dict[str, str]]] = []
+    total_rows = 0
+    for page_num in range(1, max(1, max_pages) + 1):
+        try:
+            payload = fetch_szse_page(page_num=page_num, page_size=page_size)
+        except Exception as exc:
+            print(f"[history] warn szse page={page_num} fetch_failed error={exc}", flush=True)
+            continue
+        companies = payload.get("data", [])
+        if not companies:
+            break
+        page_rows: list[dict[str, str]] = []
+        for company in companies:
+            sec_code = str(company.get("secCode") or "").strip()
+            sec_name = str(company.get("secName") or "").strip()
+            for item in company.get("announList", []):
+                title = strip_tags(str(item.get("title") or "").strip())
+                category = strip_tags(str(item.get("bigCategoryName") or "").strip())
+                if not title:
+                    continue
+                if suspension_only and not any(keyword in f"{title} {category}" for keyword in SUSPENSION_KEYWORDS):
+                    continue
+                if (not suspension_only) and any(keyword in f"{title} {category}" for keyword in SUSPENSION_KEYWORDS):
+                    pass
+                publish_time = str(item.get("publishTime") or "").strip()
+                if not in_date_range(publish_time, start_date, end_date):
+                    continue
+                attach_path = str(item.get("attachPath") or "").strip()
+                attach_url = f"https://disc.static.szse.cn/download{attach_path}" if attach_path else ""
+                source_name = "深交所/停复牌公告" if suspension_only else "深交所/上市公司公告"
+                category_name = category or ("停复牌" if suspension_only else "")
+                page_rows.append(
+                    {
+                        "source": source_name,
+                        "title": title,
+                        "content": "；".join(
+                            [
+                                title,
+                                f"证券代码：{sec_code}",
+                                f"证券简称：{sec_name}",
+                                f"公告类别：{category_name}",
+                            ]
+                        ),
+                        "publish_time": normalize_datetime(publish_time),
+                        "url": attach_url,
+                        "symbol_or_subject": COMPANY_EVENT,
+                    }
+                )
+        deduped_page_rows = dedupe_rows(page_rows)
+        if deduped_page_rows:
+            batches.append(deduped_page_rows)
+            total_rows += len(deduped_page_rows)
+            oldest = min(normalize_date(row["publish_time"]) for row in deduped_page_rows)
+            if oldest and oldest < start_date:
+                break
+        if total_rows >= direct_history_limit(max_pages, page_size):
+            break
+    return batches
+
+
+def parse_eastmoney_article_sync(url: str) -> dict[str, str] | None:
+    html = fetch_text(url)
+    title_match = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.S) or re.search(r"<title>(.*?)_.*?</title>", html, re.S)
+    content_match = re.search(r'<div[^>]+id="ContentBody"[^>]*>([\s\S]*?)</div>', html, re.I) or re.search(r'<div[^>]+class="newsContent"[^>]*>([\s\S]*?)</div>', html, re.I)
+    time_match = re.search(r"([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2})", html)
+    title = strip_tags(title_match.group(1)) if title_match else ""
+    if not title:
+        return None
+    content = strip_tags(content_match.group(1)) if content_match else title
+    return {
+        "source": "东方财富/行业资讯",
+        "title": title,
+        "content": content or title,
+        "publish_time": normalize_datetime(time_match.group(1) if time_match else _publish_time_from_eastmoney_url(url)),
+        "url": url,
+        "symbol_or_subject": INDUSTRY_EVENT,
+    }
+
+
+def collect_eastmoney_industry_history(start_date: str, end_date: str, max_pages: int, page_size: int, workers: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_eastmoney_industry_history_batches(start_date, end_date, max_pages, page_size, workers):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_eastmoney_industry_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+    workers: int,
+) -> list[list[dict[str, str]]]:
+    batches: list[list[dict[str, str]]] = []
+    total_links = 0
+    seen: set[str] = set()
+    for page_index in range(max(1, max_pages)):
+        html = fetch_text(build_eastmoney_page_url(page_index))
+        page_links: list[str] = []
+        for link in re.findall(r"https://finance\.eastmoney\.com/a/[0-9]+\.html", html):
+            if link in seen:
+                continue
+            seen.add(link)
+            page_links.append(link)
+            total_links += 1
+            if total_links >= direct_history_limit(max_pages, page_size):
+                break
+        rows: list[dict[str, str]] = []
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            futures = [pool.submit(parse_eastmoney_article_sync, link) for link in page_links[:page_size]]
+            for future in as_completed(futures):
+                row = future.result()
+                if row and in_date_range(row["publish_time"], start_date, end_date):
+                    rows.append(row)
+        batches.append(dedupe_rows(rows))
+        if total_links >= direct_history_limit(max_pages, page_size):
+            break
+    return batches
+
+
+def collect_kr36_flash_history(start_date: str, end_date: str, max_pages: int, page_size: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_kr36_flash_history_batches(start_date, end_date, max_pages, page_size):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_kr36_flash_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+) -> list[list[dict[str, str]]]:
+    return iter_single_fetch_history_batches(
+        kr36.collect,
+        limit=direct_history_limit(max_pages, page_size),
+        start_date=start_date,
+        end_date=end_date,
+        page_size=page_size,
+    )
+
+
+def parse_caixin_list_page(page_index: int, page_size: int) -> list[dict[str, str]]:
+    html = fetch_text(build_caixin_page_url(page_index))
+    pattern = re.compile(r'<div class="boxa">([\s\S]*?)</div></div>', re.S)
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for block_match in pattern.finditer(html):
+        block = block_match.group(1)
+        title_match = re.search(r'<h4><a href="(?P<url>https://mini\.caixin\.com/[^\"]+)">(?P<title>.*?)</a>', block, re.S)
+        if not title_match:
+            continue
+        url = title_match.group("url").strip()
+        if url in seen:
+            continue
+        seen.add(url)
+        title = strip_tags(title_match.group("title"))
+        if not title:
+            continue
+        summary_match = re.search(r"<p>(.*?)</p>", block, re.S)
+        rows.append({"url": url, "title": title, "summary": strip_tags(summary_match.group(1)) if summary_match else title})
+        if len(rows) >= page_size:
+            break
+    return rows
+
+
+def parse_caixin_article_sync(item: dict[str, str]) -> dict[str, str] | None:
+    html = fetch_text(item["url"])
+    title = item["title"]
+    time_match = re.search(r"([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2})", html)
+    content_match = re.search(r'<meta name="description" content="([^"]+)"/>', html)
+    publish_time = normalize_datetime(time_match.group(1) if time_match else "")
+    content = strip_tags(content_match.group(1)) if content_match else item["summary"]
+    return {
+        "source": "财新网/mini",
+        "title": title,
+        "content": content or title,
+        "publish_time": publish_time,
+        "url": item["url"],
+        "symbol_or_subject": MACRO_EVENT,
+    }
+
+
+def collect_caixin_history(start_date: str, end_date: str, max_pages: int, page_size: int, workers: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_caixin_history_batches(start_date, end_date, max_pages, page_size, workers):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_caixin_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+    workers: int,
+) -> list[list[dict[str, str]]]:
+    batches: list[list[dict[str, str]]] = []
+    total_items = 0
+    for page_index in range(max(1, max_pages)):
+        items = parse_caixin_list_page(page_index, page_size)
+        if not items:
+            break
+        rows: list[dict[str, str]] = []
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            futures = [pool.submit(parse_caixin_article_sync, item) for item in items]
+            for future in as_completed(futures):
+                row = future.result()
+                if row and in_date_range(row["publish_time"], start_date, end_date):
+                    rows.append(row)
+        batches.append(dedupe_rows(rows))
+        total_items += len(items)
+        if total_items >= direct_history_limit(max_pages, page_size):
+            break
+    return batches
+
+
+def parse_yicai_list_page(page_index: int, page_size: int) -> list[dict[str, str]]:
+    html = fetch_text(build_yicai_page_url(page_index))
+    pattern = re.compile(r'<a href="(?P<href>/news/[0-9]+\.html)"[^>]*>\s*<div class="m-list[\s\S]*?</a>', re.S)
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for match in pattern.finditer(html):
+        href = match.group("href").strip()
+        url = "https://www.yicai.com" + href
+        if url in seen:
+            continue
+        seen.add(url)
+        block = match.group(0)
+        title_match = re.search(r"<h2>(.*?)</h2>", block, re.S)
+        summary_match = re.search(r"<p>(.*?)</p>", block, re.S)
+        title = strip_tags(title_match.group(1)) if title_match else ""
+        if not title:
+            continue
+        rows.append({"url": url, "title": title, "summary": strip_tags(summary_match.group(1)) if summary_match else title})
+        if len(rows) >= page_size:
+            break
+    return rows
+
+
+def parse_yicai_article_sync(item: dict[str, str]) -> dict[str, str] | None:
+    html = fetch_text(item["url"])
+    time_match = re.search(r"([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2})", html)
+    content_match = re.search(r'<meta name="description" content="([^"]+)"', html)
+    publish_time = normalize_datetime(time_match.group(1) if time_match else "")
+    content = strip_tags(content_match.group(1)) if content_match else item["summary"]
+    return {
+        "source": "第一财经/新闻",
+        "title": item["title"],
+        "content": content or item["title"],
+        "publish_time": publish_time,
+        "url": item["url"],
+        "symbol_or_subject": MACRO_EVENT,
+    }
+
+
+def collect_yicai_history(start_date: str, end_date: str, max_pages: int, page_size: int, workers: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for batch in iter_yicai_history_batches(start_date, end_date, max_pages, page_size, workers):
+        rows.extend(batch)
+    return dedupe_rows(rows)
+
+
+def iter_yicai_history_batches(
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+    workers: int,
+) -> list[list[dict[str, str]]]:
+    batches: list[list[dict[str, str]]] = []
+    total_items = 0
+    for page_index in range(max(1, max_pages)):
+        items = parse_yicai_list_page(page_index, page_size)
+        if not items:
+            break
+        rows: list[dict[str, str]] = []
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            futures = [pool.submit(parse_yicai_article_sync, item) for item in items]
+            for future in as_completed(futures):
+                row = future.result()
+                if row and in_date_range(row["publish_time"], start_date, end_date):
+                    rows.append(row)
+        batches.append(dedupe_rows(rows))
+        total_items += len(items)
+        if total_items >= direct_history_limit(max_pages, page_size):
+            break
+    return batches
+
+
+def collect_direct_source_history(
+    source: str,
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+    workers: int,
+) -> list[dict[str, str]]:
+    if source == "gov-news":
+        return collect_gov_news_history(start_date, end_date, max_pages, page_size, workers)
+    if source == "ndrc-policy":
+        return collect_ndrc_policy_history(start_date, end_date, max_pages, page_size, workers)
+    if source == "csrc-policy":
+        return collect_csrc_policy_history(start_date, end_date, max_pages, page_size)
+    if source == "miit-policy":
+        return collect_miit_policy_history(start_date, end_date, max_pages, page_size)
+    if source == "sse-announcements":
+        return collect_sse_announcements_history(start_date, end_date, max_pages, page_size)
+    if source == "szse-announcements":
+        return collect_szse_history(start_date, end_date, max_pages, page_size, suspension_only=False)
+    if source == "szse-suspension":
+        return collect_szse_history(start_date, end_date, max_pages, page_size, suspension_only=True)
+    if source == "eastmoney-industry":
+        return collect_eastmoney_industry_history(start_date, end_date, max_pages, page_size, workers)
+    if source == "kr36-flash":
+        return collect_kr36_flash_history(start_date, end_date, max_pages, page_size)
+    if source == "caixin-mini":
+        return collect_caixin_history(start_date, end_date, max_pages, page_size, workers)
+    if source == "yicai-news":
+        return collect_yicai_history(start_date, end_date, max_pages, page_size, workers)
+    raise ValueError(f"Unsupported direct history source: {source}")
+
+
+def iter_direct_source_history_batches(
+    source: str,
+    start_date: str,
+    end_date: str,
+    max_pages: int,
+    page_size: int,
+    workers: int,
+) -> list[list[dict[str, str]]]:
+    if source == "gov-news":
+        return iter_gov_news_history_batches(start_date, end_date, max_pages, page_size, workers)
+    if source == "ndrc-policy":
+        return iter_ndrc_policy_history_batches(start_date, end_date, max_pages, page_size, workers)
+    if source == "csrc-policy":
+        return iter_csrc_policy_history_batches(start_date, end_date, max_pages, page_size)
+    if source == "miit-policy":
+        return iter_miit_policy_history_batches(start_date, end_date, max_pages, page_size)
+    if source == "sse-announcements":
+        return iter_sse_announcements_history_batches(start_date, end_date, max_pages, page_size)
+    if source == "szse-announcements":
+        return iter_szse_history_batches(start_date, end_date, max_pages, page_size, suspension_only=False)
+    if source == "szse-suspension":
+        return iter_szse_history_batches(start_date, end_date, max_pages, page_size, suspension_only=True)
+    if source == "eastmoney-industry":
+        return iter_eastmoney_industry_history_batches(start_date, end_date, max_pages, page_size, workers)
+    if source == "kr36-flash":
+        return iter_kr36_flash_history_batches(start_date, end_date, max_pages, page_size)
+    if source == "caixin-mini":
+        return iter_caixin_history_batches(start_date, end_date, max_pages, page_size, workers)
+    if source == "yicai-news":
+        return iter_yicai_history_batches(start_date, end_date, max_pages, page_size, workers)
+    raise ValueError(f"Unsupported direct history source: {source}")
+
+
 def collect_akshare_news_for_symbol(
     ts_code: str,
     company_name: str,
@@ -212,15 +995,15 @@ def collect_akshare_news_for_symbol(
         if not title or not url:
             continue
         rows.append(
-            {
-                "source": f"AKShare/EastMoney/{source_name}",
-                "title": title,
-                "content": content,
-                "publish_time": normalize_datetime(publish_time),
-                "url": url,
-                "symbol_or_subject": ts_code,
-            }
-        )
+                {
+                    "source": f"AKShare/EastMoney/{source_name}",
+                    "title": title,
+                    "content": content,
+                    "publish_time": normalize_datetime(publish_time),
+                    "url": url,
+                    "symbol_or_subject": COMPANY_EVENT,
+                }
+            )
         if len(rows) >= limit_per_symbol:
             break
     return rows
@@ -311,6 +1094,65 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     start_date = normalize_date(args.start_date)
     end_date = normalize_date(args.end_date)
+    today = datetime.now().date().isoformat()
+    effective_end_date = min(end_date, today)
+    if effective_end_date != end_date:
+        print(
+            f"[history] clamp end-date {end_date} -> {effective_end_date} to avoid future-dated raw rows",
+            flush=True,
+        )
+        end_date = effective_end_date
+    if not is_symbol_history_source(args.source):
+        started = time.time()
+        print(
+            f"[history] source={args.source} mode=direct range={start_date}..{end_date} "
+            f"max_pages={args.max_pages} page_size={args.page_size} workers={args.workers}",
+            flush=True,
+        )
+        batch_rows = iter_direct_source_history_batches(
+            source=args.source,
+            start_date=start_date,
+            end_date=end_date,
+            max_pages=args.max_pages,
+            page_size=args.page_size,
+            workers=args.workers,
+        )
+        rows: list[dict[str, str]] = []
+        db_flushes = 0
+        db_rows_upserted = 0
+        for batch_idx, batch in enumerate(batch_rows, start=1):
+            rows.extend(batch)
+            if args.skip_db_load:
+                print(
+                    f"[history] progress batch {batch_idx}/{len(batch_rows)} rows={len(rows)} elapsed={int(time.time() - started)}s",
+                    flush=True,
+                )
+                continue
+            if batch:
+                flushed = flush_rows_to_db(args.db, batch)
+                db_flushes += 1
+                db_rows_upserted += flushed
+                print(
+                    f"[history] db_flush {db_flushes} rows={flushed} cumulative={db_rows_upserted} "
+                    f"batch={batch_idx}/{len(batch_rows)} elapsed={int(time.time() - started)}s",
+                    flush=True,
+                )
+        out = (
+            Path(args.output_dir).resolve()
+            / f"history_{args.source}_{start_date}_{end_date}_pages{args.max_pages}_size{args.page_size}.csv"
+        )
+        rows = dedupe_rows(rows)
+        write_csv(out, rows)
+        if args.skip_db_load:
+            print(f"[history] db_load=skipped rows={len(rows)} elapsed={int(time.time() - started)}s", flush=True)
+        else:
+            print(
+                f"[history] db_load=done flushes={db_flushes} upserted={db_rows_upserted} rows={len(rows)} elapsed={int(time.time() - started)}s",
+                flush=True,
+            )
+        print(f"[history] wrote {len(rows)} unique rows to {out}", flush=True)
+        return
+
     symbols = resolve_symbols(
         args.db,
         max_symbols=args.max_symbols,

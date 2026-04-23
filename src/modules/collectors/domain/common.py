@@ -27,7 +27,22 @@ def fetch_text(url: str, retries: int = DEFAULT_FETCH_RETRIES) -> str:
             last_error = err
             try:
                 result = subprocess.run(
-                    ["curl", "-L", "--max-time", "20", url],
+                    [
+                        "curl",
+                        "-L",
+                        "--max-time",
+                        "20",
+                        "--retry",
+                        "2",
+                        "--retry-delay",
+                        "1",
+                        "--retry-all-errors",
+                        "--http1.1",
+                        "--compressed",
+                        "-A",
+                        USER_AGENT,
+                        url,
+                    ],
                     check=True,
                     capture_output=True,
                     text=False,
