@@ -38,14 +38,20 @@ flowchart TD
 cd /Users/tim/股市预测模型
 conda activate spm-m5pro
 brew services start postgresql@15
-python3 src/cli/quality.py db-status --db stock_event_mining
+python3 src/cli/quality.py db --db stock_event_mining
 ```
+
+说明：
+
+- `collect.py` 的采集与正文回填命令现在会在**当前进程内**临时清除 `HTTP_PROXY / HTTPS_PROXY / ALL_PROXY` 等代理变量
+- 这不会修改你的系统网络环境，只是保证国内站点采集默认直连
+- `events.py run` 在未开启 `--skip-collect` 时，也会沿用同样的默认行为
 
 确认点：
 
 - PostgreSQL 已启动
 - `spm-m5pro` 环境可用
-- `db-status` 可以正常返回核心表规模
+- `db` 可以正常返回核心表规模
 
 ### 2. Intel Mac
 
@@ -158,7 +164,8 @@ python3 src/cli/events.py run --db stock_event_mining --limit 8
 python3 src/cli/linking.py run --db stock_event_mining --top-k 3 --min-score 0.35
 python3 src/cli/graph.py run --db stock_event_mining --input output/seeds/company_relations_seed.csv
 python3 src/cli/research.py feature --db stock_event_mining --analysis-mode event-study --benchmark hs300
-python3 src/cli/quality.py qa --db stock_event_mining
+python3 src/cli/research.py train --db stock_event_mining --label-dataset output/event_return_dataset.csv
+python3 src/cli/quality.py summary --db stock_event_mining
 ```
 
 ## 五、日常检查项
@@ -166,7 +173,7 @@ python3 src/cli/quality.py qa --db stock_event_mining
 ### 1. 数据库总体状态
 
 ```bash
-python3 src/cli/quality.py db-status --db stock_event_mining
+python3 src/cli/quality.py db --db stock_event_mining
 ```
 
 ### 2. 2025-2026 正文覆盖率

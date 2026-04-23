@@ -76,8 +76,8 @@ TRUNCATE TABLE stg_structured_events RESTART IDENTITY CASCADE;
 或直接走项目入口：
 
 ```bash
-./SPM quality storage-audit DB=stock_event_mining
-./SPM quality clean-stage DB=stock_event_mining --yes
+./SPM status storage DB=stock_event_mining
+./SPM status clean-stage DB=stock_event_mining --yes
 make db-stage-clean DB=stock_event_mining YES=1
 ```
 

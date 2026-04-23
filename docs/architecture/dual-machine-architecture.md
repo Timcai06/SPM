@@ -213,6 +213,7 @@ Intel 能工作，必须满足下面这些条件：
 - 不依赖 SSH tunnel
 - 不写死 `localhost`
 - 使用 `PG*` 环境变量或 DSN
+- 采集与正文回填命令默认在**当前进程内**临时清除代理环境变量，避免国内站点流量绕行代理，同时不影响机器的系统网络设置
 
 ## 八、环境分层
 
@@ -273,8 +274,8 @@ Intel 能工作，必须满足下面这些条件：
 
 日常用：
 
-- [README.md](README.md)
-- [docs/operations/runbook.md](docs/operations/runbook.md)
+- [README.md](../../README.md)
+- [docs/operations/runbook.md](../operations/runbook.md)
 - `conda activate spm-m5pro`
 
 ### Intel
@@ -283,14 +284,14 @@ Intel 能工作，必须满足下面这些条件：
 
 - `git switch run`
 - `source .venv/bin/activate`
-- `./SPM collect history`
-- `./SPM collect backfill-cninfo`
+- `./SPM ingest history`
+- `./SPM ingest backfill`
 
 ### 文档阅读顺序
 
-1. [README.md](README.md)
-2. [docs/overview/project-status.md](docs/overview/project-status.md)
-3. [docs/operations/runbook.md](docs/operations/runbook.md)
+1. [README.md](../../README.md)
+2. [docs/overview/project-status.md](../overview/project-status.md)
+3. [docs/operations/runbook.md](../operations/runbook.md)
 4. 本文档
 
 ## 十一、演进方向

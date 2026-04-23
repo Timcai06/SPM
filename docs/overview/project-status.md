@@ -1,6 +1,6 @@
 # 项目状态总览
 
-更新时间：`2026-04-22`
+更新时间：`2026-04-23`
 
 ## 总结
 
@@ -34,7 +34,7 @@
 
 ## 核心数据库快照
 
-来自 `python3 src/cli/quality.py db-status --db stock_event_mining`：
+来自 `python3 src/cli/quality.py db --db stock_event_mining`：
 
 | 表 | 行数 |
 |---|---:|
@@ -52,7 +52,7 @@
 | `security_forward_labels_daily` | 78,770 |
 | `event_research_samples` | 538 |
 | `control_research_samples` | 36,377 |
-| `etl_runs` | 37 |
+| `etl_runs` | 48 |
 | `etl_run_steps` | 8 |
 | `dataset_versions` | 0 |
 
@@ -61,14 +61,14 @@
 | 指标 | 数值 |
 |---|---:|
 | 2025-2026 巨潮历史公告总量 | 517,570 |
-| 已回填有效正文 | 211,701 |
-| 回填覆盖率 | 40.90% |
+| 已回填有效正文 | 212,842 |
+| 回填覆盖率 | 41.12% |
 | 命中 `12000` 字上限 | 17,903 |
 
 ```mermaid
 pie title 2025-2026 巨潮正文状态
-    "有效正文" : 211701
-    "空或过短正文" : 305869
+    "有效正文" : 212842
+    "空或过短正文" : 304728
 ```
 
 ### 正文长度分布
@@ -114,7 +114,7 @@ pie title 2025-2026 巨潮正文状态
 |---|---|
 | 主开发分支 | `dev` |
 | 主运行分支 | `run` |
-| 当前发布状态 | `run` 当前落后 `dev` 4 个提交 |
+| 当前发布状态 | `run` 与 `dev` 当前同步 |
 | 远端分支 | `origin/dev`, `origin/run` |
 | 已清理分支 | `main`, `backup/run-pre-sync-20260404` |
 
@@ -134,7 +134,7 @@ pie title 2025-2026 巨潮正文状态
 - `dataset_versions` 尚未形成稳定产物登记规模
 - 传播图谱与研究样本层仍有进一步扩展空间
 - 市场与基本面维度仍需要继续补齐
-- `run` 分支还未包含最新 4 个修复提交，因此 Intel 若只拉 `origin/run`，部分新命令/修复不会生效
+- `run` 分支当前已和 `dev` 对齐，Intel 拉取 `origin/run` 时可以拿到当前主线修复
 
 ## 当前建议
 

@@ -90,7 +90,7 @@ python3 src/cli/graph.py propagate --db stock_event_mining
 
 ```bash
 python3 src/cli/linking.py link-events --db stock_event_mining --top-k 3 --min-score 0.35
-python3 src/cli/research.py train-samples --db stock_event_mining --min-link-score 0.35 --label-dataset output/event_return_dataset.csv
+python3 src/cli/research.py train --db stock_event_mining --min-link-score 0.35 --label-dataset output/event_return_dataset.csv
 ```
 
 ## 6. 推荐执行顺序
@@ -104,7 +104,7 @@ python3 src/cli/linking.py load-company-stats --db stock_event_mining
 python3 src/cli/linking.py load-market-environment --db stock_event_mining --input output/seeds/market_environment_seed.csv
 python3 src/cli/graph.py load-relations --db stock_event_mining --input output/seeds/company_relations_seed.csv
 python3 src/cli/graph.py propagate --db stock_event_mining
-python3 src/cli/research.py train-samples --db stock_event_mining --min-link-score 0.35 --label-dataset output/event_return_dataset.csv
+python3 src/cli/research.py train --db stock_event_mining --min-link-score 0.35 --label-dataset output/event_return_dataset.csv
 ```
 
 ## 7. 当前已知限制

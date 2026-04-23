@@ -212,7 +212,7 @@ flowchart TD
 - Intel 不承担主开发职责
 - 数据库不靠 Git 同步，仍只认 M5 上 PostgreSQL 主库
 
-完整说明见 [DUAL_MACHINE_ARCHITECTURE.md](DUAL_MACHINE_ARCHITECTURE.md)。
+完整说明见 [docs/architecture/dual-machine-architecture.md](docs/architecture/dual-machine-architecture.md)。
 
 ---
 
@@ -231,15 +231,26 @@ python3 src/cli/quality.py --help
 make help
 ```
 
+### 入口优先级
+
+日常使用建议固定成三层：
+
+1. `./SPM ...` 给日常操作
+2. `make ...` 给批量执行和自动化
+3. `python3 src/cli/*.py ...` 给开发和调试
+
+这样平时只需要记住少量高频任务组，不需要把底层实现命令全记住。
+
 ### 最常用命令
 
 #### 用户入口
 
 ```bash
-./SPM collect history HISTORY_SOURCE=cninfo-disclosure DB=stock_event_mining
-./SPM collect backfill-cninfo DB=stock_event_mining CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
-./SPM events run DB=stock_event_mining LIMIT=8
-./SPM quality db DB=stock_event_mining
+./SPM ingest history HISTORY_SOURCE=cninfo-disclosure DB=stock_event_mining
+./SPM ingest backfill DB=stock_event_mining CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
+./SPM event run DB=stock_event_mining LIMIT=8
+./SPM research train DB=stock_event_mining
+./SPM status db DB=stock_event_mining
 ```
 
 #### 底层 CLI
@@ -267,8 +278,9 @@ python3 src/cli/graph.py run --db stock_event_mining --input output/seeds/compan
 
 ```bash
 python3 src/cli/research.py feature --db stock_event_mining --analysis-mode event-study --benchmark hs300
-python3 src/cli/quality.py db-status --db stock_event_mining
-python3 src/cli/quality.py qa --db stock_event_mining
+python3 src/cli/research.py train --db stock_event_mining --label-dataset output/event_return_dataset.csv
+python3 src/cli/quality.py db --db stock_event_mining
+python3 src/cli/quality.py summary --db stock_event_mining
 ```
 
 ---
@@ -344,15 +356,20 @@ flowchart TD
     A --> D["operations/<br/>运行手册 / 执行路线"]
     A --> E["governance/<br/>问题 / 存储 / 路线图"]
     A --> F["data/<br/>分类契约 / seed 模板"]
-    A --> G["DUAL_MACHINE_ARCHITECTURE.md<br/>双机协作主说明"]
+    A --> G["docs/architecture/dual-machine-architecture.md<br/>双机协作主说明"]
 ```
+
+- 数据库模型：[docs/architecture/database-model.md](docs/architecture/database-model.md)
+- 双机协作：[docs/architecture/dual-machine-architecture.md](docs/architecture/dual-machine-architecture.md)
+- 存储治理：[docs/governance/storage-retention-policy.md](docs/governance/storage-retention-policy.md)
+- 数据源扩展计划：[docs/data/source-expansion-plan.md](docs/data/source-expansion-plan.md)
 
 建议阅读顺序：
 
 1. [docs/README.md](docs/README.md)
 2. [docs/overview/project-status.md](docs/overview/project-status.md)
 3. [docs/overview/tech-stack.md](docs/overview/tech-stack.md)
-4. [DUAL_MACHINE_ARCHITECTURE.md](DUAL_MACHINE_ARCHITECTURE.md)
+4. [docs/architecture/dual-machine-architecture.md](docs/architecture/dual-machine-architecture.md)
 5. [docs/operations/runbook.md](docs/operations/runbook.md)
 6. [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md)
 7. [docs/architecture/database-model.md](docs/architecture/database-model.md)

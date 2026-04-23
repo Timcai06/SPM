@@ -15,6 +15,7 @@ if str(SRC_ROOT) not in sys.path:
 from cli.events_parser import CLASSIFY_INPUT_FILES, ROOT, build_parser
 from modules.events.jobs import canonicalize_job, classify_job, classify_pending_job, reclassify_source_job
 from modules.events.services.canonical_loading_service import load_canonical_rows
+from modules.runtime.services.network_env_service import without_process_proxies
 from modules.runtime.services.run_metadata_service import logged_run
 from pipelines import events as events_pipeline
 
@@ -59,7 +60,11 @@ def run_pipeline_command(args: argparse.Namespace) -> None:
         metadata={"with_analysis": args.with_analysis, "use_llm": args.use_llm},
     ) as run_id:
         argv.extend(["--run-id", run_id])
-        events_pipeline.main(argv)
+        if args.skip_collect:
+            events_pipeline.main(argv)
+        else:
+            with without_process_proxies():
+                events_pipeline.main(argv)
 
 
 def run_classify_command(args: argparse.Namespace) -> None:

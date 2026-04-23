@@ -29,13 +29,21 @@ def build_parser() -> argparse.ArgumentParser:
     feature_parser.add_argument("--report-path", default="output/feature_return_report.md")
     feature_parser.add_argument("--market-max-rows", type=int, default=1200)
 
-    train_parser = sub.add_parser("train-samples", help="build model-ready training samples into DB")
+    train_parser = sub.add_parser(
+        "train-samples",
+        aliases=["train"],
+        help="build model-ready training samples into DB",
+    )
     train_parser.add_argument("--db", default="stock_event_mining")
     train_parser.add_argument("--min-link-score", type=float, default=0.35)
     train_parser.add_argument("--label-dataset", default="output/event_return_dataset.csv")
     train_parser.add_argument("--run-id", default="")
 
-    negative_parser = sub.add_parser("build-negative-samples", help="build non-event training samples")
+    negative_parser = sub.add_parser(
+        "build-negative-samples",
+        aliases=["negative-samples", "controls"],
+        help="build non-event training samples",
+    )
     negative_parser.add_argument("--db", default="stock_event_mining")
     negative_parser.add_argument("--start-date", default="")
     negative_parser.add_argument("--end-date", default="")

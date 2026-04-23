@@ -8,7 +8,7 @@
 |---|---|
 | [system-architecture.md](system-architecture.md) | 当前系统结构、优点、边界和演进方向 |
 | [database-model.md](database-model.md) | 数据分层、核心表语义和主键关系 |
-| [DUAL_MACHINE_ARCHITECTURE.md](../../DUAL_MACHINE_ARCHITECTURE.md) | 双机协作、主库位置、运行分工和 Git 约束 |
+| [dual-machine-architecture.md](dual-machine-architecture.md) | 双机协作、主库位置、运行分工和 Git 约束 |
 
 ## 适合什么时候看
 

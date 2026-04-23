@@ -7,7 +7,16 @@ Usage:
   ./SPM <group> <command> [MAKE_VAR=VALUE ...]
   ./SPM <shortcut> [MAKE_VAR=VALUE ...]
 
-Primary groups:
+Daily groups:
+  workflow  full | trial
+  ingest    live | history | backfill
+  event     run | pending | reclassify | canonicalize
+  link      run | universe | standard-industries | board-industries | stats | profiles | market | sentiment
+  graph     run | load | propagate
+  research  feature | train | controls
+  status    summary | sample | db | storage | delivery | check | clean-stage
+
+Compatibility groups:
   workflow  full | trial
   collect   live | history | backfill-cninfo
   events    run | classify-pending | reclassify
@@ -19,10 +28,18 @@ Primary groups:
 Shortcuts:
   full                  -> workflow full
   trial                 -> workflow trial
-  db                    -> quality db
-  storage               -> quality storage-audit
-  clean-stage           -> quality clean-stage
-  quality               -> quality summary
+  history               -> ingest history
+  backfill              -> ingest backfill
+  event                 -> event run
+  train                 -> research train
+  controls              -> research controls
+  summary               -> status summary
+  sample                -> status sample
+  check                 -> status check
+  db                    -> status db
+  storage               -> status storage
+  clean-stage           -> status clean-stage
+  quality               -> status summary
   collect-live          -> collect live
   collect-history       -> collect history
   backfill-cninfo       -> collect backfill-cninfo
@@ -48,13 +65,14 @@ Shortcuts:
   negative-samples      -> research negative-samples
 
 Examples:
-  ./SPM collect history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1
-  ./SPM collect backfill-cninfo CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
-  ./SPM events run DB=stock_event_mining LIMIT=20
+  ./SPM ingest history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1
+  ./SPM ingest backfill CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
+  ./SPM event run DB=stock_event_mining LIMIT=20
   ./SPM research feature TIME_BUDGET=300 MAX_ROWS=200
-  ./SPM quality db DB=stock_event_mining
-  ./SPM quality storage-audit DB=stock_event_mining
-  ./SPM quality clean-stage DB=stock_event_mining --yes
+  ./SPM research train DB=stock_event_mining
+  ./SPM status db DB=stock_event_mining
+  ./SPM status storage DB=stock_event_mining
+  ./SPM status clean-stage DB=stock_event_mining --yes
 EOF
 }
 
@@ -71,7 +89,7 @@ normalize_make_args() {
   local normalized=()
   local arg
   for arg in "$@"; do
-    if [ "$group:$command" = "quality:clean-stage" ] && [ "$arg" = "--yes" ]; then
+    if { [ "$group:$command" = "quality:clean-stage" ] || [ "$group:$command" = "status:clean-stage" ]; } && [ "$arg" = "--yes" ]; then
       normalized+=("YES=1")
     else
       normalized+=("$arg")
@@ -82,7 +100,7 @@ normalize_make_args() {
 
 is_group() {
   case "$1" in
-    workflow|collect|events|linking|graph|research|quality) return 0 ;;
+    workflow|ingest|event|link|graph|research|status|collect|events|linking|quality) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -90,6 +108,12 @@ is_group() {
 is_group_command() {
   case "$1:$2" in
     workflow:full|workflow:trial) return 0 ;;
+    ingest:live|ingest:history|ingest:backfill) return 0 ;;
+    event:run|event:pending|event:reclassify|event:canonicalize) return 0 ;;
+    link:run|link:universe|link:standard-industries|link:board-industries|link:stats|link:profiles|link:market|link:sentiment) return 0 ;;
+    graph:run|graph:load|graph:propagate) return 0 ;;
+    research:feature|research:train|research:controls) return 0 ;;
+    status:summary|status:check|status:sample|status:delivery|status:db|status:storage|status:clean-stage) return 0 ;;
     collect:live|collect:history|collect:backfill-cninfo) return 0 ;;
     events:run|events:classify-pending|events:reclassify) return 0 ;;
     linking:run|linking:link-events|linking:company-universe|linking:standard-industries|linking:board-industries|linking:stats-import|linking:stats-load|linking:profiles-import|linking:profiles-load|linking:market-env|linking:sentiment-load) return 0 ;;
@@ -104,10 +128,18 @@ resolve_shortcut() {
   case "$1" in
     full) echo "workflow full" ;;
     trial) echo "workflow trial" ;;
-    db) echo "quality db" ;;
-    storage) echo "quality storage-audit" ;;
-    clean-stage) echo "quality clean-stage" ;;
-    quality) echo "quality summary" ;;
+    history) echo "ingest history" ;;
+    backfill) echo "ingest backfill" ;;
+    event) echo "event run" ;;
+    train) echo "research train" ;;
+    controls) echo "research controls" ;;
+    summary) echo "status summary" ;;
+    sample) echo "status sample" ;;
+    check) echo "status check" ;;
+    db) echo "status db" ;;
+    storage) echo "status storage" ;;
+    clean-stage) echo "status clean-stage" ;;
+    quality) echo "status summary" ;;
     collect-live) echo "collect live" ;;
     collect-history) echo "collect history" ;;
     backfill-cninfo) echo "collect backfill-cninfo" ;;
@@ -181,6 +213,37 @@ set -- "${normalized_args[@]}"
 case "$group:$command" in
   workflow:full) dispatch_make full "$@" ;;
   workflow:trial) dispatch_make trial "$@" ;;
+
+  ingest:live) dispatch_make collect-live "$@" ;;
+  ingest:history) dispatch_make collect-history "$@" ;;
+  ingest:backfill) dispatch_make backfill-cninfo-fulltext "$@" ;;
+
+  event:run) dispatch_make events-run "$@" ;;
+  event:pending) dispatch_make classify-pending "$@" ;;
+  event:reclassify) dispatch_make reclassify-source "$@" ;;
+  event:canonicalize) exec python3 src/cli/events.py canonicalize "$@" ;;
+
+  link:run) dispatch_make linking-run "$@" ;;
+  link:universe) dispatch_make company-universe "$@" ;;
+  link:standard-industries) dispatch_make standard-industries "$@" ;;
+  link:board-industries) dispatch_make board-industries "$@" ;;
+  link:stats) dispatch_make stats-load "$@" ;;
+  link:profiles) dispatch_make profiles-load "$@" ;;
+  link:market) dispatch_make market-env "$@" ;;
+  link:sentiment) dispatch_make sentiment-load "$@" ;;
+
+  graph:load) dispatch_make load-relations "$@" ;;
+
+  research:train) dispatch_make research-train-samples "$@" ;;
+  research:controls) dispatch_make research-negative-samples "$@" ;;
+
+  status:summary) dispatch_make quality-summary "$@" ;;
+  status:check) dispatch_make quality-check "$@" ;;
+  status:sample) dispatch_make quality-sample "$@" ;;
+  status:delivery) dispatch_make delivery-status "$@" ;;
+  status:db) dispatch_make db-summary "$@" ;;
+  status:storage) dispatch_make db-storage-audit "$@" ;;
+  status:clean-stage) dispatch_make db-stage-clean "$@" ;;
 
   collect:live) dispatch_make collect-live "$@" ;;
   collect:history) dispatch_make collect-history "$@" ;;

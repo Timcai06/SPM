@@ -22,6 +22,18 @@ class ResearchCliTests(unittest.TestCase):
         self.assertEqual(args.command, "train-samples")
         self.assertEqual(args.min_link_score, 0.35)
 
+    def test_parser_supports_train_alias(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["train"])
+        self.assertEqual(args.command, "train")
+        self.assertEqual(args.min_link_score, 0.35)
+
+    def test_parser_supports_controls_alias(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["controls"])
+        self.assertEqual(args.command, "controls")
+        self.assertEqual(args.min_link_score, 0.35)
+
     @patch("cli.research.register_output_artifact")
     @patch("cli.research.logged_run")
     @patch("cli.research.feature_return_job.main")

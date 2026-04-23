@@ -131,7 +131,10 @@ def run_negative_samples_command(args: argparse.Namespace) -> None:
 COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "feature": run_feature_command,
     "train-samples": run_train_samples_command,
+    "train": run_train_samples_command,
     "build-negative-samples": run_negative_samples_command,
+    "negative-samples": run_negative_samples_command,
+    "controls": run_negative_samples_command,
 }
 
 

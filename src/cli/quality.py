@@ -118,10 +118,13 @@ def run_delivery_status_command(args: argparse.Namespace) -> None:
 COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "check": run_check_command,
     "quality": run_quality_command,
+    "sample": run_quality_command,
     "db-status": run_db_status_command,
+    "db": run_db_status_command,
     "storage-audit": run_storage_audit_command,
     "clean-stage": run_clean_stage_command,
     "qa": run_qa_command,
+    "summary": run_qa_command,
     "delivery-status": run_delivery_status_command,
 }
 

@@ -14,14 +14,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("check", help="validate output datasets")
 
-    quality_parser = sub.add_parser("quality", help="build quality sample/report")
+    quality_parser = sub.add_parser("quality", aliases=["sample"], help="build quality sample/report")
     quality_parser.add_argument("--sample-size", type=int, default=50)
     quality_parser.add_argument("--run-id", default="")
 
-    db_status_parser = sub.add_parser("db-status", help="show core table row counts")
+    db_status_parser = sub.add_parser("db-status", aliases=["db"], help="show core table row counts")
     db_status_parser.add_argument("--db", default="stock_event_mining")
 
-    qa_parser = sub.add_parser("qa", help="show batch quality summary with deltas")
+    qa_parser = sub.add_parser("qa", aliases=["summary"], help="show batch quality summary with deltas")
     qa_parser.add_argument("--db", default="stock_event_mining")
     qa_parser.add_argument("--snapshot-path", default=str(DEFAULT_QA_SNAPSHOT))
     qa_parser.add_argument("--collector-report", default=str(DEFAULT_COLLECTOR_REPORT))

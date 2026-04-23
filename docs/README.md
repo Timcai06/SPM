@@ -20,7 +20,7 @@ flowchart TD
     B --> E["operations/<br/>运行手册与执行路线"]
     B --> F["governance/<br/>问题、存储治理、工程路线"]
     B --> G["data/<br/>分类口径与 seed 模板"]
-    B --> H["DUAL_MACHINE_ARCHITECTURE.md<br/>双机协作主说明"]
+    B --> H["architecture/dual-machine-architecture.md<br/>双机协作主说明"]
 ```
 
 ## 目录说明
@@ -45,7 +45,7 @@ flowchart TD
 
 ### 2. 想理解双机协作和运行分工
 
-1. [DUAL_MACHINE_ARCHITECTURE.md](../DUAL_MACHINE_ARCHITECTURE.md)
+1. [architecture/dual-machine-architecture.md](architecture/dual-machine-architecture.md)
 2. [operations/runbook.md](operations/runbook.md)
 3. [governance/known-issues.md](governance/known-issues.md)
 4. [governance/engineering-roadmap.md](governance/engineering-roadmap.md)

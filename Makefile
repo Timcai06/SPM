@@ -116,8 +116,9 @@ help:
 	@echo "  make research-train-samples # 生成 event_research_samples"
 	@echo "  make research-negative-samples # 生成非事件负样本"
 	@echo "  make quality-summary        # 数据库质量摘要"
-	@echo "  ./SPM quality clean-stage DB=stock_event_mining --yes  # 用户入口"
+	@echo "  ./SPM status clean-stage DB=stock_event_mining --yes   # 用户入口"
 	@echo "  make db-stage-clean DB=stock_event_mining YES=1        # 底层 make 入口"
+	@echo "  说明：采集相关命令默认在进程内临时清除代理环境变量，不影响系统全局网络设置"
 	@echo ""
 	@echo "常用参数："
 	@echo "  make collect-history HISTORY_SOURCE=akshare-news HISTORY_MAX_SYMBOLS=1000 HISTORY_OFFSET=0 HISTORY_LIMIT_PER_SYMBOL=20 HISTORY_WORKERS=12"
@@ -311,13 +312,13 @@ research-feature:
 	$(PY) src/cli/research.py feature --db $(DB) --analysis-mode event-study --benchmark hs300 --event-windows 1,3,5 --time-budget-sec $(TIME_BUDGET) --max-rows $(MAX_ROWS) --api-timeout-sec $(API_TIMEOUT) --progress-every $(PROGRESS_EVERY) $(FEATURE_TOKEN_ARG)
 
 research-train-samples:
-	$(PY) src/cli/research.py train-samples \
+	$(PY) src/cli/research.py train \
 		--db $(DB) \
 		--min-link-score $(MIN_SCORE) \
 		--label-dataset output/event_return_dataset.csv
 
 research-negative-samples:
-	$(PY) src/cli/research.py build-negative-samples --db $(DB) --max-per-day $(NEG_MAX_PER_DAY)
+	$(PY) src/cli/research.py controls --db $(DB) --max-per-day $(NEG_MAX_PER_DAY)
 
 stats-import:
 	$(PY) src/cli/linking.py import-company-stats --db $(DB) --source $(STATS_SOURCE) --days $(DAYS) --max-symbols $(STATS_MAX_SYMBOLS) --max-rows $(STATS_MAX_ROWS) --tushare-token-file $(TOKEN_FILE)
@@ -341,10 +342,10 @@ quality-check:
 	$(PY) src/cli/quality.py check
 
 quality-sample:
-	$(PY) src/cli/quality.py quality --sample-size 50
+	$(PY) src/cli/quality.py sample --sample-size 50
 
 quality-summary:
-	$(PY) src/cli/quality.py qa --db $(DB)
+	$(PY) src/cli/quality.py summary --db $(DB)
 
 delivery-status:
 	$(PY) src/cli/quality.py delivery-status --db $(DB)

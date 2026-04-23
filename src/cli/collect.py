@@ -14,6 +14,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from cli.collect_parser import build_parser
 from modules.collectors.jobs import cninfo_fulltext_backfill_job, collect_job, history_job
+from modules.runtime.services.network_env_service import without_process_proxies
 from modules.runtime.services.run_metadata_service import logged_run
 
 
@@ -25,7 +26,8 @@ def run_collect_command(args: argparse.Namespace) -> None:
     argv = ["--limit", str(args.limit)]
     if args.include_non_keyword:
         argv.append("--include-non-keyword")
-    collect_job.main(argv)
+    with without_process_proxies():
+        collect_job.main(argv)
 
 
 def run_collect_history_command(args: argparse.Namespace) -> None:
@@ -71,7 +73,8 @@ def run_collect_history_command(args: argparse.Namespace) -> None:
         argv=argv,
         metadata={"source": args.source, "symbol_source": args.symbol_source},
     ):
-        history_job.main(argv)
+        with without_process_proxies():
+            history_job.main(argv)
 
 
 def run_cninfo_backfill_command(args: argparse.Namespace) -> None:
@@ -124,7 +127,8 @@ def run_cninfo_backfill_command(args: argparse.Namespace) -> None:
         argv=argv,
         metadata={"source": args.source, "start_date": args.start_date, "end_date": args.end_date},
     ):
-        cninfo_fulltext_backfill_job.main(argv)
+        with without_process_proxies():
+            cninfo_fulltext_backfill_job.main(argv)
 
 
 COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
