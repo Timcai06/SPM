@@ -233,7 +233,16 @@ make help
 
 ### 最常用命令
 
-#### 采集与正文回填
+#### 用户入口
+
+```bash
+./SPM collect history HISTORY_SOURCE=cninfo-disclosure DB=stock_event_mining
+./SPM collect backfill-cninfo DB=stock_event_mining CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
+./SPM events run DB=stock_event_mining LIMIT=8
+./SPM quality db DB=stock_event_mining
+```
+
+#### 底层 CLI
 
 ```bash
 python3 src/cli/collect.py collect-history --db stock_event_mining --source cninfo-disclosure
@@ -328,16 +337,26 @@ uv pip install requests aiohttp akshare pandas psycopg pdfplumber python-dotenv 
 
 ## 九、文档地图
 
+```mermaid
+flowchart TD
+    A["docs/README.md<br/>文档中心"] --> B["overview/<br/>状态 / 技术总览"]
+    A --> C["architecture/<br/>系统结构 / 数据模型"]
+    A --> D["operations/<br/>运行手册 / 执行路线"]
+    A --> E["governance/<br/>问题 / 存储 / 路线图"]
+    A --> F["data/<br/>分类契约 / seed 模板"]
+    A --> G["DUAL_MACHINE_ARCHITECTURE.md<br/>双机协作主说明"]
+```
+
 建议阅读顺序：
 
 1. [docs/README.md](/Users/tim/股市预测模型/docs/README.md)
-2. [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
-3. [docs/overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md)
-4. [docs/overview/tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md)
+2. [docs/overview/project-status.md](/Users/tim/股市预测模型/docs/overview/project-status.md)
+3. [docs/overview/tech-stack.md](/Users/tim/股市预测模型/docs/overview/tech-stack.md)
+4. [DUAL_MACHINE_ARCHITECTURE.md](/Users/tim/股市预测模型/DUAL_MACHINE_ARCHITECTURE.md)
 5. [docs/operations/runbook.md](/Users/tim/股市预测模型/docs/operations/runbook.md)
-6. [docs/governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md)
+6. [docs/architecture/system-architecture.md](/Users/tim/股市预测模型/docs/architecture/system-architecture.md)
 7. [docs/architecture/database-model.md](/Users/tim/股市预测模型/docs/architecture/database-model.md)
-8. [docs/architecture/system-architecture.md](/Users/tim/股市预测模型/docs/architecture/system-architecture.md)
+8. [docs/governance/known-issues.md](/Users/tim/股市预测模型/docs/governance/known-issues.md)
 9. [docs/governance/engineering-roadmap.md](/Users/tim/股市预测模型/docs/governance/engineering-roadmap.md)
 
 ---
