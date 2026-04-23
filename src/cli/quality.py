@@ -61,6 +61,27 @@ def run_storage_audit_command(args: argparse.Namespace) -> None:
         storage_governance_job.run_storage_audit(argv)
 
 
+def run_raw_coverage_command(args: argparse.Namespace) -> None:
+    argv = [
+        "--db",
+        args.db,
+        "--start-date",
+        args.start_date,
+        "--end-date",
+        args.end_date,
+        "--top-n",
+        str(args.top_n),
+    ]
+    with logged_run(
+        db_name=args.db,
+        command_group="quality",
+        command_name="raw-coverage",
+        argv=argv,
+        metadata={"start_date": args.start_date, "end_date": args.end_date, "top_n": args.top_n},
+    ):
+        storage_governance_job.run_raw_source_coverage(argv)
+
+
 def run_clean_stage_command(args: argparse.Namespace) -> None:
     argv = ["--db", args.db, "--lock-timeout-sec", str(args.lock_timeout_sec)]
     if args.yes:
@@ -122,6 +143,8 @@ COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "db-status": run_db_status_command,
     "db": run_db_status_command,
     "storage-audit": run_storage_audit_command,
+    "raw-coverage": run_raw_coverage_command,
+    "sources": run_raw_coverage_command,
     "clean-stage": run_clean_stage_command,
     "qa": run_qa_command,
     "summary": run_qa_command,

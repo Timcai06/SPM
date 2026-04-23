@@ -12,7 +12,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from modules.runtime.services.network_env_service import without_process_proxies
+from modules.runtime.services.network_env_service import direct_network_only, without_process_proxies
 
 
 class NetworkEnvServiceTests(unittest.TestCase):
@@ -34,3 +34,33 @@ class NetworkEnvServiceTests(unittest.TestCase):
             self.assertEqual(os.environ.get("HTTPS_PROXY"), env["HTTPS_PROXY"])
             self.assertEqual(os.environ.get("ALL_PROXY"), env["ALL_PROXY"])
             self.assertEqual(os.environ.get("NO_PROXY"), env["NO_PROXY"])
+
+    @patch("modules.runtime.services.network_env_service._default_route_interface", return_value="en0")
+    @patch("modules.runtime.services.network_env_service._read_scutil_proxy_flags", return_value={})
+    def test_direct_network_only_allows_direct_route(self, _mock_proxy: object, _mock_route: object) -> None:
+        env = {
+            "HTTP_PROXY": "http://proxy.internal:7890",
+            "HTTPS_PROXY": "http://proxy.internal:7890",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with direct_network_only():
+                self.assertNotIn("HTTP_PROXY", os.environ)
+                self.assertNotIn("HTTPS_PROXY", os.environ)
+
+    @patch(
+        "modules.runtime.services.network_env_service._read_scutil_proxy_flags",
+        return_value={"HTTPEnable": "1", "HTTPSEnable": "0", "SOCKSEnable": "0"},
+    )
+    def test_direct_network_only_rejects_system_proxy(self, _mock_proxy: object) -> None:
+        with self.assertRaises(SystemExit) as ctx:
+            with direct_network_only():
+                pass
+        self.assertIn("macOS proxy settings are active", str(ctx.exception))
+
+    @patch("modules.runtime.services.network_env_service._default_route_interface", return_value="utun5")
+    @patch("modules.runtime.services.network_env_service._read_scutil_proxy_flags", return_value={})
+    def test_direct_network_only_rejects_tunnel_default_route(self, _mock_proxy: object, _mock_route: object) -> None:
+        with self.assertRaises(SystemExit) as ctx:
+            with direct_network_only():
+                pass
+        self.assertIn("default route is using tunnel interface", str(ctx.exception))

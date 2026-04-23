@@ -31,7 +31,7 @@ flowchart TD
 | [architecture/](architecture/README.md) | 系统结构、数据模型、双机架构关联 | 想看模块边界、数据库层次、架构演化 |
 | [operations/](operations/README.md) | 日常运行、回填、冻结期、无 Tushare 路线 | 想真正执行任务、排障或交付 |
 | [governance/](governance/README.md) | 已知问题、空间治理、工程优先级 | 想知道坑点、约束和下一步做什么 |
-| [data/](data/README.md) | 分类口径、seed 模板、数据补录说明 | 想补数据、理解交付字段或准备 seed |
+| [data/](data/README.md) | 分类口径、raw 来源矩阵、seed 模板、数据补录说明 | 想补数据、理解交付字段或准备 seed |
 
 ## 推荐阅读顺序
 
@@ -65,6 +65,8 @@ flowchart TD
 | [governance/storage-retention-policy.md](governance/storage-retention-policy.md) | 哪些表占空间、哪些表能删、哪些不能碰 |
 | [governance/engineering-roadmap.md](governance/engineering-roadmap.md) | 今天真正值得做的事 |
 | [data/classification-contract.md](data/classification-contract.md) | 交付分类口径与字段契约 |
+| [data/raw-source-capability-matrix.md](data/raw-source-capability-matrix.md) | 2025/2026 raw 来源能力、扩量优先级、正文回填边界 |
+| [data/source-expansion-plan.md](data/source-expansion-plan.md) | 基于附件 2 和当前库快照的数据源扩展路径 |
 | [data/templates/README.md](data/templates/README.md) | 所有 seed 模板的目录和说明 |
 
 ## 命名约定

@@ -33,6 +33,8 @@ HISTORY_SLEEP ?= 0.1
 HISTORY_CNINFO_FULLTEXT ?= 0
 HISTORY_CNINFO_FULLTEXT_MAX_CHARS ?= 12000
 HISTORY_DB_FLUSH_EVERY ?= 100
+HISTORY_MAX_PAGES ?= 20
+HISTORY_PAGE_SIZE ?= 50
 CNINFO_BACKFILL_SOURCE ?= 巨潮资讯网/历史公告
 CNINFO_BACKFILL_START ?= 2025-01-01
 CNINFO_BACKFILL_END ?= 2026-01-01
@@ -78,6 +80,9 @@ STANDARD_INDUSTRY_ONLY_DIRTY ?=
 STANDARD_INDUSTRY_SKIP_LEGACY ?=
 DELIVERY_DIR ?= output/delivery
 MAX_EXPORT_MB ?= 400
+RAW_AUDIT_START ?= 2025-01-01
+RAW_AUDIT_END ?= 2027-01-01
+RAW_AUDIT_TOP_N ?= 200
 
 FEATURE_TOKEN_ARG :=
 ifeq ($(USE_TUSHARE),1)
@@ -93,7 +98,7 @@ endif
 	linking-run link-events \
 	graph-run load-relations propagate \
 	cluster-stats backfill-event-features refresh-event-features export-yearly check-export-size \
-	db-summary db-storage-audit db-stage-clean research-base-pipeline \
+	db-summary db-storage-audit db-raw-source-audit db-stage-clean research-base-pipeline \
 	research-feature research-train-samples research-negative-samples \
 	stats-import stats-load profiles-import profiles-load market-env sentiment-load \
 	quality-check quality-sample quality-summary delivery-status \
@@ -116,6 +121,8 @@ help:
 	@echo "  make research-train-samples # 生成 event_research_samples"
 	@echo "  make research-negative-samples # 生成非事件负样本"
 	@echo "  make quality-summary        # 数据库质量摘要"
+	@echo "  make db-raw-source-audit    # 2025/2026 各 raw 来源数量与正文覆盖"
+	@echo "  ./SPM status sources DB=stock_event_mining          # 用户入口"
 	@echo "  ./SPM status clean-stage DB=stock_event_mining --yes   # 用户入口"
 	@echo "  make db-stage-clean DB=stock_event_mining YES=1        # 底层 make 入口"
 	@echo "  说明：采集相关命令默认在进程内临时清除代理环境变量，不影响系统全局网络设置"
@@ -174,6 +181,8 @@ collect-history:
 		--retries $(HISTORY_RETRIES) \
 		--sleep-sec $(HISTORY_SLEEP) \
 		--db-flush-every $(HISTORY_DB_FLUSH_EVERY) \
+		--max-pages $(HISTORY_MAX_PAGES) \
+		--page-size $(HISTORY_PAGE_SIZE) \
 		$(if $(filter 1,$(HISTORY_CNINFO_FULLTEXT)),--cninfo-fulltext,) \
 		--cninfo-fulltext-max-chars $(HISTORY_CNINFO_FULLTEXT_MAX_CHARS)
 
@@ -300,6 +309,9 @@ db-summary:
 
 db-storage-audit:
 	psql -d $(DB) -f sql/inspect_storage_footprint.sql
+
+db-raw-source-audit:
+	$(PY) src/cli/quality.py sources --db $(DB) --start-date $(RAW_AUDIT_START) --end-date $(RAW_AUDIT_END) --top-n $(RAW_AUDIT_TOP_N)
 
 db-stage-clean:
 	@test "$(YES)" = "1" || (echo "Refusing to truncate stage tables. Re-run with YES=1."; exit 1)

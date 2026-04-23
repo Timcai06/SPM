@@ -251,6 +251,7 @@ make help
 ./SPM event run DB=stock_event_mining LIMIT=8
 ./SPM research train DB=stock_event_mining
 ./SPM status db DB=stock_event_mining
+./SPM status sources DB=stock_event_mining
 ```
 
 #### 底层 CLI
@@ -281,6 +282,7 @@ python3 src/cli/research.py feature --db stock_event_mining --analysis-mode even
 python3 src/cli/research.py train --db stock_event_mining --label-dataset output/event_return_dataset.csv
 python3 src/cli/quality.py db --db stock_event_mining
 python3 src/cli/quality.py summary --db stock_event_mining
+python3 src/cli/quality.py sources --db stock_event_mining
 ```
 
 ---
@@ -363,6 +365,7 @@ flowchart TD
 - 双机协作：[docs/architecture/dual-machine-architecture.md](docs/architecture/dual-machine-architecture.md)
 - 存储治理：[docs/governance/storage-retention-policy.md](docs/governance/storage-retention-policy.md)
 - 数据源扩展计划：[docs/data/source-expansion-plan.md](docs/data/source-expansion-plan.md)
+- 原始来源能力矩阵：[docs/data/raw-source-capability-matrix.md](docs/data/raw-source-capability-matrix.md)
 
 建议阅读顺序：
 

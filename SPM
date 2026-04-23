@@ -14,7 +14,7 @@ Daily groups:
   link      run | universe | standard-industries | board-industries | stats | profiles | market | sentiment
   graph     run | load | propagate
   research  feature | train | controls
-  status    summary | sample | db | storage | delivery | check | clean-stage
+  status    summary | sample | db | storage | sources | delivery | check | clean-stage
 
 Compatibility groups:
   workflow  full | trial
@@ -23,7 +23,7 @@ Compatibility groups:
   linking   run | link-events | company-universe | standard-industries | board-industries | stats-import | stats-load | profiles-import | profiles-load | market-env | sentiment-load
   graph     run | load-relations | propagate
   research  feature | train-samples | negative-samples
-  quality   summary | check | sample | delivery-status | db | storage-audit | clean-stage
+  quality   summary | check | sample | delivery-status | db | storage-audit | sources | clean-stage
 
 Shortcuts:
   full                  -> workflow full
@@ -38,6 +38,7 @@ Shortcuts:
   check                 -> status check
   db                    -> status db
   storage               -> status storage
+  sources               -> status sources
   clean-stage           -> status clean-stage
   quality               -> status summary
   collect-live          -> collect live
@@ -72,6 +73,7 @@ Examples:
   ./SPM research train DB=stock_event_mining
   ./SPM status db DB=stock_event_mining
   ./SPM status storage DB=stock_event_mining
+  ./SPM status sources DB=stock_event_mining
   ./SPM status clean-stage DB=stock_event_mining --yes
 EOF
 }
@@ -113,13 +115,13 @@ is_group_command() {
     link:run|link:universe|link:standard-industries|link:board-industries|link:stats|link:profiles|link:market|link:sentiment) return 0 ;;
     graph:run|graph:load|graph:propagate) return 0 ;;
     research:feature|research:train|research:controls) return 0 ;;
-    status:summary|status:check|status:sample|status:delivery|status:db|status:storage|status:clean-stage) return 0 ;;
+    status:summary|status:check|status:sample|status:delivery|status:db|status:storage|status:sources|status:clean-stage) return 0 ;;
     collect:live|collect:history|collect:backfill-cninfo) return 0 ;;
     events:run|events:classify-pending|events:reclassify) return 0 ;;
     linking:run|linking:link-events|linking:company-universe|linking:standard-industries|linking:board-industries|linking:stats-import|linking:stats-load|linking:profiles-import|linking:profiles-load|linking:market-env|linking:sentiment-load) return 0 ;;
     graph:run|graph:load-relations|graph:propagate) return 0 ;;
     research:feature|research:train-samples|research:negative-samples) return 0 ;;
-  quality:summary|quality:check|quality:sample|quality:delivery-status|quality:db|quality:storage|quality:storage-audit|quality:clean-stage) return 0 ;;
+  quality:summary|quality:check|quality:sample|quality:delivery-status|quality:db|quality:storage|quality:storage-audit|quality:sources|quality:clean-stage) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -138,6 +140,7 @@ resolve_shortcut() {
     check) echo "status check" ;;
     db) echo "status db" ;;
     storage) echo "status storage" ;;
+    sources) echo "status sources" ;;
     clean-stage) echo "status clean-stage" ;;
     quality) echo "status summary" ;;
     collect-live) echo "collect live" ;;
@@ -243,6 +246,7 @@ case "$group:$command" in
   status:delivery) dispatch_make delivery-status "$@" ;;
   status:db) dispatch_make db-summary "$@" ;;
   status:storage) dispatch_make db-storage-audit "$@" ;;
+  status:sources) dispatch_make db-raw-source-audit "$@" ;;
   status:clean-stage) dispatch_make db-stage-clean "$@" ;;
 
   collect:live) dispatch_make collect-live "$@" ;;
@@ -279,6 +283,7 @@ case "$group:$command" in
   quality:delivery-status) dispatch_make delivery-status "$@" ;;
   quality:db) dispatch_make db-summary "$@" ;;
   quality:storage|quality:storage-audit) dispatch_make db-storage-audit "$@" ;;
+  quality:sources) dispatch_make db-raw-source-audit "$@" ;;
   quality:clean-stage) dispatch_make db-stage-clean "$@" ;;
 
   *)

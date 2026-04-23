@@ -30,6 +30,16 @@ def build_parser() -> argparse.ArgumentParser:
     storage_parser = sub.add_parser("storage-audit", help="show database storage footprint")
     storage_parser.add_argument("--db", default="stock_event_mining")
 
+    raw_coverage_parser = sub.add_parser(
+        "raw-coverage",
+        aliases=["sources"],
+        help="show 2025/2026 raw source coverage and fulltext gaps",
+    )
+    raw_coverage_parser.add_argument("--db", default="stock_event_mining")
+    raw_coverage_parser.add_argument("--start-date", default="2025-01-01")
+    raw_coverage_parser.add_argument("--end-date", default="2027-01-01")
+    raw_coverage_parser.add_argument("--top-n", type=int, default=200)
+
     clean_stage_parser = sub.add_parser("clean-stage", help="truncate rebuildable stage tables")
     clean_stage_parser.add_argument("--db", default="stock_event_mining")
     clean_stage_parser.add_argument("--lock-timeout-sec", type=int, default=120)

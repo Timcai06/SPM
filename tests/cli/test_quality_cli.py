@@ -46,6 +46,13 @@ class QualityCliTests(unittest.TestCase):
         self.assertEqual(args.command, "storage-audit")
         self.assertEqual(args.db, "stock_event_mining")
 
+    def test_parser_supports_sources_alias(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["sources", "--db", "stock_event_mining", "--top-n", "25"])
+        self.assertEqual(args.command, "sources")
+        self.assertEqual(args.db, "stock_event_mining")
+        self.assertEqual(args.top_n, 25)
+
     @patch("cli.quality.check_job.main")
     def test_check_handler_calls_job(self, mock_check_main: MagicMock) -> None:
         quality.run_check_command(MagicMock())
@@ -115,6 +122,31 @@ class QualityCliTests(unittest.TestCase):
         quality.run_storage_audit_command(args)
 
         mock_audit.assert_called_once_with(["--db", "stock_event_mining"])
+
+    @patch("cli.quality.logged_run")
+    @patch("cli.quality.storage_governance_job.run_raw_source_coverage")
+    def test_sources_alias_handler_calls_job(self, mock_raw_coverage: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "quality_run_sources"
+        args = MagicMock()
+        args.db = "stock_event_mining"
+        args.start_date = "2025-01-01"
+        args.end_date = "2027-01-01"
+        args.top_n = 25
+
+        quality.COMMAND_HANDLERS["sources"](args)
+
+        mock_raw_coverage.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--start-date",
+                "2025-01-01",
+                "--end-date",
+                "2027-01-01",
+                "--top-n",
+                "25",
+            ]
+        )
 
     @patch("cli.quality.logged_run")
     @patch("cli.quality.storage_governance_job.run_clean_stage")

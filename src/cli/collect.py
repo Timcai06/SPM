@@ -14,7 +14,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from cli.collect_parser import build_parser
 from modules.collectors.jobs import cninfo_fulltext_backfill_job, collect_job, history_job
-from modules.runtime.services.network_env_service import without_process_proxies
+from modules.runtime.services.network_env_service import direct_network_only
 from modules.runtime.services.run_metadata_service import logged_run
 
 
@@ -26,7 +26,7 @@ def run_collect_command(args: argparse.Namespace) -> None:
     argv = ["--limit", str(args.limit)]
     if args.include_non_keyword:
         argv.append("--include-non-keyword")
-    with without_process_proxies():
+    with direct_network_only():
         collect_job.main(argv)
 
 
@@ -60,6 +60,10 @@ def run_collect_history_command(args: argparse.Namespace) -> None:
         str(args.db_flush_every),
         "--output-dir",
         args.output_dir,
+        "--max-pages",
+        str(args.max_pages),
+        "--page-size",
+        str(args.page_size),
     ]
     if args.skip_db_load:
         argv.append("--skip-db-load")
@@ -73,7 +77,7 @@ def run_collect_history_command(args: argparse.Namespace) -> None:
         argv=argv,
         metadata={"source": args.source, "symbol_source": args.symbol_source},
     ):
-        with without_process_proxies():
+        with direct_network_only():
             history_job.main(argv)
 
 
@@ -127,7 +131,7 @@ def run_cninfo_backfill_command(args: argparse.Namespace) -> None:
         argv=argv,
         metadata={"source": args.source, "start_date": args.start_date, "end_date": args.end_date},
     ):
-        with without_process_proxies():
+        with direct_network_only():
             cninfo_fulltext_backfill_job.main(argv)
 
 

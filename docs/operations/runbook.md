@@ -46,6 +46,7 @@ python3 src/cli/quality.py db --db stock_event_mining
 - `collect.py` 的采集与正文回填命令现在会在**当前进程内**临时清除 `HTTP_PROXY / HTTPS_PROXY / ALL_PROXY` 等代理变量
 - 这不会修改你的系统网络环境，只是保证国内站点采集默认直连
 - `events.py run` 在未开启 `--skip-collect` 时，也会沿用同样的默认行为
+- 采集命令会先做 direct-network preflight：如果检测到 macOS 系统代理、PAC、SOCKS，或者默认路由走 `utun/tun/ppp/ipsec`，命令会直接退出，不会带着代理继续跑
 
 确认点：
 
