@@ -35,6 +35,14 @@ def safe_normalize_datetime(value: str) -> str:
         return "1970-01-01 00:00:00"
 
 
+def is_future_publish_date(value: str) -> bool:
+    try:
+        publish_dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return False
+    return publish_dt.date() > datetime.now().date()
+
+
 def upsert_raw_documents(db_name: str, rows: list[dict[str, str]]) -> None:
     if not rows:
         return
@@ -45,6 +53,9 @@ def upsert_raw_documents(db_name: str, rows: list[dict[str, str]]) -> None:
         content = sanitize_text((row.get("content") or "")).strip()
         if not content:
             content = title or "(empty)"
+        publish_time = safe_normalize_datetime(row.get("publish_time", ""))
+        if is_future_publish_date(publish_time):
+            continue
         content_hash = hashlib.md5(f"{title}::{content}".encode("utf-8")).hexdigest()
         data_to_insert.append(
             {
@@ -52,12 +63,15 @@ def upsert_raw_documents(db_name: str, rows: list[dict[str, str]]) -> None:
                 "source_type": "text_source",
                 "title": title,
                 "content": content,
-                "publish_time": safe_normalize_datetime(row.get("publish_time", "")),
+                "publish_time": publish_time,
                 "url": sanitize_text(row.get("url", "")),
                 "symbol_or_subject": sanitize_text(row.get("symbol_or_subject", "")),
                 "content_hash": content_hash,
             }
         )
+
+    if not data_to_insert:
+        return
 
     sql = """
         INSERT INTO raw_documents (source, source_type, title, content, publish_time, url, symbol_or_subject, content_hash)

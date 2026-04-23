@@ -118,20 +118,20 @@ def main(argv: list[str] | None = None) -> None:
             e.intensity_score,
             e.impact_scope,
             CASE
-                WHEN d.symbol_or_subject ~ '^[0-9]{6}$' AND d.source LIKE '上交所%' THEN d.symbol_or_subject || '.SH'
-                WHEN d.symbol_or_subject ~ '^[0-9]{6}$' AND d.source LIKE '北交所%' THEN d.symbol_or_subject || '.BJ'
-                WHEN d.symbol_or_subject ~ '^[0-9]{6}$' THEN d.symbol_or_subject || '.SZ'
+                WHEN substring(d.content from '证券代码[:：]\\s*([0-9]{6})') ~ '^[0-9]{6}$' AND d.source LIKE '上交所%' THEN substring(d.content from '证券代码[:：]\\s*([0-9]{6})') || '.SH'
+                WHEN substring(d.content from '证券代码[:：]\\s*([0-9]{6})') ~ '^[0-9]{6}$' AND d.source LIKE '北交所%' THEN substring(d.content from '证券代码[:：]\\s*([0-9]{6})') || '.BJ'
+                WHEN substring(d.content from '证券代码[:：]\\s*([0-9]{6})') ~ '^[0-9]{6}$' THEN substring(d.content from '证券代码[:：]\\s*([0-9]{6})') || '.SZ'
                 ELSE NULL
             END AS ts_code,
             1.0::text AS final_link_score
         FROM structured_events e
         JOIN event_candidates c ON c.id = e.candidate_id
         JOIN raw_documents d ON d.id = c.raw_document_id
-        WHERE d.symbol_or_subject ~ '^[0-9]{6}$'
+        WHERE substring(d.content from '证券代码[:：]\\s*([0-9]{6})') ~ '^[0-9]{6}$'
         ORDER BY e.event_date DESC
         """
         rows = run_query_rows(args.db, sql_fallback)
-        link_source = "raw_documents_symbol_or_subject"
+        link_source = "raw_documents_content_security_code"
     token, token_source = resolve_tushare_token(
         disable_tushare=args.disable_tushare,
         tushare_token=args.tushare_token,

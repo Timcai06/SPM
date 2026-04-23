@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.raw_event_categories import MACRO_EVENT
 
 
 CAIXIN_MINI_URL = "https://mini.caixin.com/"
@@ -17,6 +18,8 @@ def parse_time(value: str) -> str:
         return now.strftime("%Y-%m-%d %H:%M:%S")
     month, day, hm = match.group(1), match.group(2), match.group(3)
     dt = datetime.strptime(f"{now.year}-{month}-{day} {hm}", "%Y-%m-%d %H:%M")
+    if dt > now + timedelta(days=1):
+        dt = dt.replace(year=dt.year - 1)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
@@ -49,10 +52,9 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
                     "content": strip_tags(summary_match.group(1)) if summary_match else title,
                     "publish_time": parse_time(strip_tags(time_match.group(1)) if time_match else ""),
                     "url": url,
-                    "symbol_or_subject": "宏观/地缘新闻",
+                    "symbol_or_subject": MACRO_EVENT,
                 }
             )
             if len(rows) >= limit:
                 break
         return rows
-

@@ -4,6 +4,7 @@ import re
 from typing import Dict, List, Optional
 
 from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.raw_event_categories import POLICY_EVENT
 
 
 CSRC_LIST_URL = "https://www.csrc.gov.cn/csrc/c100028/common_list.shtml"
@@ -65,7 +66,7 @@ async def parse_article(url: str, session: object | None = None) -> Optional[Dic
         "content": content,
         "publish_time": publish_time,
         "url": url,
-        "symbol_or_subject": "政策/监管",
+        "symbol_or_subject": POLICY_EVENT,
     }
 
 
@@ -77,4 +78,3 @@ async def collect(limit: int = 10) -> List[Dict[str, str]]:
         tasks = [parse_article(item["url"], session=session) for item in items]
         results = await asyncio.gather(*tasks)
         return [r for r in results if r]
-

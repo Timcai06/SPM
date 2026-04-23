@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 
 from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.raw_event_categories import MACRO_EVENT
 
 
 YICAI_NEWS_URL = "https://www.yicai.com/news/"
@@ -19,6 +20,8 @@ def parse_time(value: str) -> str:
         return (now - timedelta(hours=int(value.replace("小时前", "")))).strftime("%Y-%m-%d %H:%M:%S")
     if re.fullmatch(r"[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2}", value):
         dt = datetime.strptime(f"{now.year}-{value}", "%Y-%m-%d %H:%M")
+        if dt > now + timedelta(days=1):
+            dt = dt.replace(year=dt.year - 1)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2}", value):
         dt = datetime.strptime(value, "%Y-%m-%d %H:%M")
@@ -53,10 +56,9 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
                     "content": strip_tags(summary_match.group(1)) if summary_match else title,
                     "publish_time": parse_time(strip_tags(time_match.group(1)) if time_match else ""),
                     "url": url,
-                    "symbol_or_subject": "宏观/行业新闻",
+                    "symbol_or_subject": MACRO_EVENT,
                 }
             )
             if len(rows) >= limit:
                 break
         return rows
-

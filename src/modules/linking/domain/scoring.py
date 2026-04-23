@@ -59,6 +59,10 @@ GENERIC_SYMBOLS = {
     "政策/通知",
     "行业/市场新闻",
     "行业/股市快讯",
+    "政策类事件",
+    "公司行为事件",
+    "行业/技术事件",
+    "宏观/地缘事件",
     "印巴空战",
     "印巴冲突",
     "储能政策",
@@ -201,4 +205,3 @@ def score_link(event: dict, company: dict) -> tuple[float, dict]:
         "direct_name_score": round(direct_name_match, 4),
         "evidence": evidence,
     }
-

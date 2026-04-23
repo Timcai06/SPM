@@ -6,6 +6,8 @@ from __future__ import annotations
 import re
 from typing import List
 
+from modules.collectors.domain.raw_event_categories import ALL_RAW_EVENT_CATEGORIES
+
 ENTITY_PATTERN = re.compile(
     r"[0-9]{6}\.(?:SZ|SH|BJ)|"
     r"[0-9]{6}|"
@@ -25,7 +27,7 @@ GENERIC_ENTITY_TOKENS = (
 def normalize_entity_candidate(text: str) -> str:
     candidate = re.sub(r"\s+", "", text.strip())
     candidate = candidate.strip("：:，。；;（）()[]【】")
-    if not candidate or candidate in GENERIC_ENTITY_TOKENS:
+    if not candidate or candidate in GENERIC_ENTITY_TOKENS or candidate in ALL_RAW_EVENT_CATEGORIES:
         return ""
     if any(candidate.startswith(prefix) for prefix in GENERIC_ENTITY_PREFIXES):
         return ""
@@ -49,4 +51,3 @@ def extract_subject_entities(text: str, symbol_or_subject: str = "", title: str 
         if candidate and candidate not in seen:
             seen.append(candidate)
     return seen
-

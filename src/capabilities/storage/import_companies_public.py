@@ -26,6 +26,7 @@ SHORT_NAME_RE = re.compile(r"证券简称[:：]\s*([A-Za-z0-9\u4e00-\u9fa5*STST�
 FULL_NAME_SSE_RE = re.compile(r"^(.+?股份有限公司)")
 SHORT_NAME_SZSE_RE = re.compile(r"^([^：:\s]{2,20})[：:]")
 BOARD_RE = re.compile(r"板块[:：]\s*([A-Z]+)")
+CONTENT_CODE_RE = re.compile(r"证券代码[:：]\s*([0-9]{6})")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -113,6 +114,17 @@ def extract_industry_l2(row: dict[str, str]) -> str:
     return infer_industry_l1(text)
 
 
+def extract_code(row: dict[str, str]) -> str:
+    value = (row.get("symbol_or_subject") or "").strip()
+    if CODE_RE.match(value):
+        return value
+    content = (row.get("content") or "").strip()
+    match = CONTENT_CODE_RE.search(content)
+    if match:
+        return match.group(1)
+    return ""
+
+
 def concept_tags(row: dict[str, str], short_name: str, full_name: str, industry_l1: str) -> list[str]:
     tags: list[str] = []
     for item in [industry_l1, short_name, full_name]:
@@ -197,7 +209,7 @@ def main(argv: list[str] | None = None) -> None:
         if not source_file.exists():
             continue
         for row in read_csv(source_file):
-            code = (row.get("symbol_or_subject") or "").strip()
+            code = extract_code(row)
             if not CODE_RE.match(code):
                 continue
             short_name = extract_short_name(row)

@@ -13,6 +13,7 @@ import requests
 from requests.adapters import HTTPAdapter
 
 from modules.collectors.domain.common import fetch_json_post, strip_tags
+from modules.collectors.domain.raw_event_categories import COMPANY_EVENT
 
 
 CNINFO_LIST_URL = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
@@ -88,7 +89,7 @@ async def collect(limit: int = 20, lookback_days: int = 5) -> List[Dict[str, str
                     ),
                     "publish_time": publish_time,
                     "url": url,
-                    "symbol_or_subject": item.get("secCode", "").strip(),
+                    "symbol_or_subject": COMPANY_EVENT,
                 }
             )
         return rows
@@ -371,7 +372,7 @@ def collect_history(
                     "content": content,
                     "publish_time": publish_time,
                     "url": detail_url,
-                    "symbol_or_subject": ts_code,
+                    "symbol_or_subject": COMPANY_EVENT,
                 }
             )
             if len(rows) >= limit_per_symbol:

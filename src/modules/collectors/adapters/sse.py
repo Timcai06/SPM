@@ -4,6 +4,7 @@ import json
 from typing import Dict, List
 
 from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags, fetch_text_async, strip_tags
+from modules.collectors.domain.raw_event_categories import COMPANY_EVENT
 
 
 SSE_LIST_URL = "https://www.sse.com.cn/disclosure/listedinfo/announcement/json/stock_bulletin_publish_order.json"
@@ -37,8 +38,7 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
                     "content": "；".join([part for part in content_parts if part and not part.endswith("：")]),
                     "publish_time": item.get("discloseDate", "").strip(),
                     "url": url,
-                    "symbol_or_subject": item.get("securityCode", "").strip(),
+                    "symbol_or_subject": COMPANY_EVENT,
                 }
             )
         return rows
-

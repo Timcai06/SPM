@@ -6,6 +6,8 @@ import pandas as pd
 from typing import Dict, List
 from datetime import datetime
 
+from modules.collectors.domain.raw_event_categories import COMPANY_EVENT
+
 logger = logging.getLogger(__name__)
 
 # Top active stocks symbols for broad announcement/news coverage
@@ -48,7 +50,7 @@ def collect(limit: int = 10) -> List[Dict[str, str]]:
                     "content": str(row['新闻内容']),
                     "publish_time": str(row['发布时间']),
                     "url": str(row['新闻链接']),
-                    "symbol_or_subject": symbol
+                    "symbol_or_subject": COMPANY_EVENT
                 })
         except Exception as e:
             logger.warning(f"Failed to fetch news for {symbol} via AKShare: {e}")

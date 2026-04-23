@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.raw_event_categories import INDUSTRY_EVENT
 
 
 EASTMONEY_INDUSTRY_URL = "https://finance.eastmoney.com/a/cywjh.html"
@@ -39,7 +40,7 @@ async def parse_article(url: str, session: object | None = None) -> Optional[Dic
         "content": content or title,
         "publish_time": parse_datetime(time_match.group(1)) if time_match else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "url": url,
-        "symbol_or_subject": "行业/市场新闻",
+        "symbol_or_subject": INDUSTRY_EVENT,
     }
 
 
@@ -65,4 +66,3 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
         tasks = [parse_article(link, session=session) for link in candidates]
         results = await asyncio.gather(*tasks)
         return [r for r in results if r]
-

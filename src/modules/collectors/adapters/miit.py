@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Dict, List
 
 from modules.collectors.domain.common import fetch_text_async, strip_tags
+from modules.collectors.domain.raw_event_categories import POLICY_EVENT
 
 
 MIIT_HOME_URL = "https://www.miit.gov.cn/"
@@ -68,7 +69,7 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
                     "content": title,
                     "publish_time": publish_date,
                     "url": url,
-                    "symbol_or_subject": "政策/产业",
+                    "symbol_or_subject": POLICY_EVENT,
                 }
             )
         return rows

@@ -23,7 +23,11 @@ def load_structured_events(cur) -> list[dict]:
                se.event_summary,
                rd.title AS raw_title,
                rd.content AS raw_content,
-               rd.symbol_or_subject AS raw_symbol
+               COALESCE(
+                   substring(rd.symbol_or_subject from '^([0-9]{6})'),
+                   substring(rd.content from '证券代码[:：][[:space:]]*([0-9]{6})'),
+                   substring(rd.title from '\b([0-9]{6})\b')
+               ) AS raw_symbol
         FROM structured_events se
         JOIN event_candidates ec ON ec.id = se.candidate_id
         JOIN raw_documents rd ON rd.id = ec.raw_document_id

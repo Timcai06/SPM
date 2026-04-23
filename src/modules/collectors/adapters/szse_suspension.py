@@ -4,6 +4,7 @@ import json
 from typing import Dict, List
 
 from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.raw_event_categories import COMPANY_EVENT
 
 
 SZSE_LIST_URL = "https://www.szse.cn/api/disc/announcement/detailinfo"
@@ -49,10 +50,9 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
                         ),
                         "publish_time": item.get("publishTime", "").strip().split(" ")[0],
                         "url": attach_url,
-                        "symbol_or_subject": sec_code,
+                        "symbol_or_subject": COMPANY_EVENT,
                     }
                 )
                 if len(rows) >= limit:
                     return rows
         return rows
-

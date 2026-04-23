@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from modules.collectors.domain.common import fetch_text, fetch_text_async, strip_tags
+from modules.collectors.domain.raw_event_categories import INDUSTRY_EVENT
 
 
 KR36_FLASH_STOCK_URL = "https://www.36kr.com/newsflashes/catalog/2"
@@ -58,10 +59,9 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
                     "content": content,
                     "publish_time": publish_time,
                     "url": f"https://www.36kr.com/newsflashes/{item_id}" if item_id else KR36_FLASH_STOCK_URL,
-                    "symbol_or_subject": "行业/股市快讯",
+                    "symbol_or_subject": INDUSTRY_EVENT,
                 }
             )
             if len(rows) >= limit:
                 break
         return rows
-

@@ -74,7 +74,7 @@ def main() -> None:
                 join event_candidates ec on ec.id=e.candidate_id
                 join raw_documents rd on rd.id=ec.raw_document_id
                 join companies c on c.id=l.company_id
-                where rd.symbol_or_subject in ('政策/宏观','政策/通知','行业/市场新闻','行业/股市快讯')
+                where rd.symbol_or_subject in ('政策类事件','行业/技术事件','宏观/地缘事件')
                 order by l.final_link_score desc, l.id asc
                 limit %s
                 """,
