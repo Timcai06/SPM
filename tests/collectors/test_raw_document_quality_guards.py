@@ -13,7 +13,7 @@ if str(SRC) not in sys.path:
 
 from modules.collectors.adapters.caixin import parse_time as parse_caixin_time
 from modules.collectors.adapters.yicai import parse_time as parse_yicai_time
-from modules.collectors.services.history_collect_service import has_quality_body
+from modules.collectors.domain.history_rows import has_quality_body
 from modules.collectors.services.raw_document_loading_service import is_future_publish_date
 
 
