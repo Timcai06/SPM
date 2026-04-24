@@ -58,7 +58,7 @@ flowchart TD
 | 运行分支 | `run` |
 | 运行拓扑 | `M5 Pro (DB/研究)` + `Intel Mac (采集/回填)` |
 | 主入口 | `./SPM` 与 `src/cli/*.py` |
-| 当前阶段 | 数据底座与研究底座已经成形，仍在继续提高正文覆盖率与研究完整度 |
+| 当前阶段 | 数据底座与研究底座已经成形，当前正优先做厚 2025/2026 raw 层和强正文来源 |
 
 ---
 
@@ -66,11 +66,11 @@ flowchart TD
 
 ### 1. 数据库状态快照
 
-更新时间：`2026-04-22`
+更新时间：`2026-04-23`
 
 | 表/主题 | 当前规模 |
 |---|---:|
-| `raw_documents` | 1,577,640 |
+| `raw_documents` | 1,581,500 |
 | `event_candidates` | 1,577,638 |
 | `structured_events` | 370,135 |
 | `canonical_event_clusters` | 106,760 |
@@ -84,10 +84,27 @@ flowchart TD
 | `security_forward_labels_daily` | 78,770 |
 | `event_research_samples` | 538 |
 | `control_research_samples` | 36,377 |
-| `etl_runs` | 37 |
+| `etl_runs` | 48 |
 | `etl_run_steps` | 8 |
 
-### 2. 2025-2026 巨潮正文回填进度
+### 2. 2025-2026 raw 第一层快照
+
+| 来源家族 | 行数 | 合格正文 | 强正文 |
+|---|---:|---:|---:|
+| 巨潮资讯网 | 517,743 | 201,952 | 201,021 |
+| 深交所 | 2,097 | 206 | 0 |
+| 上交所 | 1,279 | 202 | 0 |
+| AKShare | 946 | 847 | 0 |
+| 第一财经 | 655 | 42 | 0 |
+| 中国政府网 | 383 | 370 | 303 |
+| 中国证监会 | 198 | 178 | 160 |
+| 财新网 | 186 | 66 | 0 |
+| 东方财富 | 170 | 161 | 132 |
+| 36氪 | 155 | 103 | 2 |
+| 国家发改委 | 73 | 73 | 67 |
+| 工信部 | 65 | 0 | 0 |
+
+### 3. 2025-2026 巨潮正文回填进度
 
 | 指标 | 数值 |
 |---|---:|
@@ -102,13 +119,32 @@ pie title 2025-2026 巨潮正文覆盖率
     "未回填或正文过短" : 305869
 ```
 
-### 3. 当前工程判断
+### 4. 当前工程判断
 
-- **链路已跑通**：Intel 已能通过 TCP 直连 M5 上 PostgreSQL，并完成正文回填写库
+- **采集主链已补齐**：现有 adapter 都已进入 `collect-history` 主链
+- **链路已跑通**：Intel 已能通过 TCP 直连 M5 上 PostgreSQL，并完成采集与正文回填写库
 - **环境已分层**：M5 使用 `spm-m5pro` Conda 环境，Intel 使用 `.venv`
 - **Git 结构已收敛**：只保留 `dev` 与 `run`
-- **正文回填可用**：Intel 已不再强依赖 `pdftotext`，缺失时可回退到 `pdfplumber`
-- **主要短板仍在数据覆盖率**：正文回填整体可用，但 2025-2026 覆盖率仍需继续提升
+- **采集默认不走代理**：采集命令会做 direct-network preflight，不满足直连条件就直接退出
+- **主要短板仍在来源均衡和正文覆盖**：不同来源的抓取策略由 source profile 集中管理，不再要求操作时人工区分
+
+### 5. 现在推荐你只记两个采集命令
+
+```bash
+./SPM ingest full DB=stock_event_mining
+./SPM status raw DB=stock_event_mining
+```
+
+这两个命令的职责是：
+
+- `ingest full`：统一做 2025/2026 全量补数据。对正文型来源优先补正文，对其他来源优先补覆盖，对巨潮执行正文回填，并在末尾把 `symbol_or_subject` 规范到附件 2 的四类事件粗分类
+- `status raw`：统一看 raw 层覆盖、正文质量、四类粗分类覆盖、以及距离目标行数还有多远
+
+也就是说：
+
+- 你不需要再自己区分“强正文/弱正文”或“该不该单独回填”
+- 你不需要自己记每个来源的页数、并发和门槛
+- 系统会把这些来源级规则集中在 `src/modules/collectors/domain/source_profiles.py`
 
 ---
 
@@ -247,6 +283,7 @@ make help
 
 ```bash
 ./SPM ingest history HISTORY_SOURCE=cninfo-disclosure DB=stock_event_mining
+./SPM ingest history HISTORY_SOURCE=yicai-news DB=stock_event_mining HISTORY_START=2025-01-01 HISTORY_END=2026-04-23 HISTORY_MAX_PAGES=200 HISTORY_PAGE_SIZE=50 HISTORY_QUALITY_BODY_ONLY=1 HISTORY_MIN_CONTENT_LENGTH=300
 ./SPM ingest backfill DB=stock_event_mining CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
 ./SPM event run DB=stock_event_mining LIMIT=8
 ./SPM research train DB=stock_event_mining
@@ -258,6 +295,7 @@ make help
 
 ```bash
 python3 src/cli/collect.py collect-history --db stock_event_mining --source cninfo-disclosure
+python3 src/cli/collect.py collect-history --db stock_event_mining --source yicai-news --start-date 2025-01-01 --end-date 2026-04-23 --max-pages 200 --page-size 50 --quality-body-only --min-content-length 300
 python3 src/cli/collect.py backfill-cninfo-fulltext --db stock_event_mining --start-date 2025-01-01 --end-date 2026-12-31
 ```
 

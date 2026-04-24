@@ -53,6 +53,24 @@ class QualityCliTests(unittest.TestCase):
         self.assertEqual(args.db, "stock_event_mining")
         self.assertEqual(args.top_n, 25)
 
+    def test_parser_supports_normalize_raw_categories(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "normalize-raw-categories",
+                "--db",
+                "stock_event_mining",
+                "--start-date",
+                "2025-01-01",
+                "--end-date",
+                "2026-04-24",
+            ]
+        )
+        self.assertEqual(args.command, "normalize-raw-categories")
+        self.assertEqual(args.db, "stock_event_mining")
+        self.assertEqual(args.start_date, "2025-01-01")
+        self.assertEqual(args.end_date, "2026-04-24")
+
     @patch("cli.quality.check_job.main")
     def test_check_handler_calls_job(self, mock_check_main: MagicMock) -> None:
         quality.run_check_command(MagicMock())
@@ -145,6 +163,33 @@ class QualityCliTests(unittest.TestCase):
                 "2027-01-01",
                 "--top-n",
                 "25",
+            ]
+        )
+
+    @patch("cli.quality.logged_run")
+    @patch("cli.quality.storage_governance_job.run_normalize_raw_categories")
+    def test_normalize_raw_categories_handler_calls_job(
+        self, mock_normalize: MagicMock, mock_logged_run: MagicMock
+    ) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "quality_run_raw_categories"
+        args = MagicMock()
+        args.db = "stock_event_mining"
+        args.start_date = "2025-01-01"
+        args.end_date = "2026-04-24"
+        args.lock_timeout_sec = 120
+
+        quality.run_normalize_raw_categories_command(args)
+
+        mock_normalize.assert_called_once_with(
+            [
+                "--db",
+                "stock_event_mining",
+                "--lock-timeout-sec",
+                "120",
+                "--start-date",
+                "2025-01-01",
+                "--end-date",
+                "2026-04-24",
             ]
         )
 

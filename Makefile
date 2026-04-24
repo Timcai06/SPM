@@ -35,6 +35,8 @@ HISTORY_CNINFO_FULLTEXT_MAX_CHARS ?= 12000
 HISTORY_DB_FLUSH_EVERY ?= 100
 HISTORY_MAX_PAGES ?= 20
 HISTORY_PAGE_SIZE ?= 50
+HISTORY_QUALITY_BODY_ONLY ?= 0
+HISTORY_MIN_CONTENT_LENGTH ?= 300
 CNINFO_BACKFILL_SOURCE ?= 巨潮资讯网/历史公告
 CNINFO_BACKFILL_START ?= 2025-01-01
 CNINFO_BACKFILL_END ?= 2026-01-01
@@ -83,6 +85,16 @@ MAX_EXPORT_MB ?= 400
 RAW_AUDIT_START ?= 2025-01-01
 RAW_AUDIT_END ?= 2027-01-01
 RAW_AUDIT_TOP_N ?= 200
+RAW_REFRESH_START ?= 2025-01-01
+RAW_REFRESH_END ?= 2026-04-23
+RAW_REFRESH_TARGET_ROWS ?= 5000
+RAW_REFRESH_MAX_JOBS ?= 4
+RAW_REFRESH_MIN_CONTENT_LENGTH ?= 300
+RAW_REFRESH_CNINFO_MAX_SYMBOLS ?= 3000
+RAW_REFRESH_CNINFO_LIMIT_PER_SYMBOL ?= 120
+RAW_REFRESH_CNINFO_WORKERS ?= 24
+RAW_REFRESH_CNINFO_BACKFILL_ROWS ?= 30000
+RAW_REFRESH_CNINFO_BACKFILL_WORKERS ?= 24
 
 FEATURE_TOKEN_ARG :=
 ifeq ($(USE_TUSHARE),1)
@@ -98,7 +110,8 @@ endif
 	linking-run link-events \
 	graph-run load-relations propagate \
 	cluster-stats backfill-event-features refresh-event-features export-yearly check-export-size \
-	db-summary db-storage-audit db-raw-source-audit db-stage-clean research-base-pipeline \
+	db-summary db-storage-audit db-raw-source-audit db-normalize-raw-categories db-stage-clean research-base-pipeline \
+	db-raw-audit ingest-full-raw \
 	research-feature research-train-samples research-negative-samples \
 	stats-import stats-load profiles-import profiles-load market-env sentiment-load \
 	quality-check quality-sample quality-summary delivery-status \
@@ -106,6 +119,11 @@ endif
 
 help:
 	@echo "推荐入口："
+	@echo "  ./SPM ingest full DB=stock_event_mining             # 一键做 2025/2026 全量补数据"
+	@echo "  ./SPM status raw DB=stock_event_mining              # 看 raw 层覆盖、正文质量、目标差距"
+	@echo "  ./SPM status clean-stage DB=stock_event_mining --yes   # 清理可重建 stage 表"
+	@echo ""
+	@echo "工程入口："
 	@echo "  make research-base-pipeline # 历史采集 -> 分类 -> 链接 -> 数据库摘要"
 	@echo "  make company-universe       # 扩 companies 到全A公司池"
 	@echo "  make standard-industries    # 补 companies 一级标准行业（CNInfo/证监会口径）"
@@ -122,14 +140,17 @@ help:
 	@echo "  make research-negative-samples # 生成非事件负样本"
 	@echo "  make quality-summary        # 数据库质量摘要"
 	@echo "  make db-raw-source-audit    # 2025/2026 各 raw 来源数量与正文覆盖"
-	@echo "  ./SPM status sources DB=stock_event_mining          # 用户入口"
-	@echo "  ./SPM status clean-stage DB=stock_event_mining --yes   # 用户入口"
-	@echo "  make db-stage-clean DB=stock_event_mining YES=1        # 底层 make 入口"
+	@echo "  make db-normalize-raw-categories # 统一 raw_documents.symbol_or_subject 到附件 2 四类"
+	@echo "  make ingest-full-raw        # 一键做 2025/2026 全量补数据：补来源、补正文、补回填"
+	@echo "  make db-raw-audit           # 查看 raw 层覆盖、正文质量、目标差距"
+	@echo "  make db-stage-clean DB=stock_event_mining YES=1     # 底层 make 入口"
 	@echo "  说明：采集相关命令默认在进程内临时清除代理环境变量，不影响系统全局网络设置"
 	@echo ""
 	@echo "常用参数："
 	@echo "  make collect-history HISTORY_SOURCE=akshare-news HISTORY_MAX_SYMBOLS=1000 HISTORY_OFFSET=0 HISTORY_LIMIT_PER_SYMBOL=20 HISTORY_WORKERS=12"
 	@echo "  make collect-history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1 HISTORY_CNINFO_FULLTEXT_MAX_CHARS=12000"
+	@echo "  make collect-history HISTORY_SOURCE=gov-news HISTORY_START=2025-01-01 HISTORY_END=2026-04-23 HISTORY_MAX_PAGES=100 HISTORY_PAGE_SIZE=50 HISTORY_QUALITY_BODY_ONLY=1 HISTORY_MIN_CONTENT_LENGTH=300"
+	@echo "  make ingest-full-raw DB=stock_event_mining"
 	@echo "  make backfill-cninfo-fulltext CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01 CNINFO_BACKFILL_MAX_ROWS=5000 CNINFO_BACKFILL_OFFSET=0"
 	@echo "  make backfill-cninfo-fulltext CNINFO_BACKFILL_SHARD_COUNT=2 CNINFO_BACKFILL_SHARD_INDEX=0 CNINFO_BACKFILL_WORKERS=4"
 	@echo "  make backfill-cninfo-fulltext CNINFO_BACKFILL_PROGRESS_EVERY=10 CNINFO_BACKFILL_HEARTBEAT_SEC=5 CNINFO_BACKFILL_DETAIL_TIMEOUT_SEC=12 CNINFO_BACKFILL_PDF_TIMEOUT_SEC=18"
@@ -183,6 +204,8 @@ collect-history:
 		--db-flush-every $(HISTORY_DB_FLUSH_EVERY) \
 		--max-pages $(HISTORY_MAX_PAGES) \
 		--page-size $(HISTORY_PAGE_SIZE) \
+		$(if $(filter 1,$(HISTORY_QUALITY_BODY_ONLY)),--quality-body-only,) \
+		--min-content-length $(HISTORY_MIN_CONTENT_LENGTH) \
 		$(if $(filter 1,$(HISTORY_CNINFO_FULLTEXT)),--cninfo-fulltext,) \
 		--cninfo-fulltext-max-chars $(HISTORY_CNINFO_FULLTEXT_MAX_CHARS)
 
@@ -313,10 +336,30 @@ db-storage-audit:
 db-raw-source-audit:
 	$(PY) src/cli/quality.py sources --db $(DB) --start-date $(RAW_AUDIT_START) --end-date $(RAW_AUDIT_END) --top-n $(RAW_AUDIT_TOP_N)
 
+db-raw-audit:
+	$(PY) src/cli/quality.py raw --db $(DB) --start-date $(RAW_REFRESH_START) --end-date $(RAW_REFRESH_END) --top-n $(RAW_AUDIT_TOP_N)
+
+db-normalize-raw-categories:
+	$(PY) src/cli/quality.py normalize-raw-categories --db $(DB)
+
 db-stage-clean:
 	@test "$(YES)" = "1" || (echo "Refusing to truncate stage tables. Re-run with YES=1."; exit 1)
 	psql -d $(DB) -c "TRUNCATE TABLE stg_event_candidates RESTART IDENTITY CASCADE;"
 	psql -d $(DB) -c "TRUNCATE TABLE stg_structured_events RESTART IDENTITY CASCADE;"
+
+ingest-full-raw:
+	$(PY) src/cli/collect.py full-raw \
+	  --db $(DB) \
+	  --start-date $(RAW_REFRESH_START) \
+	  --end-date $(RAW_REFRESH_END) \
+	  --max-jobs $(RAW_REFRESH_MAX_JOBS) \
+	  --min-content-length $(RAW_REFRESH_MIN_CONTENT_LENGTH) \
+	  --cninfo-max-symbols $(RAW_REFRESH_CNINFO_MAX_SYMBOLS) \
+	  --cninfo-limit-per-symbol $(RAW_REFRESH_CNINFO_LIMIT_PER_SYMBOL) \
+	  --cninfo-workers $(RAW_REFRESH_CNINFO_WORKERS) \
+	  --cninfo-backfill-max-rows $(RAW_REFRESH_CNINFO_BACKFILL_ROWS) \
+	  --cninfo-backfill-workers $(RAW_REFRESH_CNINFO_BACKFILL_WORKERS) \
+	  --top-n $(RAW_AUDIT_TOP_N)
 
 research-base-pipeline: collect-history classify-pending link-events db-summary
 

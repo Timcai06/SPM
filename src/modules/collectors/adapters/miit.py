@@ -24,6 +24,14 @@ async def parse_detail_publish_date(url: str, session: object | None = None) -> 
     return datetime.now().strftime("%Y-%m-%d")
 
 
+async def parse_detail_content(url: str, session: object | None = None) -> str:
+    html = await fetch_text_async(url, session=session)
+    match = re.search(r'id="con_con"[^>]*>([\s\S]*?)</div>\s*</div>', html, re.S)
+    if match:
+        return strip_tags(match.group(1))
+    return ""
+
+
 async def collect(limit: int = 20) -> List[Dict[str, str]]:
     import aiohttp
     import asyncio
@@ -58,15 +66,15 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
             if len(candidates) >= limit:
                 break
         
-        tasks = [parse_detail_publish_date(url, session=session) for url, _ in candidates]
-        dates = await asyncio.gather(*tasks)
+        dates = await asyncio.gather(*[parse_detail_publish_date(url, session=session) for url, _ in candidates])
+        contents = await asyncio.gather(*[parse_detail_content(url, session=session) for url, _ in candidates])
         
-        for (url, title), publish_date in zip(candidates, dates):
+        for (url, title), publish_date, content in zip(candidates, dates, contents):
             rows.append(
                 {
                     "source": "工信部/政策文件",
                     "title": title,
-                    "content": title,
+                    "content": content or title,
                     "publish_time": publish_date,
                     "url": url,
                     "symbol_or_subject": POLICY_EVENT,

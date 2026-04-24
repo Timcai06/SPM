@@ -15,9 +15,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 import akshare as ak
 import psycopg
+import requests
 
 SRC_ROOT = Path(__file__).resolve().parents[3]
 if str(SRC_ROOT) not in sys.path:
@@ -59,6 +61,8 @@ EASTMONEY_PAGE_1 = "https://finance.eastmoney.com/a/cywjh.html"
 CAIXIN_PAGE_1 = "https://mini.caixin.com/"
 YICAI_PAGE_1 = "https://www.yicai.com/news/"
 SUSPENSION_KEYWORDS = ("停牌", "复牌", "停复牌")
+MIIT_SEARCH_INFO_URL = "https://www.miit.gov.cn/search-front-server/api/search/info"
+KR36_FLASH_API_URL = "https://gateway.36kr.com/api/mis/nav/newsflash/list"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -82,6 +86,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--db-flush-every", type=int, default=100, help="Incrementally upsert every N collected rows.")
     parser.add_argument("--max-pages", type=int, default=20, help="For direct source history collectors, cap page iterations.")
     parser.add_argument("--page-size", type=int, default=50, help="For direct source history collectors, cap rows per page or total page fetch size.")
+    parser.add_argument("--quality-body-only", action="store_true", help="Only keep rows with article-like body content.")
+    parser.add_argument("--min-content-length", type=int, default=300, help="Minimum content length when --quality-body-only is enabled.")
     return parser.parse_args(argv)
 
 
@@ -541,13 +547,101 @@ def iter_miit_policy_history_batches(
     max_pages: int,
     page_size: int,
 ) -> list[list[dict[str, str]]]:
-    return iter_single_fetch_history_batches(
-        miit.collect,
-        limit=direct_history_limit(max_pages, page_size),
-        start_date=start_date,
-        end_date=end_date,
-        page_size=page_size,
-    )
+    def extract_miit_content(item: dict[str, Any]) -> str:
+        infoextends = item.get("infoextends")
+        if isinstance(infoextends, str):
+            try:
+                infoextends = json.loads(infoextends)
+            except Exception:
+                infoextends = None
+        if isinstance(infoextends, dict):
+            for element in infoextends.get("elementList", []) or []:
+                field_name = str(element.get("fieldName") or "").strip().lower()
+                if field_name == "content":
+                    text = strip_tags(str(element.get("fieldValue") or ""))
+                    if text:
+                        return text
+        return strip_tags(str(item.get("infocontent") or ""))
+
+    def fetch_miit_search_page(page_num: int) -> dict[str, Any]:
+        params = {
+            "websiteid": "110000000000000",
+            "scope": "basic",
+            "q": "",
+            "pg": str(page_size),
+            "cateid": "57",
+            "pos": "title,content",
+            "begin": start_date,
+            "end": end_date,
+            "dateField": "deploytime",
+            "selectFields": "title,content,deploytime,_index,url,cdate,infoextends,infocontentattribute,columnname,filenumbername,publishgroupname,publishtime,metaid,bexxgk,columnid,xxgkextend1,xxgkextend2,themename,typename,indexcode,createdate",
+            "highlightConfigs": '[{"field":"infocontent","numberOfFragments":2,"fragmentOffset":0,"fragmentSize":30,"noMatchSize":145}]',
+            "highlightFields": "title_text,infocontent,webid",
+            "level": "6",
+            "group": "distinct",
+            "sortFields": "deploytime:desc",
+            "p": str(page_num),
+        }
+        response = requests.get(
+            MIIT_SEARCH_INFO_URL,
+            params=params,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=20,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    batches: list[list[dict[str, str]]] = []
+    total_rows = 0
+    for page_num in range(1, max(1, max_pages) + 1):
+        try:
+            payload = fetch_miit_search_page(page_num)
+        except Exception as exc:
+            print(f"[history] warn miit page={page_num} fetch_failed error={exc}", flush=True)
+            continue
+        items = (((payload.get("data") or {}).get("searchResult") or {}).get("dataResults") or [])
+        if not items:
+            break
+        page_rows: list[dict[str, str]] = []
+        for item in items:
+            data = (((item.get("groupData") or [{}])[0]) or {}).get("data") or item
+            title = strip_tags(str(data.get("title") or "")).strip()
+            if not title:
+                continue
+            publish_time = str(data.get("jsearch_date") or data.get("deploytime") or "").strip()
+            if not publish_time and data.get("createdate"):
+                try:
+                    publish_time = datetime.fromtimestamp(int(data["createdate"]) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    publish_time = ""
+            if not in_date_range(publish_time, start_date, end_date):
+                continue
+            content = extract_miit_content(data)
+            if not content:
+                continue
+            url = str(data.get("url") or "").strip()
+            if url.startswith("/"):
+                url = urljoin("https://www.miit.gov.cn", url)
+            page_rows.append(
+                {
+                    "source": "工信部/政策文件",
+                    "title": title,
+                    "content": content,
+                    "publish_time": normalize_datetime(publish_time),
+                    "url": url,
+                    "symbol_or_subject": POLICY_EVENT,
+                }
+            )
+        deduped_page_rows = dedupe_rows(page_rows)
+        if deduped_page_rows:
+            batches.append(deduped_page_rows)
+            total_rows += len(deduped_page_rows)
+            oldest = min(normalize_date(row["publish_time"]) for row in deduped_page_rows)
+            if oldest and oldest < start_date:
+                break
+        if total_rows >= direct_history_limit(max_pages, page_size):
+            break
+    return batches
 
 
 def collect_sse_announcements_history(start_date: str, end_date: str, max_pages: int, page_size: int) -> list[dict[str, str]]:
@@ -749,13 +843,71 @@ def iter_kr36_flash_history_batches(
     max_pages: int,
     page_size: int,
 ) -> list[list[dict[str, str]]]:
-    return iter_single_fetch_history_batches(
-        kr36.collect,
-        limit=direct_history_limit(max_pages, page_size),
-        start_date=start_date,
-        end_date=end_date,
-        page_size=page_size,
+    session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            "Origin": "https://www.36kr.com",
+            "Referer": "https://www.36kr.com/newsflashes/catalog/2",
+        }
     )
+    batches: list[list[dict[str, str]]] = []
+    page_callback: str | None = None
+    total_rows = 0
+    for page_index in range(max(1, max_pages)):
+        payload = {
+            "partner_id": "web",
+            "timestamp": int(time.time() * 1000),
+            "param": {
+                "pageSize": max(1, page_size),
+                "pageEvent": 0 if page_index == 0 else 1,
+                "siteId": 1,
+                "type": 2,
+                "platformId": 2,
+            },
+        }
+        if page_callback:
+            payload["param"]["pageCallback"] = page_callback
+        try:
+            response = session.post(KR36_FLASH_API_URL, json=payload, timeout=20)
+            response.raise_for_status()
+            data = response.json().get("data") or {}
+        except Exception as exc:
+            print(f"[history] warn 36kr page={page_index + 1} fetch_failed error={exc}", flush=True)
+            continue
+        item_list = data.get("itemList") or []
+        if not item_list:
+            break
+        page_rows: list[dict[str, str]] = []
+        for item in item_list:
+            material = item.get("templateMaterial", {}) or {}
+            title = strip_tags(str(material.get("widgetTitle") or "")).strip()
+            content = strip_tags(str(material.get("widgetContent") or "")).strip() or title
+            publish_ts = material.get("publishTime")
+            publish_time = datetime.fromtimestamp(int(publish_ts) / 1000).strftime("%Y-%m-%d %H:%M:%S") if publish_ts else ""
+            if not title or not in_date_range(publish_time, start_date, end_date):
+                continue
+            item_id = material.get("itemId") or item.get("itemId")
+            page_rows.append(
+                {
+                    "source": "36氪/股市快讯",
+                    "title": title,
+                    "content": content,
+                    "publish_time": publish_time,
+                    "url": f"https://www.36kr.com/newsflashes/{item_id}" if item_id else "https://www.36kr.com/newsflashes/catalog/2",
+                    "symbol_or_subject": INDUSTRY_EVENT,
+                }
+            )
+        deduped_page_rows = dedupe_rows(page_rows)
+        if deduped_page_rows:
+            batches.append(deduped_page_rows)
+            total_rows += len(deduped_page_rows)
+        page_callback = str(data.get("pageCallback") or "")
+        if not data.get("hasNextPage") or total_rows >= direct_history_limit(max_pages, page_size):
+            break
+    return batches
 
 
 def parse_caixin_list_page(page_index: int, page_size: int) -> list[dict[str, str]]:
@@ -786,7 +938,9 @@ def parse_caixin_article_sync(item: dict[str, str]) -> dict[str, str] | None:
     html = fetch_text(item["url"])
     title = item["title"]
     time_match = re.search(r"([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2})", html)
-    content_match = re.search(r'<meta name="description" content="([^"]+)"/>', html)
+    content_match = re.search(r'<div class="textbox"[^>]*>([\s\S]*?)</div>\s*</div>', html, re.S)
+    if not content_match:
+        content_match = re.search(r'<meta name="description" content="([^"]+)"/>', html)
     publish_time = normalize_datetime(time_match.group(1) if time_match else "")
     content = strip_tags(content_match.group(1)) if content_match else item["summary"]
     return {
@@ -859,7 +1013,9 @@ def parse_yicai_list_page(page_index: int, page_size: int) -> list[dict[str, str
 def parse_yicai_article_sync(item: dict[str, str]) -> dict[str, str] | None:
     html = fetch_text(item["url"])
     time_match = re.search(r"([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2})", html)
-    content_match = re.search(r'<meta name="description" content="([^"]+)"', html)
+    content_match = re.search(r'<div class="m-text"[\s\S]*?<div class="m-txt">([\s\S]*?)</div>\s*</div>', html, re.S)
+    if not content_match:
+        content_match = re.search(r'<meta name="description" content="([^"]+)"', html)
     publish_time = normalize_datetime(time_match.group(1) if time_match else "")
     content = strip_tags(content_match.group(1)) if content_match else item["summary"]
     return {
@@ -1085,6 +1241,22 @@ def dedupe_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     return sorted(unique.values(), key=lambda item: (item["publish_time"], item["url"]))
 
 
+def has_quality_body(row: dict[str, str], min_content_length: int) -> bool:
+    title = str(row.get("title") or "").strip()
+    content = str(row.get("content") or "").strip()
+    if not content or len(content) < max(1, min_content_length):
+        return False
+    if title and content == title:
+        return False
+    if title and content.startswith(title) and len(content) <= len(title) + 40:
+        return False
+    return True
+
+
+def filter_quality_rows(rows: list[dict[str, str]], min_content_length: int) -> list[dict[str, str]]:
+    return [row for row in rows if has_quality_body(row, min_content_length=min_content_length)]
+
+
 def flush_rows_to_db(db: str, pending_rows: list[dict[str, str]]) -> int:
     rows = dedupe_rows(pending_rows)
     return upsert_raw_document_rows(db, rows)
@@ -1121,6 +1293,8 @@ def main(argv: list[str] | None = None) -> None:
         db_flushes = 0
         db_rows_upserted = 0
         for batch_idx, batch in enumerate(batch_rows, start=1):
+            if args.quality_body_only:
+                batch = filter_quality_rows(batch, min_content_length=args.min_content_length)
             rows.extend(batch)
             if args.skip_db_load:
                 print(
@@ -1191,6 +1365,8 @@ def main(argv: list[str] | None = None) -> None:
             ts_code, rows, error = future.result()
             if error:
                 failures.append((ts_code, error))
+            if args.quality_body_only:
+                rows = filter_quality_rows(rows, min_content_length=args.min_content_length)
             all_rows.extend(rows)
             if not args.skip_db_load:
                 pending_flush_rows.extend(rows)

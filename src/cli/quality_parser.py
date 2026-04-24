@@ -32,13 +32,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     raw_coverage_parser = sub.add_parser(
         "raw-coverage",
-        aliases=["sources"],
+        aliases=["sources", "raw"],
         help="show 2025/2026 raw source coverage and fulltext gaps",
     )
     raw_coverage_parser.add_argument("--db", default="stock_event_mining")
     raw_coverage_parser.add_argument("--start-date", default="2025-01-01")
     raw_coverage_parser.add_argument("--end-date", default="2027-01-01")
     raw_coverage_parser.add_argument("--top-n", type=int, default=200)
+
+    raw_categories_parser = sub.add_parser(
+        "normalize-raw-categories",
+        aliases=["raw-categories"],
+        help="normalize raw_documents symbol_or_subject to Appendix-2 event categories",
+    )
+    raw_categories_parser.add_argument("--db", default="stock_event_mining")
+    raw_categories_parser.add_argument("--start-date", default="")
+    raw_categories_parser.add_argument("--end-date", default="")
+    raw_categories_parser.add_argument("--lock-timeout-sec", type=int, default=120)
 
     clean_stage_parser = sub.add_parser("clean-stage", help="truncate rebuildable stage tables")
     clean_stage_parser.add_argument("--db", default="stock_event_mining")

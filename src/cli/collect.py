@@ -14,6 +14,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from cli.collect_parser import build_parser
 from modules.collectors.jobs import cninfo_fulltext_backfill_job, collect_job, history_job
+from modules.collectors.services import full_raw_ingest_service
 from modules.runtime.services.network_env_service import direct_network_only
 from modules.runtime.services.run_metadata_service import logged_run
 
@@ -65,6 +66,9 @@ def run_collect_history_command(args: argparse.Namespace) -> None:
         "--page-size",
         str(args.page_size),
     ]
+    if args.quality_body_only:
+        argv.append("--quality-body-only")
+    argv.extend(["--min-content-length", str(args.min_content_length)])
     if args.skip_db_load:
         argv.append("--skip-db-load")
     if args.cninfo_fulltext:
@@ -135,10 +139,49 @@ def run_cninfo_backfill_command(args: argparse.Namespace) -> None:
             cninfo_fulltext_backfill_job.main(argv)
 
 
+def run_full_raw_command(args: argparse.Namespace) -> None:
+    argv = [
+        "--db",
+        args.db,
+        "--start-date",
+        args.start_date,
+        "--end-date",
+        args.end_date,
+        "--max-jobs",
+        str(args.max_jobs),
+        "--min-content-length",
+        str(args.min_content_length),
+        "--cninfo-max-symbols",
+        str(args.cninfo_max_symbols),
+        "--cninfo-limit-per-symbol",
+        str(args.cninfo_limit_per_symbol),
+        "--cninfo-workers",
+        str(args.cninfo_workers),
+        "--cninfo-backfill-max-rows",
+        str(args.cninfo_backfill_max_rows),
+        "--cninfo-backfill-workers",
+        str(args.cninfo_backfill_workers),
+        "--top-n",
+        str(args.top_n),
+    ]
+    if args.dry_run:
+        argv.append("--dry-run")
+    with logged_run(
+        db_name=args.db,
+        command_group="collect",
+        command_name="full-raw",
+        argv=argv,
+        metadata={"start_date": args.start_date, "end_date": args.end_date, "max_jobs": args.max_jobs},
+    ):
+        with direct_network_only():
+            full_raw_ingest_service.main(argv)
+
+
 COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "collect": run_collect_command,
     "collect-history": run_collect_history_command,
     "backfill-cninfo-fulltext": run_cninfo_backfill_command,
+    "full-raw": run_full_raw_command,
 }
 
 

@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 
+from modules.collectors.domain.source_profiles import history_source_choices
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Collection and fulltext backfill entrypoint.")
@@ -19,21 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     history_parser.add_argument("--db", default="stock_event_mining")
     history_parser.add_argument(
         "--source",
-        choices=[
-            "akshare-news",
-            "cninfo-disclosure",
-            "gov-news",
-            "ndrc-policy",
-            "csrc-policy",
-            "miit-policy",
-            "sse-announcements",
-            "szse-announcements",
-            "szse-suspension",
-            "eastmoney-industry",
-            "kr36-flash",
-            "caixin-mini",
-            "yicai-news",
-        ],
+        choices=history_source_choices(),
         default="akshare-news",
     )
     history_parser.add_argument("--symbol-source", choices=["db", "all-a"], default="db")
@@ -53,6 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
     history_parser.add_argument("--cninfo-fulltext-max-chars", type=int, default=12000)
     history_parser.add_argument("--max-pages", type=int, default=20)
     history_parser.add_argument("--page-size", type=int, default=50)
+    history_parser.add_argument("--quality-body-only", action="store_true")
+    history_parser.add_argument("--min-content-length", type=int, default=300)
 
     backfill_parser = sub.add_parser(
         "backfill-cninfo-fulltext",
@@ -78,4 +68,18 @@ def build_parser() -> argparse.ArgumentParser:
     backfill_parser.add_argument("--db-flush-every", type=int, default=100)
     backfill_parser.add_argument("--fulltext-max-chars", type=int, default=12000)
     backfill_parser.add_argument("--skip-db-load", action="store_true")
+
+    full_raw_parser = sub.add_parser("full-raw", help="run the full 2025/2026 raw ingest, body backfill, and category normalization workflow")
+    full_raw_parser.add_argument("--db", default="stock_event_mining")
+    full_raw_parser.add_argument("--start-date", default="2025-01-01")
+    full_raw_parser.add_argument("--end-date", default="2026-04-23")
+    full_raw_parser.add_argument("--max-jobs", type=int, default=4)
+    full_raw_parser.add_argument("--min-content-length", type=int, default=300)
+    full_raw_parser.add_argument("--cninfo-max-symbols", type=int, default=3000)
+    full_raw_parser.add_argument("--cninfo-limit-per-symbol", type=int, default=120)
+    full_raw_parser.add_argument("--cninfo-workers", type=int, default=24)
+    full_raw_parser.add_argument("--cninfo-backfill-max-rows", type=int, default=30000)
+    full_raw_parser.add_argument("--cninfo-backfill-workers", type=int, default=24)
+    full_raw_parser.add_argument("--top-n", type=int, default=200)
+    full_raw_parser.add_argument("--dry-run", action="store_true")
     return parser

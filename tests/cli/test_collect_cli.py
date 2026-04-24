@@ -25,6 +25,20 @@ class CollectCliTests(unittest.TestCase):
         self.assertEqual(args.progress_every, 10)
         self.assertEqual(args.heartbeat_sec, 5.0)
 
+    def test_parser_supports_history_quality_flags(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["collect-history", "--quality-body-only", "--min-content-length", "400"])
+        self.assertTrue(args.quality_body_only)
+        self.assertEqual(args.min_content_length, 400)
+
+    def test_parser_supports_full_raw(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["full-raw", "--db", "stock_event_mining", "--max-jobs", "6", "--dry-run"])
+        self.assertEqual(args.command, "full-raw")
+        self.assertEqual(args.db, "stock_event_mining")
+        self.assertEqual(args.max_jobs, 6)
+        self.assertTrue(args.dry_run)
+
     @patch.dict("cli.collect.COMMAND_HANDLERS", {"collect": MagicMock()})
     @patch("cli.collect.parse_args")
     def test_main_dispatches_via_handlers(self, mock_parse_args: MagicMock) -> None:
@@ -68,12 +82,16 @@ class CollectCliTests(unittest.TestCase):
         args.skip_db_load = False
         args.cninfo_fulltext = True
         args.cninfo_fulltext_max_chars = 9000
+        args.quality_body_only = True
+        args.min_content_length = 400
 
         collect.run_collect_history_command(args)
 
         argv = mock_history_main.call_args.args[0]
         self.assertIn("--cninfo-fulltext", argv)
         self.assertIn("--db-flush-every", argv)
+        self.assertIn("--quality-body-only", argv)
+        self.assertIn("--min-content-length", argv)
 
     @patch("cli.collect.logged_run")
     @patch("cli.collect.cninfo_fulltext_backfill_job.main")
@@ -108,6 +126,31 @@ class CollectCliTests(unittest.TestCase):
         self.assertIn("--heartbeat-sec", argv)
         self.assertIn("--detail-timeout-sec", argv)
         self.assertIn("--pdf-timeout-sec", argv)
+
+    @patch("cli.collect.logged_run")
+    @patch("cli.collect.full_raw_ingest_service.main")
+    def test_full_raw_handler_calls_service(self, mock_full_raw_main: MagicMock, mock_logged_run: MagicMock) -> None:
+        mock_logged_run.return_value.__enter__.return_value = "collect_run_full"
+        args = MagicMock()
+        args.db = "stock_event_mining"
+        args.start_date = "2025-01-01"
+        args.end_date = "2026-04-23"
+        args.max_jobs = 4
+        args.min_content_length = 300
+        args.cninfo_max_symbols = 3000
+        args.cninfo_limit_per_symbol = 120
+        args.cninfo_workers = 24
+        args.cninfo_backfill_max_rows = 30000
+        args.cninfo_backfill_workers = 24
+        args.top_n = 200
+        args.dry_run = True
+
+        collect.run_full_raw_command(args)
+
+        argv = mock_full_raw_main.call_args.args[0]
+        self.assertIn("--max-jobs", argv)
+        self.assertIn("--dry-run", argv)
+        self.assertIn("--cninfo-backfill-max-rows", argv)
 
 
 if __name__ == "__main__":

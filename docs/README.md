@@ -65,8 +65,8 @@ flowchart TD
 | [governance/storage-retention-policy.md](governance/storage-retention-policy.md) | 哪些表占空间、哪些表能删、哪些不能碰 |
 | [governance/engineering-roadmap.md](governance/engineering-roadmap.md) | 今天真正值得做的事 |
 | [data/classification-contract.md](data/classification-contract.md) | 交付分类口径与字段契约 |
-| [data/raw-source-capability-matrix.md](data/raw-source-capability-matrix.md) | 2025/2026 raw 来源能力、扩量优先级、正文回填边界 |
-| [data/source-expansion-plan.md](data/source-expansion-plan.md) | 基于附件 2 和当前库快照的数据源扩展路径 |
+| [data/raw-source-capability-matrix.md](data/raw-source-capability-matrix.md) | 2025/2026 raw 来源能力、正文质量门槛、source profile 规则 |
+| [data/source-expansion-plan.md](data/source-expansion-plan.md) | 基于附件 2 和当前库快照的数据源扩展路径、四类粗分类与扩量顺序 |
 | [data/templates/README.md](data/templates/README.md) | 所有 seed 模板的目录和说明 |
 
 ## 命名约定

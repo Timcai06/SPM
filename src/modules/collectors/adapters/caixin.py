@@ -45,11 +45,14 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
                 continue
             summary_match = re.search(r"<p>(.*?)</p>", block, re.S)
             time_match = re.search(r"<span>(.*?)</span>", block, re.S)
+            detail_html = fetch_text(url)
+            content_match = re.search(r'<div class="textbox"[^>]*>([\s\S]*?)</div>\s*</div>', detail_html, re.S)
+            content = strip_tags(content_match.group(1)) if content_match else ""
             rows.append(
                 {
                     "source": "财新网/mini",
                     "title": title,
-                    "content": strip_tags(summary_match.group(1)) if summary_match else title,
+                    "content": content or (strip_tags(summary_match.group(1)) if summary_match else title),
                     "publish_time": parse_time(strip_tags(time_match.group(1)) if time_match else ""),
                     "url": url,
                     "symbol_or_subject": MACRO_EVENT,

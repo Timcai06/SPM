@@ -82,6 +82,22 @@ def run_raw_coverage_command(args: argparse.Namespace) -> None:
         storage_governance_job.run_raw_source_coverage(argv)
 
 
+def run_normalize_raw_categories_command(args: argparse.Namespace) -> None:
+    argv = ["--db", args.db, "--lock-timeout-sec", str(args.lock_timeout_sec)]
+    if args.start_date:
+        argv.extend(["--start-date", args.start_date])
+    if args.end_date:
+        argv.extend(["--end-date", args.end_date])
+    with logged_run(
+        db_name=args.db,
+        command_group="quality",
+        command_name="normalize-raw-categories",
+        argv=argv,
+        metadata={"start_date": args.start_date, "end_date": args.end_date},
+    ):
+        storage_governance_job.run_normalize_raw_categories(argv)
+
+
 def run_clean_stage_command(args: argparse.Namespace) -> None:
     argv = ["--db", args.db, "--lock-timeout-sec", str(args.lock_timeout_sec)]
     if args.yes:
@@ -145,6 +161,9 @@ COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "storage-audit": run_storage_audit_command,
     "raw-coverage": run_raw_coverage_command,
     "sources": run_raw_coverage_command,
+    "raw": run_raw_coverage_command,
+    "normalize-raw-categories": run_normalize_raw_categories_command,
+    "raw-categories": run_normalize_raw_categories_command,
     "clean-stage": run_clean_stage_command,
     "qa": run_qa_command,
     "summary": run_qa_command,

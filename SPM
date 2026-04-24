@@ -7,72 +7,42 @@ Usage:
   ./SPM <group> <command> [MAKE_VAR=VALUE ...]
   ./SPM <shortcut> [MAKE_VAR=VALUE ...]
 
-Daily groups:
+Primary groups:
   workflow  full | trial
-  ingest    live | history | backfill
+  ingest    live | history | backfill | full
   event     run | pending | reclassify | canonicalize
   link      run | universe | standard-industries | board-industries | stats | profiles | market | sentiment
   graph     run | load | propagate
   research  feature | train | controls
-  status    summary | sample | db | storage | sources | delivery | check | clean-stage
+  status    summary | sample | db | storage | sources | raw | delivery | check | clean-stage
 
-Compatibility groups:
-  workflow  full | trial
-  collect   live | history | backfill-cninfo
-  events    run | classify-pending | reclassify
-  linking   run | link-events | company-universe | standard-industries | board-industries | stats-import | stats-load | profiles-import | profiles-load | market-env | sentiment-load
-  graph     run | load-relations | propagate
-  research  feature | train-samples | negative-samples
-  quality   summary | check | sample | delivery-status | db | storage-audit | sources | clean-stage
+Primary shortcuts:
+  full          -> workflow full
+  history       -> ingest history
+  backfill      -> ingest backfill
+  event         -> event run
+  train         -> research train
+  controls      -> research controls
+  summary       -> status summary
+  db            -> status db
+  storage       -> status storage
+  sources       -> status sources
+  raw           -> status raw
+  clean-stage   -> status clean-stage
 
-Shortcuts:
-  full                  -> workflow full
-  trial                 -> workflow trial
-  history               -> ingest history
-  backfill              -> ingest backfill
-  event                 -> event run
-  train                 -> research train
-  controls              -> research controls
-  summary               -> status summary
-  sample                -> status sample
-  check                 -> status check
-  db                    -> status db
-  storage               -> status storage
-  sources               -> status sources
-  clean-stage           -> status clean-stage
-  quality               -> status summary
-  collect-live          -> collect live
-  collect-history       -> collect history
-  backfill-cninfo       -> collect backfill-cninfo
-  events                -> events run
-  classify-pending      -> events classify-pending
-  reclassify            -> events reclassify
-  linking               -> linking run
-  link-events           -> linking link-events
-  company-universe      -> linking company-universe
-  standard-industries   -> linking standard-industries
-  board-industries      -> linking board-industries
-  stats-import          -> linking stats-import
-  stats-load            -> linking stats-load
-  profiles-import       -> linking profiles-import
-  profiles-load         -> linking profiles-load
-  market-env            -> linking market-env
-  sentiment-load        -> linking sentiment-load
-  graph                 -> graph run
-  load-relations        -> graph load-relations
-  propagate             -> graph propagate
-  feature               -> research feature
-  train-samples         -> research train-samples
-  negative-samples      -> research negative-samples
+Legacy aliases:
+  Older names are still accepted for compatibility, but are intentionally hidden here.
 
 Examples:
   ./SPM ingest history HISTORY_SOURCE=cninfo-disclosure HISTORY_CNINFO_FULLTEXT=1
+  ./SPM ingest full DB=stock_event_mining
   ./SPM ingest backfill CNINFO_BACKFILL_START=2025-01-01 CNINFO_BACKFILL_END=2026-01-01
   ./SPM event run DB=stock_event_mining LIMIT=20
   ./SPM research feature TIME_BUDGET=300 MAX_ROWS=200
   ./SPM research train DB=stock_event_mining
   ./SPM status db DB=stock_event_mining
   ./SPM status storage DB=stock_event_mining
+  ./SPM status raw DB=stock_event_mining
   ./SPM status sources DB=stock_event_mining
   ./SPM status clean-stage DB=stock_event_mining --yes
 EOF
@@ -110,12 +80,12 @@ is_group() {
 is_group_command() {
   case "$1:$2" in
     workflow:full|workflow:trial) return 0 ;;
-    ingest:live|ingest:history|ingest:backfill) return 0 ;;
+    ingest:live|ingest:history|ingest:backfill|ingest:full) return 0 ;;
     event:run|event:pending|event:reclassify|event:canonicalize) return 0 ;;
     link:run|link:universe|link:standard-industries|link:board-industries|link:stats|link:profiles|link:market|link:sentiment) return 0 ;;
     graph:run|graph:load|graph:propagate) return 0 ;;
     research:feature|research:train|research:controls) return 0 ;;
-    status:summary|status:check|status:sample|status:delivery|status:db|status:storage|status:sources|status:clean-stage) return 0 ;;
+    status:summary|status:check|status:sample|status:delivery|status:db|status:storage|status:sources|status:raw|status:clean-stage) return 0 ;;
     collect:live|collect:history|collect:backfill-cninfo) return 0 ;;
     events:run|events:classify-pending|events:reclassify) return 0 ;;
     linking:run|linking:link-events|linking:company-universe|linking:standard-industries|linking:board-industries|linking:stats-import|linking:stats-load|linking:profiles-import|linking:profiles-load|linking:market-env|linking:sentiment-load) return 0 ;;
@@ -132,6 +102,7 @@ resolve_shortcut() {
     trial) echo "workflow trial" ;;
     history) echo "ingest history" ;;
     backfill) echo "ingest backfill" ;;
+    raw-refresh) echo "ingest full" ;;
     event) echo "event run" ;;
     train) echo "research train" ;;
     controls) echo "research controls" ;;
@@ -140,6 +111,7 @@ resolve_shortcut() {
     check) echo "status check" ;;
     db) echo "status db" ;;
     storage) echo "status storage" ;;
+    raw) echo "status raw" ;;
     sources) echo "status sources" ;;
     clean-stage) echo "status clean-stage" ;;
     quality) echo "status summary" ;;
@@ -220,6 +192,7 @@ case "$group:$command" in
   ingest:live) dispatch_make collect-live "$@" ;;
   ingest:history) dispatch_make collect-history "$@" ;;
   ingest:backfill) dispatch_make backfill-cninfo-fulltext "$@" ;;
+  ingest:full) dispatch_make ingest-full-raw "$@" ;;
 
   event:run) dispatch_make events-run "$@" ;;
   event:pending) dispatch_make classify-pending "$@" ;;
@@ -247,6 +220,7 @@ case "$group:$command" in
   status:db) dispatch_make db-summary "$@" ;;
   status:storage) dispatch_make db-storage-audit "$@" ;;
   status:sources) dispatch_make db-raw-source-audit "$@" ;;
+  status:raw) dispatch_make db-raw-audit "$@" ;;
   status:clean-stage) dispatch_make db-stage-clean "$@" ;;
 
   collect:live) dispatch_make collect-live "$@" ;;
