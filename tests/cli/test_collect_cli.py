@@ -37,6 +37,7 @@ class CollectCliTests(unittest.TestCase):
         self.assertEqual(args.command, "full-raw")
         self.assertEqual(args.db, "stock_event_mining")
         self.assertEqual(args.max_jobs, 6)
+        self.assertEqual(args.target_body_rows, 0)
         self.assertTrue(args.dry_run)
 
     @patch.dict("cli.collect.COMMAND_HANDLERS", {"collect": MagicMock()})
@@ -137,18 +138,23 @@ class CollectCliTests(unittest.TestCase):
         args.end_date = "2026-04-23"
         args.max_jobs = 4
         args.min_content_length = 300
+        args.target_body_rows = 2000
         args.cninfo_max_symbols = 3000
         args.cninfo_limit_per_symbol = 120
         args.cninfo_workers = 24
         args.cninfo_backfill_max_rows = 30000
         args.cninfo_backfill_workers = 24
         args.top_n = 200
+        args.force = True
         args.dry_run = True
 
         collect.run_full_raw_command(args)
 
         argv = mock_full_raw_main.call_args.args[0]
         self.assertIn("--max-jobs", argv)
+        self.assertIn("--target-body-rows", argv)
+        self.assertIn("2000", argv)
+        self.assertIn("--force", argv)
         self.assertIn("--dry-run", argv)
         self.assertIn("--cninfo-backfill-max-rows", argv)
 

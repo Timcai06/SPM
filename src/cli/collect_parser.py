@@ -75,11 +75,13 @@ def build_parser() -> argparse.ArgumentParser:
     full_raw_parser.add_argument("--end-date", default="2026-04-23")
     full_raw_parser.add_argument("--max-jobs", type=int, default=4)
     full_raw_parser.add_argument("--min-content-length", type=int, default=300)
+    full_raw_parser.add_argument("--target-body-rows", type=int, default=0)
     full_raw_parser.add_argument("--cninfo-max-symbols", type=int, default=3000)
     full_raw_parser.add_argument("--cninfo-limit-per-symbol", type=int, default=120)
     full_raw_parser.add_argument("--cninfo-workers", type=int, default=24)
     full_raw_parser.add_argument("--cninfo-backfill-max-rows", type=int, default=30000)
     full_raw_parser.add_argument("--cninfo-backfill-workers", type=int, default=24)
     full_raw_parser.add_argument("--top-n", type=int, default=200)
+    full_raw_parser.add_argument("--force", action="store_true")
     full_raw_parser.add_argument("--dry-run", action="store_true")
     return parser

@@ -87,7 +87,7 @@ RAW_AUDIT_END ?= 2027-01-01
 RAW_AUDIT_TOP_N ?= 200
 RAW_REFRESH_START ?= 2025-01-01
 RAW_REFRESH_END ?= 2026-04-23
-RAW_REFRESH_TARGET_ROWS ?= 5000
+RAW_REFRESH_TARGET_BODY_ROWS ?= 2000
 RAW_REFRESH_MAX_JOBS ?= 4
 RAW_REFRESH_MIN_CONTENT_LENGTH ?= 300
 RAW_REFRESH_CNINFO_MAX_SYMBOLS ?= 3000
@@ -95,6 +95,7 @@ RAW_REFRESH_CNINFO_LIMIT_PER_SYMBOL ?= 120
 RAW_REFRESH_CNINFO_WORKERS ?= 24
 RAW_REFRESH_CNINFO_BACKFILL_ROWS ?= 30000
 RAW_REFRESH_CNINFO_BACKFILL_WORKERS ?= 24
+RAW_REFRESH_FORCE ?= 0
 
 FEATURE_TOKEN_ARG :=
 ifeq ($(USE_TUSHARE),1)
@@ -354,12 +355,14 @@ ingest-full-raw:
 	  --end-date $(RAW_REFRESH_END) \
 	  --max-jobs $(RAW_REFRESH_MAX_JOBS) \
 	  --min-content-length $(RAW_REFRESH_MIN_CONTENT_LENGTH) \
+	  --target-body-rows $(RAW_REFRESH_TARGET_BODY_ROWS) \
 	  --cninfo-max-symbols $(RAW_REFRESH_CNINFO_MAX_SYMBOLS) \
 	  --cninfo-limit-per-symbol $(RAW_REFRESH_CNINFO_LIMIT_PER_SYMBOL) \
 	  --cninfo-workers $(RAW_REFRESH_CNINFO_WORKERS) \
 	  --cninfo-backfill-max-rows $(RAW_REFRESH_CNINFO_BACKFILL_ROWS) \
 	  --cninfo-backfill-workers $(RAW_REFRESH_CNINFO_BACKFILL_WORKERS) \
-	  --top-n $(RAW_AUDIT_TOP_N)
+	  --top-n $(RAW_AUDIT_TOP_N) \
+	  $(if $(filter 1,$(RAW_REFRESH_FORCE)),--force,)
 
 research-base-pipeline: collect-history classify-pending link-events db-summary
 

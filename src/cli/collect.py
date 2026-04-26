@@ -151,6 +151,8 @@ def run_full_raw_command(args: argparse.Namespace) -> None:
         str(args.max_jobs),
         "--min-content-length",
         str(args.min_content_length),
+        "--target-body-rows",
+        str(args.target_body_rows),
         "--cninfo-max-symbols",
         str(args.cninfo_max_symbols),
         "--cninfo-limit-per-symbol",
@@ -164,6 +166,8 @@ def run_full_raw_command(args: argparse.Namespace) -> None:
         "--top-n",
         str(args.top_n),
     ]
+    if args.force:
+        argv.append("--force")
     if args.dry_run:
         argv.append("--dry-run")
     with logged_run(

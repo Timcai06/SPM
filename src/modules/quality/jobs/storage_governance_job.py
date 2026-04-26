@@ -10,7 +10,7 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
-from modules.collectors.domain.source_profiles import iter_source_pattern_rows
+from modules.collectors.domain.source_profiles import iter_replenish_pattern_rows, iter_source_pattern_rows
 from modules.runtime.adapters.db import dsn_for
 from modules.runtime.adapters.db import write_guard
 
@@ -20,15 +20,17 @@ INSPECT_SQL_PATH = ROOT / "sql" / "inspect_storage_footprint.sql"
 
 
 SOURCE_PATTERN_ROWS = iter_source_pattern_rows()
-REPLENISH_SOURCE_PATTERN_ROWS = iter_source_pattern_rows(include_cninfo=False)
+REPLENISH_SOURCE_PATTERN_ROWS = iter_replenish_pattern_rows()
 
 
-def _source_pattern_values_sql(rows: list[tuple[str, str, str, str, bool, str]] | None = None) -> str:
+def _source_pattern_values_sql(rows: list[tuple] | None = None) -> str:
     selected = SOURCE_PATTERN_ROWS if rows is None else rows
-    return ",\n                ".join(["(%s, %s, %s, %s, %s, %s)"] * len(selected))
+    if not selected:
+        return ""
+    return ",\n                ".join(["(" + ", ".join(["%s"] * len(selected[0])) + ")"] * len(selected))
 
 
-def _source_pattern_params(rows: list[tuple[str, str, str, str, bool, str]] | None = None) -> list[object]:
+def _source_pattern_params(rows: list[tuple] | None = None) -> list[object]:
     selected = SOURCE_PATTERN_ROWS if rows is None else rows
     params: list[object] = []
     for row in selected:
@@ -373,7 +375,7 @@ def _fetch_replenish_progress(
     return _fetch_all(
         conn,
         f"""
-        WITH targets(history_source, source_family, source_pattern, raw_event_category, body_capable, note) AS (
+        WITH targets(history_source, source_family, source_pattern, raw_event_category, body_capable, note, target_rows, collector_family) AS (
             VALUES
                 {values_sql}
         ),
@@ -399,27 +401,37 @@ def _fetch_replenish_progress(
                 t.history_source,
                 t.body_capable,
                 t.note,
+                t.target_rows,
+                t.collector_family,
                 COALESCE(SUM(sc.current_rows), 0) AS current_rows,
                 COALESCE(SUM(sc.qualified_rows), 0) AS qualified_rows,
                 COALESCE(SUM(sc.strong_body_rows), 0) AS strong_body_rows
             FROM targets t
             LEFT JOIN source_counts sc
               ON sc.source LIKE t.source_pattern
-            GROUP BY t.history_source, t.body_capable, t.note
+            GROUP BY t.history_source, t.body_capable, t.note, t.target_rows, t.collector_family
         )
         SELECT
             history_source,
+            collector_family,
             body_capable,
+            target_rows,
             current_rows,
             qualified_rows,
             strong_body_rows,
             CASE
-                WHEN body_capable THEN GREATEST(5000 - strong_body_rows, 0)
-                ELSE NULL
+                WHEN target_rows <= 0 THEN 0
+                ELSE GREATEST(target_rows - strong_body_rows, 0)
             END AS gap_to_target,
+            CASE
+                WHEN target_rows <= 0 THEN 'run_backfill_if_needed'
+                WHEN strong_body_rows >= target_rows THEN 'skip_target_met'
+                WHEN body_capable THEN 'ingest_full_will_collect_body'
+                ELSE 'ingest_full_will_expand_coverage_for_body'
+            END AS next_ingest_action,
             note
         FROM counts
-        ORDER BY body_capable DESC, strong_body_rows DESC, current_rows DESC
+        ORDER BY body_capable DESC, gap_to_target DESC, current_rows DESC
         """,
         (*_source_pattern_params(REPLENISH_SOURCE_PATTERN_ROWS), start_date, end_date),
     )
@@ -508,18 +520,30 @@ def _print_raw_dashboard(
     body_priority = [
         {
             "history_source": row["history_source"],
+            "family": row["collector_family"],
+            "target": _format_int(row["target_rows"]),
             "current": _format_int(row["current_rows"]),
             "strong": _format_int(row["strong_body_rows"]),
             "gap": _format_int(row["gap_to_target"]),
+            "next": row["next_ingest_action"],
             "note": row["note"],
         }
         for row in replenish_rows
         if bool(row["body_capable"])
     ]
     _print_table(
-        "Priority:补正文+扩量",
+        "Priority:正文源补到目标",
         body_priority,
-        [("history_source", "source"), ("current", "rows"), ("strong", "strong"), ("gap", "gap"), ("note", "note")],
+        [
+            ("history_source", "source"),
+            ("family", "family"),
+            ("target", "target"),
+            ("current", "rows"),
+            ("strong", "strong"),
+            ("gap", "gap"),
+            ("next", "next_ingest"),
+            ("note", "note"),
+        ],
     )
 
     coverage_priority = []
@@ -529,15 +553,30 @@ def _print_raw_dashboard(
         coverage_priority.append(
             {
                 "history_source": row["history_source"],
+                "family": row["collector_family"],
+                "target": _format_int(row["target_rows"]),
                 "current": _format_int(row["current_rows"]),
                 "qualified": _format_int(row["qualified_rows"]),
+                "strong": _format_int(row["strong_body_rows"]),
+                "gap": _format_int(row["gap_to_target"]),
+                "next": row["next_ingest_action"],
                 "note": row["note"],
             }
         )
     _print_table(
-        "Priority:补覆盖",
+        "Priority:非强正文源补到目标",
         coverage_priority,
-        [("history_source", "source"), ("current", "rows"), ("qualified", "qualified"), ("note", "note")],
+        [
+            ("history_source", "source"),
+            ("family", "family"),
+            ("target", "target"),
+            ("current", "rows"),
+            ("qualified", "qualified"),
+            ("strong", "strong"),
+            ("gap", "gap"),
+            ("next", "next_ingest"),
+            ("note", "note"),
+        ],
     )
 
     action_priority: list[dict[str, object]] = []

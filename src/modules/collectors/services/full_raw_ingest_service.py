@@ -7,9 +7,18 @@ import argparse
 import shlex
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
-from modules.collectors.domain.source_profiles import RAW_HISTORY_SOURCE_PROFILES, RawHistorySourceProfile
+import psycopg
+from psycopg.rows import dict_row
+
+from modules.collectors.domain.source_profiles import (
+    RAW_HISTORY_SOURCE_PROFILES,
+    RawHistorySourceProfile,
+    profile_by_history_source,
+)
+from modules.runtime.adapters.db import dsn_for
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -24,14 +33,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--end-date", default="2026-04-23")
     parser.add_argument("--max-jobs", type=int, default=4)
     parser.add_argument("--min-content-length", type=int, default=300)
+    parser.add_argument("--target-body-rows", type=int, default=0, help="Override the per-source strong body target; 0 uses each source profile default.")
     parser.add_argument("--cninfo-max-symbols", type=int, default=3000)
     parser.add_argument("--cninfo-limit-per-symbol", type=int, default=120)
     parser.add_argument("--cninfo-workers", type=int, default=24)
     parser.add_argument("--cninfo-backfill-max-rows", type=int, default=30000)
     parser.add_argument("--cninfo-backfill-workers", type=int, default=24)
     parser.add_argument("--top-n", type=int, default=200)
+    parser.add_argument("--force", action="store_true", help="Run every source even when current rows already meet the profile target.")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
+
+
+@dataclass(frozen=True)
+class SourceProgress:
+    current_rows: int = 0
+    strong_body_rows: int = 0
 
 
 def _python_cmd(*parts: object) -> list[str]:
@@ -39,13 +56,14 @@ def _python_cmd(*parts: object) -> list[str]:
 
 
 def _cninfo_history_cmd(args: argparse.Namespace) -> list[str]:
+    profile = _profile_by_source("cninfo-disclosure")
     return _python_cmd(
         COLLECT_CLI,
         "collect-history",
         "--db",
         args.db,
         "--source",
-        "cninfo-disclosure",
+        profile.history_source,
         "--start-date",
         args.start_date,
         "--end-date",
@@ -107,7 +125,7 @@ def _history_cmd(args: argparse.Namespace, profile: RawHistorySourceProfile) -> 
         "--min-content-length",
         args.min_content_length,
     )
-    if profile.body_quality_required:
+    if profile.requires_body:
         cmd.append("--quality-body-only")
     return cmd
 
@@ -170,6 +188,128 @@ def _quote_cmd(cmd: list[str]) -> str:
     return shlex.join(cmd)
 
 
+def _profile_by_source(history_source: str) -> RawHistorySourceProfile:
+    return profile_by_history_source(history_source)
+
+
+def _mode_label(profile: RawHistorySourceProfile) -> str:
+    return "symbol" if profile.symbol_mode else "direct"
+
+
+def _target_rows(args: argparse.Namespace, profile: RawHistorySourceProfile) -> int:
+    if profile.target_rows <= 0:
+        return profile.target_rows
+    return args.target_body_rows if args.target_body_rows > 0 else profile.target_rows
+
+
+def _target_label(args: argparse.Namespace, profile: RawHistorySourceProfile) -> str:
+    target_rows = _target_rows(args, profile)
+    return "unbounded" if target_rows <= 0 else str(target_rows)
+
+
+def _target_metric(profile: RawHistorySourceProfile) -> str:
+    return "strong_body_rows"
+
+
+def _progress_value(profile: RawHistorySourceProfile, progress: SourceProgress) -> int:
+    return progress.strong_body_rows
+
+
+def _gap_to_target(args: argparse.Namespace, profile: RawHistorySourceProfile, progress: SourceProgress) -> int:
+    target_rows = _target_rows(args, profile)
+    if target_rows <= 0:
+        return 0
+    return max(target_rows - _progress_value(profile, progress), 0)
+
+
+def _should_run_profile(args: argparse.Namespace, profile: RawHistorySourceProfile, progress: SourceProgress | None) -> bool:
+    if args.force or _target_rows(args, profile) <= 0 or progress is None:
+        return True
+    return _gap_to_target(args, profile, progress) > 0
+
+
+def _strategy_label(profile: RawHistorySourceProfile) -> str:
+    if profile.allow_backfill and profile.requires_body:
+        return "backfill+body+coverage"
+    if profile.allow_backfill:
+        return "backfill+coverage"
+    if profile.requires_body:
+        return "body+coverage"
+    return "coverage"
+
+
+def _fetch_progress(args: argparse.Namespace) -> dict[str, SourceProgress] | None:
+    rows: dict[str, SourceProgress] = {}
+    try:
+        with psycopg.connect(dsn_for(args.db), row_factory=dict_row) as conn:
+            for profile in RAW_HISTORY_SOURCE_PROFILES:
+                pattern_clauses = " OR ".join(["source LIKE %s"] * len(profile.source_patterns))
+                params: list[object] = [args.start_date, args.end_date, *profile.source_patterns]
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""
+                        SELECT
+                            COUNT(*) AS current_rows,
+                            COUNT(*) FILTER (
+                                WHERE LENGTH(COALESCE(content, '')) >= %s
+                                  AND BTRIM(COALESCE(content, '')) <> BTRIM(COALESCE(title, ''))
+                            ) AS strong_body_rows
+                        FROM raw_documents
+                        WHERE publish_time >= %s::timestamp
+                          AND publish_time < %s::timestamp
+                          AND ({pattern_clauses})
+                        """,
+                        [args.min_content_length, *params],
+                    )
+                    row = cur.fetchone() or {}
+                rows[profile.history_source] = SourceProgress(
+                    current_rows=int(row.get("current_rows") or 0),
+                    strong_body_rows=int(row.get("strong_body_rows") or 0),
+                )
+    except Exception as exc:
+        print(f"[full-raw] warn progress_probe_failed error={exc}; running all profile sources", flush=True)
+        return None
+    return rows
+
+
+def _progress_label(args: argparse.Namespace, profile: RawHistorySourceProfile, progress: SourceProgress | None) -> str:
+    if progress is None:
+        return "current=? metric=? gap=?"
+    current_value = _progress_value(profile, progress)
+    if _target_rows(args, profile) <= 0:
+        gap = "unbounded"
+    else:
+        gap = str(_gap_to_target(args, profile, progress))
+    return f"current={current_value} metric={_target_metric(profile)} gap={gap}"
+
+
+def _print_plan(args: argparse.Namespace, progress_by_source: dict[str, SourceProgress] | None) -> None:
+    print(
+        f"[full-raw] plan db={args.db} window={args.start_date}..{args.end_date} "
+        f"max_jobs={args.max_jobs} min_content_length={args.min_content_length} force={int(args.force)}",
+        flush=True,
+    )
+    cninfo = _profile_by_source("cninfo-disclosure")
+    print(
+        "[full-raw] source "
+        f"{cninfo.history_source} family={cninfo.collector_family} mode={_mode_label(cninfo)} "
+        f"category={cninfo.raw_event_category} target={_target_label(args, cninfo)} "
+        f"strategy={_strategy_label(cninfo)} note={cninfo.note}",
+        flush=True,
+    )
+    for profile in RAW_HISTORY_SOURCE_PROFILES:
+        progress = progress_by_source.get(profile.history_source) if progress_by_source is not None else None
+        action = "run" if _should_run_profile(args, profile, progress) else "skip"
+        print(
+            "[full-raw] source "
+            f"{profile.history_source} family={profile.collector_family} mode={_mode_label(profile)} "
+            f"category={profile.raw_event_category} target={_target_label(args, profile)} "
+            f"strategy={_strategy_label(profile)} action={action} {_progress_label(args, profile, progress)} note={profile.note}",
+            flush=True,
+        )
+    print("[full-raw] post_steps normalize_raw_categories -> raw_status", flush=True)
+
+
 def _run(cmd: list[str], *, dry_run: bool) -> None:
     print(f"[full-raw] run {_quote_cmd(cmd)}")
     if dry_run:
@@ -177,7 +317,7 @@ def _run(cmd: list[str], *, dry_run: bool) -> None:
     subprocess.run(cmd, cwd=ROOT, check=True)
 
 
-def _run_profile_batch(args: argparse.Namespace) -> None:
+def _run_profile_batch(args: argparse.Namespace, progress_by_source: dict[str, SourceProgress] | None) -> None:
     running: list[tuple[RawHistorySourceProfile, subprocess.Popen]] = []
 
     def wait_one() -> None:
@@ -187,8 +327,21 @@ def _run_profile_batch(args: argparse.Namespace) -> None:
             raise subprocess.CalledProcessError(code, _history_cmd(args, profile))
 
     for profile in RAW_HISTORY_SOURCE_PROFILES:
+        progress = progress_by_source.get(profile.history_source) if progress_by_source is not None else None
+        if not _should_run_profile(args, profile, progress):
+            print(
+                f"[full-raw] skip {profile.history_source} "
+                f"target={_target_label(args, profile)} {_progress_label(args, profile, progress)}",
+                flush=True,
+            )
+            continue
         cmd = _history_cmd(args, profile)
-        print(f"[full-raw] start {profile.history_source} - {profile.note}")
+        print(
+            f"[full-raw] start {profile.history_source} "
+            f"family={profile.collector_family} mode={_mode_label(profile)} "
+            f"target={_target_label(args, profile)} strategy={_strategy_label(profile)} {_progress_label(args, profile, progress)}",
+            flush=True,
+        )
         print(f"[full-raw] run {_quote_cmd(cmd)}")
         if args.dry_run:
             continue
@@ -202,8 +355,10 @@ def _run_profile_batch(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
+    progress_by_source = _fetch_progress(args)
+    _print_plan(args, progress_by_source)
     _run(_cninfo_history_cmd(args), dry_run=args.dry_run)
-    _run_profile_batch(args)
+    _run_profile_batch(args, progress_by_source)
     _run(_cninfo_backfill_cmd(args), dry_run=args.dry_run)
     _run(_normalize_cmd(args), dry_run=args.dry_run)
     _run(_raw_status_cmd(args), dry_run=args.dry_run)
