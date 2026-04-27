@@ -32,6 +32,8 @@ class RunMetadataServiceTests(unittest.TestCase):
             self.assertEqual(run_id, "run_123")
 
         mock_start.assert_called_once()
+        self.assertIn("process_id", mock_start.call_args.kwargs["metadata"])
+        self.assertIn("working_directory", mock_start.call_args.kwargs["metadata"])
         mock_finish.assert_called_once()
         self.assertEqual(mock_finish.call_args.kwargs["status"], "success")
 

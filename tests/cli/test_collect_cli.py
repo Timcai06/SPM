@@ -151,12 +151,14 @@ class CollectCliTests(unittest.TestCase):
         collect.run_full_raw_command(args)
 
         argv = mock_full_raw_main.call_args.args[0]
+        metadata = mock_logged_run.call_args.kwargs["metadata"]
         self.assertIn("--max-jobs", argv)
         self.assertIn("--target-body-rows", argv)
         self.assertIn("2000", argv)
         self.assertIn("--force", argv)
         self.assertIn("--dry-run", argv)
         self.assertIn("--cninfo-backfill-max-rows", argv)
+        self.assertEqual(metadata["network_contract"], "direct_network_only")
 
 
 if __name__ == "__main__":

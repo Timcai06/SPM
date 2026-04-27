@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import os
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,14 @@ from modules.runtime.adapters import db_repository
 
 def resolve_run_id(explicit_run_id: str = "") -> str:
     return explicit_run_id.strip() or datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
+
+def _with_runtime_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    merged = dict(metadata or {})
+    merged.setdefault("process_id", os.getpid())
+    merged.setdefault("parent_process_id", os.getppid())
+    merged.setdefault("working_directory", str(Path.cwd()))
+    return merged
 
 
 @contextmanager
@@ -34,7 +43,7 @@ def logged_run(
             command_group=command_group,
             command_name=command_name,
             argv=argv,
-            metadata=metadata,
+            metadata=_with_runtime_metadata(metadata),
         )
     try:
         yield run_id

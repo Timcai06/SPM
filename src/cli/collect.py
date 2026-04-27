@@ -19,6 +19,12 @@ from modules.runtime.services.network_env_service import direct_network_only
 from modules.runtime.services.run_metadata_service import logged_run
 
 
+DIRECT_NETWORK_METADATA = {
+    "network_contract": "direct_network_only",
+    "proxy_environment": "cleared_in_process",
+}
+
+
 def parse_args() -> argparse.Namespace:
     return build_parser().parse_args()
 
@@ -79,7 +85,7 @@ def run_collect_history_command(args: argparse.Namespace) -> None:
         command_group="collect",
         command_name="collect-history",
         argv=argv,
-        metadata={"source": args.source, "symbol_source": args.symbol_source},
+        metadata={**DIRECT_NETWORK_METADATA, "source": args.source, "symbol_source": args.symbol_source},
     ):
         with direct_network_only():
             history_job.main(argv)
@@ -133,7 +139,7 @@ def run_cninfo_backfill_command(args: argparse.Namespace) -> None:
         command_group="collect",
         command_name="backfill-cninfo-fulltext",
         argv=argv,
-        metadata={"source": args.source, "start_date": args.start_date, "end_date": args.end_date},
+        metadata={**DIRECT_NETWORK_METADATA, "source": args.source, "start_date": args.start_date, "end_date": args.end_date},
     ):
         with direct_network_only():
             cninfo_fulltext_backfill_job.main(argv)
@@ -175,7 +181,7 @@ def run_full_raw_command(args: argparse.Namespace) -> None:
         command_group="collect",
         command_name="full-raw",
         argv=argv,
-        metadata={"start_date": args.start_date, "end_date": args.end_date, "max_jobs": args.max_jobs},
+        metadata={**DIRECT_NETWORK_METADATA, "start_date": args.start_date, "end_date": args.end_date, "max_jobs": args.max_jobs},
     ):
         with direct_network_only():
             full_raw_ingest_service.main(argv)
