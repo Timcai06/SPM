@@ -73,7 +73,7 @@ async def parse_article(url: str, session: object | None = None) -> Optional[Dic
 async def collect(limit: int = 10) -> List[Dict[str, str]]:
     import aiohttp
     import asyncio
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         items = await parse_list(limit, session=session)
         tasks = [parse_article(item["url"], session=session) for item in items]
         results = await asyncio.gather(*tasks)

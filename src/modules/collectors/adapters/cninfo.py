@@ -31,7 +31,8 @@ def get_session() -> requests.Session:
     session = getattr(_THREAD_LOCAL, "session", None)
     if session is None:
         session = requests.Session()
-        adapter = HTTPAdapter(pool_connections=32, pool_maxsize=32, max_retries=0)
+        session.trust_env = False
+        adapter = HTTPAdapter(pool_connections=64, pool_maxsize=64, max_retries=0)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
         _THREAD_LOCAL.session = session
@@ -41,7 +42,7 @@ def get_session() -> requests.Session:
 async def collect(limit: int = 20, lookback_days: int = 5) -> List[Dict[str, str]]:
     import aiohttp
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         from modules.collectors.domain.common import fetch_json_post_async
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=lookback_days)

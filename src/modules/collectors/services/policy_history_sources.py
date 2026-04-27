@@ -7,10 +7,8 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urljoin
 
-import requests
-
 from modules.collectors.adapters import csrc
-from modules.collectors.domain.common import fetch_text, strip_tags
+from modules.collectors.domain.common import fetch_text, get_http_session, strip_tags
 from modules.collectors.domain.history_dates import direct_history_limit, in_date_range, normalize_date, normalize_datetime
 from modules.collectors.domain.history_rows import dedupe_rows
 from modules.collectors.domain.raw_event_categories import POLICY_EVENT
@@ -213,6 +211,7 @@ def iter_csrc_policy_history_batches(
     end_date: str,
     max_pages: int,
     page_size: int,
+    workers: int = 8,
 ) -> list[list[dict[str, str]]]:
     batches: list[list[dict[str, str]]] = []
     total_rows = 0
@@ -221,10 +220,16 @@ def iter_csrc_policy_history_batches(
         if not items:
             break
         page_rows: list[dict[str, str]] = []
-        for item in items:
-            row = parse_csrc_article_sync(item)
-            if row and in_date_range(row["publish_time"], start_date, end_date):
-                page_rows.append(row)
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            futures = [pool.submit(parse_csrc_article_sync, item) for item in items]
+            for future in as_completed(futures):
+                try:
+                    row = future.result()
+                except Exception as exc:
+                    print(f"[history] warn csrc detail fetch_failed error={exc}", flush=True)
+                    continue
+                if row and in_date_range(row["publish_time"], start_date, end_date):
+                    page_rows.append(row)
         deduped_page_rows = dedupe_rows(page_rows)
         if deduped_page_rows:
             batches.append(deduped_page_rows)
@@ -273,7 +278,7 @@ def _fetch_miit_search_page(page_num: int, page_size: int, start_date: str, end_
         "sortFields": "deploytime:desc",
         "p": str(page_num),
     }
-    response = requests.get(
+    response = get_http_session().get(
         MIIT_SEARCH_INFO_URL,
         params=params,
         headers={"User-Agent": "Mozilla/5.0"},

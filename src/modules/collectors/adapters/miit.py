@@ -36,7 +36,7 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
     import aiohttp
     import asyncio
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         html = await fetch_text_async(MIIT_HOME_URL, session=session)
         pattern = re.compile(r'<a[^>]+href="(?P<href>[^"]+)"[^>]*>(?P<title>[^<]{6,120})</a>', re.S)
         rows: List[Dict[str, str]] = []

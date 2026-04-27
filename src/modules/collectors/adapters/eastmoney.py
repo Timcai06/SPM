@@ -48,7 +48,7 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
     import aiohttp
     import asyncio
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         html = await fetch_text_async(EASTMONEY_INDUSTRY_URL, session=session)
         links = re.findall(r'https://finance\.eastmoney\.com/a/[0-9]+\.html', html)
         rows: List[Dict[str, str]] = []

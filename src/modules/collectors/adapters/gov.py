@@ -61,7 +61,7 @@ async def collect(limit: int = 10, include_non_keyword: bool = False) -> List[Di
     import json
     import asyncio
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         list_text = await fetch_text_async(GOV_LIST_URL, session=session)
         payload = json.loads(list_text)
         selected = []

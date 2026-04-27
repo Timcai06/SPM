@@ -32,7 +32,7 @@ def parse_time(value: str) -> str:
 async def collect(limit: int = 20) -> List[Dict[str, str]]:
     import aiohttp
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         html = await fetch_text_async(YICAI_NEWS_URL, session=session)
         pattern = re.compile(r'<a href="(?P<href>/news/[0-9]+\.html)"[^>]*>\s*<div class="m-list[\s\S]*?</a>', re.S)
         rows: List[Dict[str, str]] = []

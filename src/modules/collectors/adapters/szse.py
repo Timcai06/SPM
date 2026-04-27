@@ -14,7 +14,7 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
     import aiohttp
     import json
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         url = f"{SZSE_LIST_URL}?random=0.1&pageSize={limit}&pageNum=1&plateCode=szse"
         text = await fetch_text_async(url, session=session)
         payload = json.loads(text)

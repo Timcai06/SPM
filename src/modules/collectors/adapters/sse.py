@@ -14,7 +14,7 @@ async def collect(limit: int = 20) -> List[Dict[str, str]]:
     import aiohttp
     import json
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         text = await fetch_text_async(SSE_LIST_URL, session=session)
         payload = json.loads(text)
         rows: List[Dict[str, str]] = []

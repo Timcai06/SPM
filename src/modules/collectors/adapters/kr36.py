@@ -25,7 +25,7 @@ def extract_initial_state(html: str) -> Optional[Dict[str, object]]:
 async def collect(limit: int = 20) -> List[Dict[str, str]]:
     import aiohttp
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         html = await fetch_text_async(KR36_FLASH_STOCK_URL, session=session)
         state = extract_initial_state(html)
         if not state:

@@ -5,9 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
-import requests
-
-from modules.collectors.domain.common import fetch_text, strip_tags
+from modules.collectors.domain.common import fetch_text, get_http_session, strip_tags
 from modules.collectors.domain.history_dates import direct_history_limit, in_date_range, normalize_datetime
 from modules.collectors.domain.history_rows import dedupe_rows
 from modules.collectors.domain.raw_event_categories import INDUSTRY_EVENT, MACRO_EVENT
@@ -97,16 +95,13 @@ def iter_kr36_flash_history_batches(
     max_pages: int,
     page_size: int,
 ) -> list[list[dict[str, str]]]:
-    session = requests.Session()
-    session.headers.update(
-        {
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json, text/plain, */*",
-            "Content-Type": "application/json",
-            "Origin": "https://www.36kr.com",
-            "Referer": "https://www.36kr.com/newsflashes/catalog/2",
-        }
-    )
+    session = get_http_session()
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "Origin": "https://www.36kr.com",
+        "Referer": "https://www.36kr.com/newsflashes/catalog/2",
+    }
     batches: list[list[dict[str, str]]] = []
     page_callback: str | None = None
     total_rows = 0
@@ -125,7 +120,7 @@ def iter_kr36_flash_history_batches(
         if page_callback:
             payload["param"]["pageCallback"] = page_callback
         try:
-            response = session.post(KR36_FLASH_API_URL, json=payload, timeout=20)
+            response = session.post(KR36_FLASH_API_URL, json=payload, headers=headers, timeout=20)
             response.raise_for_status()
             data = response.json().get("data") or {}
         except Exception as exc:

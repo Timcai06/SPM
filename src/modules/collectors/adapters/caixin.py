@@ -26,7 +26,7 @@ def parse_time(value: str) -> str:
 async def collect(limit: int = 20) -> List[Dict[str, str]]:
     import aiohttp
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=False) as session:
         html = await fetch_text_async(CAIXIN_MINI_URL, session=session)
         pattern = re.compile(r'<div class="boxa">([\s\S]*?)</div></div>', re.S)
         rows: List[Dict[str, str]] = []
