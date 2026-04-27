@@ -146,6 +146,7 @@ class CollectCliTests(unittest.TestCase):
         args.cninfo_backfill_workers = 24
         args.top_n = 200
         args.force = True
+        args.fail_fast = True
         args.dry_run = True
 
         collect.run_full_raw_command(args)
@@ -156,6 +157,7 @@ class CollectCliTests(unittest.TestCase):
         self.assertIn("--target-body-rows", argv)
         self.assertIn("2000", argv)
         self.assertIn("--force", argv)
+        self.assertIn("--fail-fast", argv)
         self.assertIn("--dry-run", argv)
         self.assertIn("--cninfo-backfill-max-rows", argv)
         self.assertEqual(metadata["network_contract"], "direct_network_only")

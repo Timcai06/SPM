@@ -41,6 +41,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--cninfo-backfill-workers", type=int, default=32)
     parser.add_argument("--top-n", type=int, default=200)
     parser.add_argument("--force", action="store_true", help="Run every source even when current rows already meet the profile target.")
+    parser.add_argument("--fail-fast", action="store_true", help="Stop the whole workflow when any source collection subprocess fails.")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
 
@@ -377,12 +378,16 @@ def _build_collection_tasks(
 
 def _run_collection_tasks(args: argparse.Namespace, tasks: list[CollectionTask]) -> None:
     running: list[tuple[CollectionTask, subprocess.Popen]] = []
+    failures: list[tuple[CollectionTask, int]] = []
 
     def wait_one() -> None:
         task, proc = running.pop(0)
         code = proc.wait()
         if code != 0:
-            raise subprocess.CalledProcessError(code, task.cmd)
+            failures.append((task, code))
+            print(f"[full-raw] warn source_failed source={task.name} exit_code={code}", flush=True)
+            if args.fail_fast:
+                raise subprocess.CalledProcessError(code, task.cmd)
 
     def stop_running() -> None:
         for task, proc in running:
@@ -420,6 +425,9 @@ def _run_collection_tasks(args: argparse.Namespace, tasks: list[CollectionTask])
     except BaseException:
         stop_running()
         raise
+    if failures:
+        failed_sources = ",".join(task.name for task, _code in failures)
+        print(f"[full-raw] source_failures count={len(failures)} sources={failed_sources}", flush=True)
 
 
 def main(argv: list[str] | None = None) -> None:

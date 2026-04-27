@@ -11,7 +11,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from modules.collectors.services.exchange_history_sources import _fill_pdf_bodies
+from modules.collectors.services.exchange_history_sources import _fill_pdf_bodies, iter_sse_announcements_history_batches
 
 
 class ExchangeHistorySourceTests(unittest.TestCase):
@@ -34,6 +34,19 @@ class ExchangeHistorySourceTests(unittest.TestCase):
         self.assertEqual(len(updated), 1)
         self.assertGreater(len(updated[0]["content"]), len(rows[0]["content"]))
         self.assertIn("交易所公告 PDF 正文", updated[0]["content"])
+
+    @patch("modules.collectors.services.exchange_history_sources.fetch_text")
+    def test_sse_history_returns_empty_batches_when_list_fetch_fails(self, mock_fetch_text) -> None:
+        mock_fetch_text.side_effect = RuntimeError("ssl eof")
+
+        batches = iter_sse_announcements_history_batches(
+            start_date="2026-04-20",
+            end_date="2026-04-27",
+            max_pages=1,
+            page_size=50,
+        )
+
+        self.assertEqual([], batches)
 
 
 if __name__ == "__main__":

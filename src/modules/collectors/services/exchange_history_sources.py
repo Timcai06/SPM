@@ -48,8 +48,14 @@ def iter_sse_announcements_history_batches(
     page_size: int,
     workers: int = 8,
 ) -> list[list[dict[str, str]]]:
-    text = fetch_text(f"{SSE_HISTORY_URL}?pageHelp.pageSize={max(200, direct_history_limit(max_pages, page_size))}&pageHelp.pageNo=1")
-    payload = json.loads(text)
+    try:
+        text = fetch_text(
+            f"{SSE_HISTORY_URL}?pageHelp.pageSize={max(200, direct_history_limit(max_pages, page_size))}&pageHelp.pageNo=1"
+        )
+        payload = json.loads(text)
+    except Exception as exc:
+        print(f"[history] warn sse fetch_failed error={exc}", flush=True)
+        return []
     rows: list[dict[str, str]] = []
     for item in payload.get("publishData", []):
         disclose_date = str(item.get("discloseDate") or "").strip()

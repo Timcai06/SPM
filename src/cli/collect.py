@@ -174,6 +174,8 @@ def run_full_raw_command(args: argparse.Namespace) -> None:
     ]
     if args.force:
         argv.append("--force")
+    if args.fail_fast:
+        argv.append("--fail-fast")
     if args.dry_run:
         argv.append("--dry-run")
     with logged_run(

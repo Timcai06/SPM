@@ -83,5 +83,6 @@ def build_parser() -> argparse.ArgumentParser:
     full_raw_parser.add_argument("--cninfo-backfill-workers", type=int, default=32)
     full_raw_parser.add_argument("--top-n", type=int, default=200)
     full_raw_parser.add_argument("--force", action="store_true")
+    full_raw_parser.add_argument("--fail-fast", action="store_true")
     full_raw_parser.add_argument("--dry-run", action="store_true")
     return parser
