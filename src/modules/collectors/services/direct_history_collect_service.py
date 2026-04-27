@@ -33,7 +33,7 @@ def _without_workers(collector: Callable[[str, str, int, int], list[list[dict[st
 
 def _szse(suspension_only: bool) -> BatchCollector:
     def wrapper(start_date: str, end_date: str, max_pages: int, page_size: int, workers: int) -> list[list[dict[str, str]]]:
-        return iter_szse_history_batches(start_date, end_date, max_pages, page_size, suspension_only=suspension_only)
+        return iter_szse_history_batches(start_date, end_date, max_pages, page_size, suspension_only=suspension_only, workers=workers)
 
     return wrapper
 
@@ -41,9 +41,9 @@ def _szse(suspension_only: bool) -> BatchCollector:
 _DIRECT_HISTORY_COLLECTOR_IMPLEMENTATIONS: dict[str, BatchCollector] = {
     "gov-news": iter_gov_news_history_batches,
     "ndrc-policy": iter_ndrc_policy_history_batches,
-    "csrc-policy": _without_workers(iter_csrc_policy_history_batches),
+    "csrc-policy": iter_csrc_policy_history_batches,
     "miit-policy": _without_workers(iter_miit_policy_history_batches),
-    "sse-announcements": _without_workers(iter_sse_announcements_history_batches),
+    "sse-announcements": iter_sse_announcements_history_batches,
     "szse-announcements": _szse(suspension_only=False),
     "szse-suspension": _szse(suspension_only=True),
     "eastmoney-industry": iter_eastmoney_industry_history_batches,

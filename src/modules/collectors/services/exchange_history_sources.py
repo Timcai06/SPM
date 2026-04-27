@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
+from modules.collectors.adapters import cninfo
 from modules.collectors.domain.common import fetch_text, strip_tags
 from modules.collectors.domain.history_dates import chunked_rows, direct_history_limit, in_date_range, normalize_date, normalize_datetime
 from modules.collectors.domain.history_rows import dedupe_rows
@@ -12,6 +14,31 @@ from modules.collectors.domain.raw_event_categories import COMPANY_EVENT
 SSE_HISTORY_URL = "https://www.sse.com.cn/disclosure/listedinfo/announcement/json/stock_bulletin_publish_order.json"
 SZSE_HISTORY_URL = "https://www.szse.cn/api/disc/announcement/detailinfo"
 SUSPENSION_KEYWORDS = ("停牌", "复牌", "停复牌")
+PDF_TEXT_MAX_CHARS = 12000
+PDF_TEXT_TIMEOUT_SEC = 18.0
+
+
+def _with_pdf_body(row: dict[str, str]) -> dict[str, str]:
+    url = str(row.get("url") or "").strip()
+    if not url:
+        return row
+    try:
+        text = cninfo.extract_pdf_text(url, max_chars=PDF_TEXT_MAX_CHARS, request_timeout_sec=PDF_TEXT_TIMEOUT_SEC)
+    except Exception:
+        return row
+    if len(text) > len(row.get("content") or ""):
+        updated = dict(row)
+        updated["content"] = text
+        return updated
+    return row
+
+
+def _fill_pdf_bodies(rows: list[dict[str, str]], workers: int) -> list[dict[str, str]]:
+    if not rows:
+        return rows
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        futures = [pool.submit(_with_pdf_body, row) for row in rows]
+        return [future.result() for future in as_completed(futures)]
 
 
 def iter_sse_announcements_history_batches(
@@ -19,6 +46,7 @@ def iter_sse_announcements_history_batches(
     end_date: str,
     max_pages: int,
     page_size: int,
+    workers: int = 8,
 ) -> list[list[dict[str, str]]]:
     text = fetch_text(f"{SSE_HISTORY_URL}?pageHelp.pageSize={max(200, direct_history_limit(max_pages, page_size))}&pageHelp.pageNo=1")
     payload = json.loads(text)
@@ -51,6 +79,7 @@ def iter_sse_announcements_history_batches(
         )
         if len(rows) >= direct_history_limit(max_pages, page_size):
             break
+    rows = _fill_pdf_bodies(rows, workers=workers)
     return [dedupe_rows(batch) for batch in chunked_rows(rows, page_size)]
 
 
@@ -65,6 +94,7 @@ def iter_szse_history_batches(
     max_pages: int,
     page_size: int,
     suspension_only: bool,
+    workers: int = 8,
 ) -> list[list[dict[str, str]]]:
     batches: list[list[dict[str, str]]] = []
     total_rows = 0
@@ -114,7 +144,7 @@ def iter_szse_history_batches(
                         "symbol_or_subject": COMPANY_EVENT,
                     }
                 )
-        deduped_page_rows = dedupe_rows(page_rows)
+        deduped_page_rows = dedupe_rows(_fill_pdf_bodies(page_rows, workers=workers))
         if deduped_page_rows:
             batches.append(deduped_page_rows)
             total_rows += len(deduped_page_rows)

@@ -25,7 +25,7 @@ class RawHistorySourceProfile:
     requires_body: bool = False
     allow_backfill: bool = False
     max_pages: int = 200
-    workers: int = 16
+    workers: int = 24
     symbol_mode: bool = False
     max_symbols: int = 0
     limit_per_symbol: int = 0
@@ -118,6 +118,7 @@ RAW_HISTORY_SOURCE_PROFILES: tuple[RawHistorySourceProfile, ...] = (
         source_patterns=("上交所/%", "上交所"),
         note="交易所公告：先补覆盖",
         collector_family="exchange",
+        workers=16,
     ),
     RawHistorySourceProfile(
         history_source="szse-announcements",
@@ -126,6 +127,7 @@ RAW_HISTORY_SOURCE_PROFILES: tuple[RawHistorySourceProfile, ...] = (
         source_patterns=("深交所/上市公司公告",),
         note="交易所公告：先补覆盖",
         collector_family="exchange",
+        workers=16,
     ),
     RawHistorySourceProfile(
         history_source="szse-suspension",

@@ -31,14 +31,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--db", default="stock_event_mining")
     parser.add_argument("--start-date", default="2025-01-01")
     parser.add_argument("--end-date", default="2026-04-23")
-    parser.add_argument("--max-jobs", type=int, default=4)
+    parser.add_argument("--max-jobs", type=int, default=6)
     parser.add_argument("--min-content-length", type=int, default=300)
     parser.add_argument("--target-body-rows", type=int, default=0, help="Override the per-source strong body target; 0 uses each source profile default.")
     parser.add_argument("--cninfo-max-symbols", type=int, default=3000)
     parser.add_argument("--cninfo-limit-per-symbol", type=int, default=120)
-    parser.add_argument("--cninfo-workers", type=int, default=24)
+    parser.add_argument("--cninfo-workers", type=int, default=32)
     parser.add_argument("--cninfo-backfill-max-rows", type=int, default=30000)
-    parser.add_argument("--cninfo-backfill-workers", type=int, default=24)
+    parser.add_argument("--cninfo-backfill-workers", type=int, default=32)
     parser.add_argument("--top-n", type=int, default=200)
     parser.add_argument("--force", action="store_true", help="Run every source even when current rows already meet the profile target.")
     parser.add_argument("--dry-run", action="store_true")
@@ -49,6 +49,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 class SourceProgress:
     current_rows: int = 0
     strong_body_rows: int = 0
+
+
+@dataclass(frozen=True)
+class CollectionTask:
+    name: str
+    family: str
+    mode: str
+    target: str
+    strategy: str
+    progress: str
+    cmd: list[str]
 
 
 def _python_cmd(*parts: object) -> list[str]:
@@ -317,15 +328,40 @@ def _run(cmd: list[str], *, dry_run: bool) -> None:
     subprocess.run(cmd, cwd=ROOT, check=True)
 
 
-def _run_profile_batch(args: argparse.Namespace, progress_by_source: dict[str, SourceProgress] | None) -> None:
-    running: list[tuple[RawHistorySourceProfile, subprocess.Popen]] = []
+def _cninfo_collection_task(args: argparse.Namespace) -> CollectionTask:
+    profile = _profile_by_source("cninfo-disclosure")
+    return CollectionTask(
+        name=profile.history_source,
+        family=profile.collector_family,
+        mode=_mode_label(profile),
+        target=_target_label(args, profile),
+        strategy=_strategy_label(profile),
+        progress="current=? metric=unbounded gap=unbounded",
+        cmd=_cninfo_history_cmd(args),
+    )
 
-    def wait_one() -> None:
-        profile, proc = running.pop(0)
-        code = proc.wait()
-        if code != 0:
-            raise subprocess.CalledProcessError(code, _history_cmd(args, profile))
 
+def _profile_collection_task(
+    args: argparse.Namespace,
+    profile: RawHistorySourceProfile,
+    progress: SourceProgress | None,
+) -> CollectionTask:
+    return CollectionTask(
+        name=profile.history_source,
+        family=profile.collector_family,
+        mode=_mode_label(profile),
+        target=_target_label(args, profile),
+        strategy=_strategy_label(profile),
+        progress=_progress_label(args, profile, progress),
+        cmd=_history_cmd(args, profile),
+    )
+
+
+def _build_collection_tasks(
+    args: argparse.Namespace,
+    progress_by_source: dict[str, SourceProgress] | None,
+) -> list[CollectionTask]:
+    tasks = [_cninfo_collection_task(args)]
     for profile in RAW_HISTORY_SOURCE_PROFILES:
         progress = progress_by_source.get(profile.history_source) if progress_by_source is not None else None
         if not _should_run_profile(args, profile, progress):
@@ -335,30 +371,62 @@ def _run_profile_batch(args: argparse.Namespace, progress_by_source: dict[str, S
                 flush=True,
             )
             continue
-        cmd = _history_cmd(args, profile)
-        print(
-            f"[full-raw] start {profile.history_source} "
-            f"family={profile.collector_family} mode={_mode_label(profile)} "
-            f"target={_target_label(args, profile)} strategy={_strategy_label(profile)} {_progress_label(args, profile, progress)}",
-            flush=True,
-        )
-        print(f"[full-raw] run {_quote_cmd(cmd)}")
-        if args.dry_run:
-            continue
-        running.append((profile, subprocess.Popen(cmd, cwd=ROOT)))
-        while len(running) >= args.max_jobs:
-            wait_one()
+        tasks.append(_profile_collection_task(args, profile, progress))
+    return tasks
 
-    while running:
-        wait_one()
+
+def _run_collection_tasks(args: argparse.Namespace, tasks: list[CollectionTask]) -> None:
+    running: list[tuple[CollectionTask, subprocess.Popen]] = []
+
+    def wait_one() -> None:
+        task, proc = running.pop(0)
+        code = proc.wait()
+        if code != 0:
+            raise subprocess.CalledProcessError(code, task.cmd)
+
+    def stop_running() -> None:
+        for task, proc in running:
+            if proc.poll() is None:
+                print(f"[full-raw] terminate {task.name} pid={proc.pid}", flush=True)
+                proc.terminate()
+        for task, proc in running:
+            if proc.poll() is not None:
+                continue
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                print(f"[full-raw] kill {task.name} pid={proc.pid}", flush=True)
+                proc.kill()
+        running.clear()
+
+    print(f"[full-raw] collection_queue tasks={len(tasks)} max_jobs={args.max_jobs}", flush=True)
+    try:
+        for task in tasks:
+            print(
+                f"[full-raw] start {task.name} "
+                f"family={task.family} mode={task.mode} target={task.target} "
+                f"strategy={task.strategy} {task.progress}",
+                flush=True,
+            )
+            print(f"[full-raw] run {_quote_cmd(task.cmd)}")
+            if args.dry_run:
+                continue
+            running.append((task, subprocess.Popen(task.cmd, cwd=ROOT)))
+            while len(running) >= args.max_jobs:
+                wait_one()
+
+        while running:
+            wait_one()
+    except BaseException:
+        stop_running()
+        raise
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     progress_by_source = _fetch_progress(args)
     _print_plan(args, progress_by_source)
-    _run(_cninfo_history_cmd(args), dry_run=args.dry_run)
-    _run_profile_batch(args, progress_by_source)
+    _run_collection_tasks(args, _build_collection_tasks(args, progress_by_source))
     _run(_cninfo_backfill_cmd(args), dry_run=args.dry_run)
     _run(_normalize_cmd(args), dry_run=args.dry_run)
     _run(_raw_status_cmd(args), dry_run=args.dry_run)
